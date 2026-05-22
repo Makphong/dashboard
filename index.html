@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard (No Node.js)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      * {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      *::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+      }
+      .no-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      @keyframes vizOverlayEnter {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes vizPanelEnter {
+        from {
+          opacity: 0;
+          transform: translateY(12px) scale(0.985);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      .viz-overlay-enter {
+        animation: vizOverlayEnter 180ms ease-out;
+      }
+      .viz-panel-enter {
+        animation: vizPanelEnter 220ms ease-out;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+          "lucide-react": "https://esm.sh/lucide-react@0.469.0?external=react",
+          "firebase/app": "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js",
+          "firebase/auth": "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js",
+          "firebase/firestore": "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js"
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel" data-type="module" data-presets="react" src="./app.jsx?v=20260522-23"></script>
+  </body>
+</html>
