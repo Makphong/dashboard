@@ -22,8 +22,79 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "local_dashboard.db"
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
-APP_VERSION = "2026-05-22-debug-2"
+APP_VERSION = "2026-05-24-perf-1"
 SERVER_STARTED_AT = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+ALGORITHM_VERSION = "1.3_RAW_3_TIME_GROUP_EDIT_COMPLETED_SAME_TIMESTAMP_HANDOFF_PROCESSING_BACKFILL_1"
+
+# In-memory caches for expensive reads; invalidated on upload/delete.
+_NORMALIZED_EVENTS_CACHE_SIGNATURE: tuple[int, int] | None = None
+_NORMALIZED_EVENTS_CACHE_VALUE: list[dict] | None = None
+_USER_PERFORMANCE_CACHE_SIGNATURE: tuple[int, int] | None = None
+_USER_PERFORMANCE_CACHE_VALUE: dict | None = None
+
+WORKFLOW_STATE_ORDER = [
+    "Uploading",
+    "Processing",
+    "Pending Review by Moodys",
+    "In Review by Moodys",
+    "Pending Re-Review by Moodys",
+    "Completed",
+]
+
+WORKFLOW_STATES = set(WORKFLOW_STATE_ORDER)
+PENDING_STATES = {"Pending Review by Moodys", "Pending Re-Review by Moodys"}
+IN_REVIEW_STATE = "In Review by Moodys"
+COMPLETED_STATE = "Completed"
+
+SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES = {
+    "AI Account Mapping",
+    "Account Value",
+    "Mapped Account",
+    "Remapped Account",
+    "Unmapped Account",
+    "Spread Metadata",
+}
+USER_EDIT_CHANGE_TYPES = {
+    "Account Value",
+    "Mapped Account",
+    "Remapped Account",
+    "Unmapped Account",
+    "Spread Metadata",
+}
+
+SYSTEM_TIME_SEGMENT_TYPES = {
+    "SYSTEM_INITIAL_PROCESSING",
+    "SYSTEM_SCHEDULED_REPROCESSING",
+    "SYSTEM_INTERNAL_TRANSITION",
+    "AUTO_TIMEOUT_MARKER",
+}
+USER_TIME_SEGMENT_TYPES = {
+    "USER_UPLOADING",
+    "USER_REVIEW_AUTO_TIMEOUT",
+    "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL",
+    "USER_COMPLETION_APPROVAL",
+    "USER_EDITING_CORRECTION",
+    "USER_REVIEW_COMMENT_CHECK",
+}
+IDLE_TIME_SEGMENT_TYPES = {
+    "IDLE_WAITING_FOR_REVIEW",
+    "IDLE_WAITING_FOR_REREVIEW",
+    "IDLE_WAITING_FOR_SCHEDULED_REPROCESS",
+    "IDLE_AFTER_SYSTEM_REPROCESS",
+    "POST_COMPLETED_ELAPSED",
+    "UNKNOWN_OR_LOW_CONFIDENCE",
+}
+
+CORE_USER_SESSION_SEGMENT_TYPES = {
+    "USER_REVIEW_AUTO_TIMEOUT",
+    "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL",
+    "USER_COMPLETION_APPROVAL",
+    "USER_EDITING_CORRECTION",
+    "USER_REVIEW_COMMENT_CHECK",
+}
+
+SESSION_TIMEOUT_MINUTES_DEFAULT = 35
+ACTIVITY_GRACE_MINUTES_DEFAULT = 10
 
 PENDING_REVIEW_STATUSES = {
     "pendingreviewbymoodys",
@@ -46,6 +117,31 @@ DATE_NUMBER_FORMAT_IDS = {
 }
 
 FIELD_ALIASES = {
+    "change_type": {
+        "changetype",
+        "change",
+        "actiontype",
+        "action",
+    },
+    "statement_type": {
+        "statementtype",
+        "statement",
+    },
+    "changed_value": {
+        "value",
+        "changedvalue",
+        "field",
+    },
+    "from_value": {
+        "from",
+        "fromvalue",
+        "oldvalue",
+    },
+    "to_value": {
+        "to",
+        "tovalue",
+        "newvalue",
+    },
     "event_time": {
         "eventtime",
         "timestamp",
@@ -105,11 +201,9 @@ FIELD_ALIASES = {
         "event",
         "operation",
         "eventtype",
-        "actiontype",
         "detail",
         "description",
-        "changetype",
-        "statementtype",
+        "actiontype",
     },
     "submitted_for_reanalysis": {
         "submittedforreanalysis",
@@ -168,45 +262,49 @@ def normalize_text(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value).lower())
 
 
-def status_bucket(status: str | None) -> str:
-    token = normalize_text(status)
-    if token in PENDING_REREVIEW_STATUSES:
-        return "pending_rereview"
-    if token in PENDING_REVIEW_STATUSES:
-        return "pending_review"
-    if token in IN_REVIEW_STATUSES:
-        return "in_review"
-    if token in COMPLETED_STATUSES:
-        return "completed"
+def canonicalize_workflow_state(value: str | None) -> str:
+    token = normalize_text(value)
+    if not token:
+        return ""
+    if "upload" in token:
+        return "Uploading"
+    if "process" in token:
+        return "Processing"
+    if token in PENDING_REREVIEW_STATUSES or "pendingrereview" in token:
+        return "Pending Re-Review by Moodys"
+    if token in PENDING_REVIEW_STATUSES or "pendingreview" in token:
+        return "Pending Review by Moodys"
+    if token in IN_REVIEW_STATUSES or "inreview" in token:
+        return "In Review by Moodys"
+    if token in COMPLETED_STATUSES or "complete" in token:
+        return "Completed"
+    return str(value).strip() if value is not None else ""
 
-    if "pendingrereview" in token:
+
+def status_bucket(status: str | None) -> str:
+    canonical = canonicalize_workflow_state(status)
+    token = normalize_text(canonical)
+    if token == normalize_text("Pending Re-Review by Moodys"):
         return "pending_rereview"
-    if "pendingreview" in token:
+    if token == normalize_text("Pending Review by Moodys"):
         return "pending_review"
-    if "inreview" in token:
+    if token == normalize_text("In Review by Moodys"):
         return "in_review"
-    if "complete" in token:
+    if token == normalize_text("Completed"):
         return "completed"
+    if token == normalize_text("Uploading"):
+        return "uploading"
+    if token == normalize_text("Processing"):
+        return "processing"
     return "other"
 
 
 def looks_like_workflow_status(value: str | None) -> bool:
-    token = normalize_text(value)
-    if not token:
-        return False
-    return (
-        "pendingreview" in token
-        or "pendingrereview" in token
-        or "inreview" in token
-        or "complete" in token
-    )
+    return bool(canonicalize_workflow_state(value))
 
 
 def normalize_workflow_status(value: str | None) -> str:
-    text = str(value).strip() if value is not None else ""
-    if not text:
-        return ""
-    return text if looks_like_workflow_status(text) else ""
+    return canonicalize_workflow_state(value)
 
 
 def is_upload_status(value: str | None) -> bool:
@@ -217,13 +315,17 @@ def is_upload_status(value: str | None) -> bool:
 def infer_actor_type(actor_type: str | None, actor_name: str | None) -> str:
     joined = f"{actor_type or ''} {actor_name or ''}".lower()
     if "system" in joined or "ai " in joined or joined.startswith("ai"):
-        return "system"
+        return "System"
     if "user" in joined or "cognize" in joined or "moodys" in joined:
-        return "user"
+        return "User"
     if (actor_name or "").strip():
         # In most audit files, non-system named actors are human users.
-        return "user"
-    return "unknown"
+        return "User"
+    return "User"
+
+
+def seconds_between(end_time: dt.datetime, start_time: dt.datetime) -> float:
+    return max(0.0, (end_time - start_time).total_seconds())
 
 
 def parse_bool(value) -> bool:
@@ -330,6 +432,30 @@ def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def current_unified_rows_signature(conn: sqlite3.Connection | None = None) -> tuple[int, int]:
+    owns_conn = conn is None
+    local_conn = conn or get_conn()
+    try:
+        row = local_conn.execute(
+            "SELECT COUNT(*) AS c, COALESCE(MAX(row_id), 0) AS max_row_id FROM unified_rows"
+        ).fetchone()
+        count = int(row["c"] if row else 0)
+        max_row_id = int(row["max_row_id"] if row else 0)
+        return count, max_row_id
+    finally:
+        if owns_conn:
+            local_conn.close()
+
+
+def invalidate_runtime_caches() -> None:
+    global _NORMALIZED_EVENTS_CACHE_SIGNATURE, _NORMALIZED_EVENTS_CACHE_VALUE
+    global _USER_PERFORMANCE_CACHE_SIGNATURE, _USER_PERFORMANCE_CACHE_VALUE
+    _NORMALIZED_EVENTS_CACHE_SIGNATURE = None
+    _NORMALIZED_EVENTS_CACHE_VALUE = None
+    _USER_PERFORMANCE_CACHE_SIGNATURE = None
+    _USER_PERFORMANCE_CACHE_VALUE = None
 
 
 def init_db() -> None:
@@ -694,6 +820,7 @@ def ingest_file(file_name: str, payload: bytes) -> dict:
             (total_rows, len(pages), source_id),
         )
 
+    invalidate_runtime_caches()
     return {
         "source_id": source_id,
         "file_name": file_name,
@@ -743,6 +870,7 @@ def delete_source(source_id: str) -> None:
         conn.execute("DELETE FROM unified_rows WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM source_pages WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
+    invalidate_runtime_caches()
 
 
 def build_canonical_map(row: dict) -> dict[str, object]:
@@ -752,15 +880,43 @@ def build_canonical_map(row: dict) -> dict[str, object]:
     return result
 
 
-def pick_field(row: dict, aliases: set[str]):
-    canonical = build_canonical_map(row)
+def pick_field(row: dict, aliases: set[str], canonical: dict[str, object] | None = None):
+    canonical_row = canonical if canonical is not None else build_canonical_map(row)
     for alias in aliases:
-        if alias in canonical:
-            return canonical[alias]
+        if alias in canonical_row:
+            return canonical_row[alias]
     return None
 
 
-def fetch_normalized_events() -> list[dict]:
+def assign_time_group(
+    segment_type: str,
+    actor_type: str,
+    is_milestone: bool = False,
+    metric_only: bool = False,
+    is_queue_wait: bool = False,
+) -> tuple[str, str, str, bool]:
+    if segment_type in SYSTEM_TIME_SEGMENT_TYPES:
+        return "System", "SYSTEM_SEGMENT_TYPE", "SYSTEM_ACTIVE_TIME", not (metric_only or is_milestone)
+    if segment_type in USER_TIME_SEGMENT_TYPES:
+        return "User", "USER_SEGMENT_TYPE", "USER_ACTIVE_TIME", not (metric_only or is_milestone)
+    if segment_type in IDLE_TIME_SEGMENT_TYPES:
+        original_bucket = "QUEUE_OR_SCHEDULED_WAIT_TIME" if is_queue_wait else "IDLE_WAITING_TIME"
+        return "Idle Time", "IDLE_SEGMENT_TYPE", original_bucket, not (metric_only or is_milestone)
+    if segment_type in {"REOPEN_MARKER", "REOPEN_TO_REVIEW_HANDOFF_MARKER"}:
+        group = "User" if actor_type == "User" else "System"
+        return group, "REOPEN_OR_HANDOFF_MARKER_BY_ACTOR", "MILESTONE_OR_MARKER", False
+    return "Idle Time", "UNKNOWN_FALLBACK_TO_IDLE", "UNKNOWN_OR_LOW_CONFIDENCE", not (metric_only or is_milestone)
+
+
+def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[dict]:
+    global _NORMALIZED_EVENTS_CACHE_SIGNATURE, _NORMALIZED_EVENTS_CACHE_VALUE
+    cache_signature = signature or current_unified_rows_signature()
+    if (
+        _NORMALIZED_EVENTS_CACHE_VALUE is not None
+        and _NORMALIZED_EVENTS_CACHE_SIGNATURE == cache_signature
+    ):
+        return [event.copy() for event in _NORMALIZED_EVENTS_CACHE_VALUE]
+
     with get_conn() as conn:
         rows = conn.execute(
             """
@@ -770,120 +926,803 @@ def fetch_normalized_events() -> list[dict]:
             """
         ).fetchall()
 
-    events = []
+    events: list[dict] = []
     for db_row in rows:
         try:
             raw = json.loads(db_row["data_json"])
         except json.JSONDecodeError:
             raw = {}
+        canonical = build_canonical_map(raw)
 
-        event_time_raw = pick_field(raw, FIELD_ALIASES["event_time"])
-        event_time = parse_datetime(event_time_raw)
+        event_time = parse_datetime(pick_field(raw, FIELD_ALIASES["event_time"], canonical))
         if not event_time:
             continue
 
-        actor_type_raw = pick_field(raw, FIELD_ALIASES["actor_type"])
-        actor_name_raw = pick_field(raw, FIELD_ALIASES["actor_name"])
-        from_status_raw = pick_field(raw, FIELD_ALIASES["from_status"])
-        to_status_raw = pick_field(raw, FIELD_ALIASES["to_status"])
-        document_id = pick_field(raw, FIELD_ALIASES["document_id"])
-        action_type_raw = pick_field(raw, FIELD_ALIASES["action_type"])
-        submitted_for_reanalysis = parse_bool(
-            pick_field(raw, FIELD_ALIASES["submitted_for_reanalysis"])
-        )
-        auto_closed = parse_bool(pick_field(raw, FIELD_ALIASES["auto_closed"]))
-        timeout_minutes = parse_int(pick_field(raw, FIELD_ALIASES["timeout_minutes"]))
-
+        actor_name_raw = pick_field(raw, FIELD_ALIASES["actor_name"], canonical)
+        actor_type_raw = pick_field(raw, FIELD_ALIASES["actor_type"], canonical)
         actor_name = str(actor_name_raw).strip() if actor_name_raw is not None else ""
         actor_type = infer_actor_type(
             str(actor_type_raw).strip() if actor_type_raw is not None else "",
             actor_name,
         )
-        doc_id = (
-            str(document_id).strip()
-            if document_id is not None and str(document_id).strip()
+
+        change_type_raw = pick_field(raw, FIELD_ALIASES["change_type"], canonical)
+        if change_type_raw is None:
+            change_type_raw = pick_field(raw, FIELD_ALIASES["action_type"], canonical)
+        statement_type_raw = pick_field(raw, FIELD_ALIASES["statement_type"], canonical)
+        changed_value_raw = pick_field(raw, FIELD_ALIASES["changed_value"], canonical)
+        from_value_raw = pick_field(raw, FIELD_ALIASES["from_value"], canonical)
+        to_value_raw = pick_field(raw, FIELD_ALIASES["to_value"], canonical)
+
+        change_type = str(change_type_raw).strip() if change_type_raw is not None else ""
+        statement_type = str(statement_type_raw).strip() if statement_type_raw is not None else ""
+        changed_value_text = str(changed_value_raw).strip() if changed_value_raw is not None else ""
+        from_status_text = str(from_value_raw).strip() if from_value_raw is not None else ""
+        to_status_text = str(to_value_raw).strip() if to_value_raw is not None else ""
+
+        is_status_event = (
+            normalize_text(change_type) == "spreadstatus"
+            and normalize_text(changed_value_text) == "status"
+        )
+        workflow_from_state = canonicalize_workflow_state(from_status_text) if is_status_event else ""
+        workflow_to_state = canonicalize_workflow_state(to_status_text) if is_status_event else ""
+
+        document_id_raw = pick_field(raw, FIELD_ALIASES["document_id"], canonical)
+        document_id = (
+            str(document_id_raw).strip()
+            if document_id_raw is not None and str(document_id_raw).strip()
             else f"{db_row['file_name']}::{db_row['page_name']}"
         )
-        action_type = str(action_type_raw).strip() if action_type_raw is not None else ""
-
-        from_status_text = str(from_status_raw).strip() if from_status_raw is not None else ""
-        to_status_text = str(to_status_raw).strip() if to_status_raw is not None else ""
-
-        is_spread_status_row = "status" in normalize_text(action_type)
-        from_status = normalize_workflow_status(from_status_text)
-        to_status = normalize_workflow_status(to_status_text)
-
-        # Keep status boundaries only for workflow transitions.
-        if is_spread_status_row and not from_status and looks_like_workflow_status(from_status_text):
-            from_status = from_status_text
-        if is_spread_status_row and not to_status and looks_like_workflow_status(to_status_text):
-            to_status = to_status_text
 
         events.append(
             {
+                "event_id": f"{db_row['file_name']}::{db_row['page_name']}#{db_row['row_number']}",
                 "source_id": db_row["source_id"],
                 "file_name": db_row["file_name"],
                 "page_name": db_row["page_name"],
-                "row_number": db_row["row_number"],
+                "row_number": int(db_row["row_number"]),
                 "event_time": event_time,
-                "actor_name": actor_name or "Unknown User",
+                "actor_name": actor_name or ("System" if actor_type == "System" else "Unknown User"),
                 "actor_type": actor_type,
-                "from_status": from_status,
-                "to_status": to_status,
+                "document_id": document_id,
+                "change_type": change_type,
+                "statement_type": statement_type,
+                "changed_value": changed_value_raw,
+                "from_value": from_value_raw,
+                "to_value": to_value_raw,
+                "from_status": workflow_from_state,
+                "to_status": workflow_to_state,
                 "from_status_raw": from_status_text,
                 "to_status_raw": to_status_text,
-                "document_id": doc_id,
-                "action_type": action_type,
-                "submitted_for_reanalysis": submitted_for_reanalysis,
-                "auto_closed": auto_closed,
-                "timeout_minutes": timeout_minutes,
+                "action_type": change_type,
+                "submitted_for_reanalysis": parse_bool(
+                    pick_field(raw, FIELD_ALIASES["submitted_for_reanalysis"], canonical)
+                ),
+                "auto_closed": parse_bool(pick_field(raw, FIELD_ALIASES["auto_closed"], canonical)),
+                "timeout_minutes": parse_int(pick_field(raw, FIELD_ALIASES["timeout_minutes"], canonical)),
+                "is_status_event": is_status_event,
+                "is_detail_event": not is_status_event,
+                "order_index": -1,
                 "raw": raw,
             }
         )
-    return events
+    _NORMALIZED_EVENTS_CACHE_SIGNATURE = cache_signature
+    _NORMALIZED_EVENTS_CACHE_VALUE = events
+    return [event.copy() for event in events]
+
+
+def is_system_evidence(event: dict) -> bool:
+    if event["actor_type"] == "System" and event["change_type"] in SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES:
+        return True
+    if (
+        event["actor_type"] == "System"
+        and event["is_status_event"]
+        and event["from_status"] in PENDING_STATES
+        and event["to_status"] == IN_REVIEW_STATE
+    ):
+        return True
+    if (
+        event["actor_type"] == "System"
+        and event["is_status_event"]
+        and event["from_status"] == IN_REVIEW_STATE
+        and event["to_status"] == COMPLETED_STATE
+    ):
+        return True
+    if (
+        event["actor_type"] == "System"
+        and event["is_status_event"]
+        and event["from_status"] == "Processing"
+    ):
+        return True
+    return False
+
+
+def first_system_evidence(events: list[dict]) -> dict | None:
+    for event in sorted(events, key=lambda item: item["order_index"]):
+        if is_system_evidence(event):
+            return event
+    return None
+
+
+def previous_system_event_before(events: list[dict], before_order_index: int) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] < before_order_index and event["actor_type"] == "System"
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[-1]
+
+
+def next_system_detail_after(events: list[dict], after_order_index: int) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] > after_order_index
+        and event["actor_type"] == "System"
+        and event["change_type"] in SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[0]
+
+
+def last_system_event_after(events: list[dict], after_order_index: int) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] >= after_order_index and event["actor_type"] == "System"
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[-1]
+
+
+def find_system_reprocess_cycle_end(first_system_event: dict, events: list[dict]) -> dict:
+    ordered = sorted(events, key=lambda item: item["order_index"])
+    for event in ordered:
+        if event["order_index"] < first_system_event["order_index"]:
+            continue
+        if (
+            event["is_status_event"]
+            and event["actor_type"] == "System"
+            and event["from_status"] == IN_REVIEW_STATE
+            and event["to_status"] == COMPLETED_STATE
+        ):
+            return event
+        if (
+            event["is_status_event"]
+            and event["actor_type"] == "System"
+            and event["from_status"] == IN_REVIEW_STATE
+            and event["to_status"] in PENDING_STATES
+        ):
+            if next_system_detail_after(ordered, event["order_index"]) is None:
+                return event
+        if (
+            event["is_status_event"]
+            and event["actor_type"] == "User"
+            and event["from_status"] in PENDING_STATES
+            and event["to_status"] == IN_REVIEW_STATE
+        ):
+            previous_system = previous_system_event_before(ordered, event["order_index"])
+            return previous_system or first_system_event
+    return last_system_event_after(ordered, first_system_event["order_index"]) or first_system_event
+
+
+def calculate_effective_user_duration(interval: dict, is_auto_timeout: bool) -> float:
+    if not is_auto_timeout:
+        return interval["duration_seconds"]
+    user_details = [event for event in interval["inner_events"] if event["actor_type"] == "User"]
+    if user_details:
+        last_user_detail = sorted(user_details, key=lambda item: item["order_index"])[-1]
+        effective_end = min(
+            interval["end_time"],
+            last_user_detail["event_time"] + dt.timedelta(minutes=ACTIVITY_GRACE_MINUTES_DEFAULT),
+        )
+    else:
+        effective_end = min(
+            interval["end_time"],
+            interval["start_time"] + dt.timedelta(minutes=SESSION_TIMEOUT_MINUTES_DEFAULT),
+        )
+    return seconds_between(effective_end, interval["start_time"])
+
+
+def is_same_timestamp_reopen_to_review_handoff(interval: dict) -> bool:
+    if interval["duration_seconds"] != 0:
+        return False
+    transitions = {
+        (interval["start_event"]["from_status"], interval["start_event"]["to_status"]),
+        (interval["end_event"]["from_status"], interval["end_event"]["to_status"]),
+    }
+    return (
+        ("Completed", "Pending Re-Review by Moodys") in transitions
+        and ("Pending Re-Review by Moodys", "In Review by Moodys") in transitions
+    )
+
+
+def build_segment(
+    interval: dict,
+    segment_type: str,
+    start_event: dict,
+    end_event: dict,
+    *,
+    actor_name: str | None,
+    actor_type: str,
+    is_active_work: bool,
+    is_idle: bool,
+    is_queue_wait: bool = False,
+    is_milestone: bool = False,
+    metric_only: bool = False,
+    is_auto_timeout: bool = False,
+    same_timestamp_handoff: bool = False,
+) -> dict:
+    start_time = start_event["event_time"]
+    end_time = end_event["event_time"]
+    duration_seconds = 0.0 if is_milestone else seconds_between(end_time, start_time)
+
+    effective_duration_seconds = duration_seconds
+    if is_auto_timeout:
+        effective_duration_seconds = calculate_effective_user_duration(interval, True)
+
+    time_group, time_group_rule_id, original_bucket, time_group_countable = assign_time_group(
+        segment_type,
+        actor_type,
+        is_milestone=is_milestone,
+        metric_only=metric_only,
+        is_queue_wait=is_queue_wait,
+    )
+
+    user_name = actor_name or ""
+    if not user_name:
+        if actor_type == "System":
+            user_name = "System"
+        elif time_group == "Idle Time":
+            user_name = "Idle"
+        else:
+            user_name = "Unknown User"
+
+    return {
+        "id": (
+            f"{interval['document_id']}|{segment_type}|"
+            f"{start_event['row_number']}->{end_event['row_number']}|"
+            f"{start_event['order_index']}->{end_event['order_index']}"
+        ),
+        "segmentType": segment_type,
+        "timeGroup": time_group,
+        "timeGroupRuleId": time_group_rule_id,
+        "timeGroupCountable": time_group_countable,
+        "originalTimeBucket": original_bucket,
+        "metricOnly": metric_only,
+        "isActiveWork": is_active_work,
+        "isIdle": is_idle,
+        "isQueueWait": is_queue_wait,
+        "isMilestone": is_milestone,
+        "sameTimestampHandoff": same_timestamp_handoff,
+        "start": start_time.isoformat(),
+        "end": end_time.isoformat(),
+        "durationSeconds": duration_seconds,
+        "effectiveDurationSeconds": effective_duration_seconds,
+        "documentId": interval["document_id"],
+        "userName": user_name,
+        "actorType": actor_type,
+        "fileName": start_event["file_name"],
+        "pageName": start_event["page_name"],
+        "autoTimeout": is_auto_timeout,
+        "__start_dt": start_time,
+        "__end_dt": end_time,
+    }
+
+
+def segment_events_between(events: list[dict], start_event: dict, end_event: dict) -> list[dict]:
+    return [
+        event
+        for event in events
+        if start_event["order_index"] <= event["order_index"] <= end_event["order_index"]
+    ]
+
+
+def build_interval_segments(interval: dict, all_events: list[dict]) -> list[dict]:
+    state = interval["state"]
+
+    if is_same_timestamp_reopen_to_review_handoff(interval):
+        actor_name = interval["exit_actor"] or interval["enter_actor"]
+        actor_type = interval["exit_actor_type"] if interval["exit_actor_type"] in {"System", "User"} else interval["enter_actor_type"]
+        return [
+            build_segment(
+                interval,
+                "REOPEN_TO_REVIEW_HANDOFF_MARKER",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=actor_name,
+                actor_type=actor_type,
+                is_active_work=False,
+                is_idle=False,
+                is_milestone=True,
+                same_timestamp_handoff=True,
+            )
+        ]
+
+    if state == "Uploading":
+        return [
+            build_segment(
+                interval,
+                "USER_UPLOADING",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=interval["enter_actor"],
+                actor_type=interval["enter_actor_type"],
+                is_active_work=True,
+                is_idle=False,
+            )
+        ]
+
+    if state == "Processing":
+        return [
+            build_segment(
+                interval,
+                "SYSTEM_INITIAL_PROCESSING",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name="System",
+                actor_type="System",
+                is_active_work=True,
+                is_idle=False,
+            )
+        ]
+
+    if state in PENDING_STATES:
+        first_system = first_system_evidence(interval["inner_events"])
+        if first_system is not None:
+            segments: list[dict] = []
+            cycle_end = find_system_reprocess_cycle_end(first_system, all_events)
+
+            if first_system["event_time"] > interval["start_time"]:
+                segments.append(
+                    build_segment(
+                        interval,
+                        "IDLE_WAITING_FOR_SCHEDULED_REPROCESS",
+                        interval["start_event"],
+                        first_system,
+                        actor_name=None,
+                        actor_type="None",
+                        is_active_work=False,
+                        is_idle=True,
+                        is_queue_wait=True,
+                    )
+                )
+
+            segments.append(
+                build_segment(
+                    interval,
+                    "SYSTEM_SCHEDULED_REPROCESSING",
+                    first_system,
+                    cycle_end,
+                    actor_name="System",
+                    actor_type="System",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            )
+
+            if (
+                cycle_end["event_time"] < interval["end_time"]
+                and interval["exit_actor_type"] == "User"
+                and interval["exit_to"] == IN_REVIEW_STATE
+            ):
+                segments.append(
+                    build_segment(
+                        interval,
+                        "IDLE_AFTER_SYSTEM_REPROCESS",
+                        cycle_end,
+                        interval["end_event"],
+                        actor_name=None,
+                        actor_type="None",
+                        is_active_work=False,
+                        is_idle=True,
+                    )
+                )
+            return segments
+
+        idle_segment_type = (
+            "IDLE_WAITING_FOR_REVIEW"
+            if state == "Pending Review by Moodys"
+            else "IDLE_WAITING_FOR_REREVIEW"
+        )
+        return [
+            build_segment(
+                interval,
+                idle_segment_type,
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=None,
+                actor_type="None",
+                is_active_work=False,
+                is_idle=True,
+            )
+        ]
+
+    if state == IN_REVIEW_STATE:
+        user_edit_count = len(
+            [
+                event
+                for event in interval["inner_events"]
+                if event["actor_type"] == "User" and event["change_type"] in USER_EDIT_CHANGE_TYPES
+            ]
+        )
+
+        if (
+            interval["enter_actor_type"] == "User"
+            and interval["exit_actor_type"] == "System"
+            and interval["exit_to"] in PENDING_STATES
+        ):
+            return [
+                build_segment(
+                    interval,
+                    "USER_REVIEW_AUTO_TIMEOUT",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                    is_auto_timeout=True,
+                ),
+                build_segment(
+                    interval,
+                    "AUTO_TIMEOUT_MARKER",
+                    interval["end_event"],
+                    interval["end_event"],
+                    actor_name="System",
+                    actor_type="System",
+                    is_active_work=False,
+                    is_idle=False,
+                    is_milestone=True,
+                    is_auto_timeout=True,
+                ),
+            ]
+
+        if (
+            interval["enter_actor_type"] == "User"
+            and interval["exit_to"] == COMPLETED_STATE
+            and user_edit_count > 0
+        ):
+            return [
+                build_segment(
+                    interval,
+                    "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
+
+        if (
+            interval["enter_actor_type"] == "User"
+            and interval["exit_to"] == COMPLETED_STATE
+            and user_edit_count == 0
+        ):
+            return [
+                build_segment(
+                    interval,
+                    "USER_COMPLETION_APPROVAL",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
+
+        if (
+            interval["enter_actor_type"] == "User"
+            and interval["exit_to"] != COMPLETED_STATE
+            and user_edit_count > 0
+        ):
+            return [
+                build_segment(
+                    interval,
+                    "USER_EDITING_CORRECTION",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
+
+        if (
+            interval["enter_actor_type"] == "User"
+            and interval["exit_to"] != COMPLETED_STATE
+            and not (
+                interval["exit_actor_type"] == "System"
+                and interval["exit_to"] in PENDING_STATES
+            )
+            and user_edit_count == 0
+        ):
+            return [
+                build_segment(
+                    interval,
+                    "USER_REVIEW_COMMENT_CHECK",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
+
+        if interval["enter_actor_type"] == "System":
+            return [
+                build_segment(
+                    interval,
+                    "SYSTEM_INTERNAL_TRANSITION",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name="System",
+                    actor_type="System",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
+
+    if state == COMPLETED_STATE:
+        segments = [
+            build_segment(
+                interval,
+                "POST_COMPLETED_ELAPSED",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=None,
+                actor_type="None",
+                is_active_work=False,
+                is_idle=True,
+            )
+        ]
+        if (
+            interval["exit_from"] == COMPLETED_STATE
+            and interval["exit_to"] == "Pending Re-Review by Moodys"
+        ):
+            segments.append(
+                build_segment(
+                    interval,
+                    "REOPEN_MARKER",
+                    interval["end_event"],
+                    interval["end_event"],
+                    actor_name=interval["exit_actor"],
+                    actor_type=interval["exit_actor_type"],
+                    is_active_work=False,
+                    is_idle=False,
+                    is_milestone=True,
+                )
+            )
+        return segments
+
+    return [
+        build_segment(
+            interval,
+            "UNKNOWN_OR_LOW_CONFIDENCE",
+            interval["start_event"],
+            interval["end_event"],
+            actor_name=interval["enter_actor"],
+            actor_type=interval["enter_actor_type"],
+            is_active_work=False,
+            is_idle=False,
+        )
+    ]
+
+
+def resolve_overlaps(segments: list[dict]) -> list[dict]:
+    if not segments:
+        return []
+
+    sorted_segments = sorted(
+        segments,
+        key=lambda segment: (
+            segment["__start_dt"],
+            segment["__end_dt"],
+            segment["segmentType"],
+        ),
+    )
+    resolved: list[dict] = []
+    reprocess_windows: list[tuple[dt.datetime, dt.datetime]] = []
+
+    for segment in sorted_segments:
+        if segment["segmentType"] == "SYSTEM_SCHEDULED_REPROCESSING":
+            reprocess_windows.append((segment["__start_dt"], segment["__end_dt"]))
+            resolved.append(segment)
+            continue
+
+        if segment["segmentType"] == "SYSTEM_INTERNAL_TRANSITION":
+            fully_covered = False
+            for start_dt, end_dt in reprocess_windows:
+                if start_dt <= segment["__start_dt"] and segment["__end_dt"] <= end_dt:
+                    fully_covered = True
+                    break
+            if fully_covered:
+                continue
+
+        resolved.append(segment)
+
+    return sorted(
+        resolved,
+        key=lambda segment: (
+            segment["__start_dt"],
+            segment["__end_dt"],
+            segment["segmentType"],
+        ),
+    )
+
+
+def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
+    if not doc_events:
+        return []
+
+    ordered = sorted(doc_events, key=lambda item: (item["event_time"], -int(item["row_number"])))
+    for idx, event in enumerate(ordered):
+        event["order_index"] = idx
+
+    status_events = [
+        event
+        for event in ordered
+        if event["is_status_event"] and event["to_status"]
+    ]
+    if len(status_events) < 2:
+        return []
+
+    intervals: list[dict] = []
+
+    first_status_event = status_events[0]
+    if first_status_event["from_status"] == "Processing":
+        first_pre_status_event = next(
+            (
+                event
+                for event in ordered
+                if event["order_index"] < first_status_event["order_index"]
+            ),
+            None,
+        )
+        if (
+            first_pre_status_event is not None
+            and first_pre_status_event["event_time"] < first_status_event["event_time"]
+        ):
+            bootstrap_inner = [
+                event
+                for event in ordered
+                if first_pre_status_event["order_index"] < event["order_index"] < first_status_event["order_index"]
+            ]
+            intervals.append(
+                {
+                    "document_id": first_status_event["document_id"],
+                    "start_event": first_pre_status_event,
+                    "end_event": first_status_event,
+                    "inner_events": bootstrap_inner,
+                    "start_time": first_pre_status_event["event_time"],
+                    "end_time": first_status_event["event_time"],
+                    "duration_seconds": seconds_between(first_status_event["event_time"], first_pre_status_event["event_time"]),
+                    "state": "Processing",
+                    "enter_from": "Processing",
+                    "enter_to": "Processing",
+                    "enter_actor": first_pre_status_event["actor_name"],
+                    "enter_actor_type": first_pre_status_event["actor_type"],
+                    "exit_from": first_status_event["from_status"],
+                    "exit_to": first_status_event["to_status"],
+                    "exit_actor": first_status_event["actor_name"],
+                    "exit_actor_type": first_status_event["actor_type"],
+                }
+            )
+
+    for idx in range(len(status_events) - 1):
+        current = status_events[idx]
+        nxt = status_events[idx + 1]
+        inner = [
+            event
+            for event in ordered
+            if current["order_index"] < event["order_index"] < nxt["order_index"]
+        ]
+        intervals.append(
+            {
+                "document_id": current["document_id"],
+                "start_event": current,
+                "end_event": nxt,
+                "inner_events": inner,
+                "start_time": current["event_time"],
+                "end_time": nxt["event_time"],
+                "duration_seconds": seconds_between(nxt["event_time"], current["event_time"]),
+                "state": current["to_status"],
+                "enter_from": current["from_status"],
+                "enter_to": current["to_status"],
+                "enter_actor": current["actor_name"],
+                "enter_actor_type": current["actor_type"],
+                "exit_from": nxt["from_status"],
+                "exit_to": nxt["to_status"],
+                "exit_actor": nxt["actor_name"],
+                "exit_actor_type": nxt["actor_type"],
+            }
+        )
+
+    segments: list[dict] = []
+    for interval in intervals:
+        segments.extend(build_interval_segments(interval, ordered))
+    return resolve_overlaps(segments)
+
+
+def countable_segment_seconds(segment: dict) -> float:
+    if not segment.get("timeGroupCountable"):
+        return 0.0
+    if segment.get("timeGroup") == "User" and segment.get("segmentType") == "USER_REVIEW_AUTO_TIMEOUT":
+        return max(0.0, float(segment.get("effectiveDurationSeconds") or 0.0))
+    return max(0.0, float(segment.get("durationSeconds") or 0.0))
+
+
+def empty_user_performance_response() -> dict:
+    return {
+        "kpis": {
+            "activeUserTimeSeconds": 0,
+            "activeUserTimeDisplay": "0s",
+            "contributingUsers": 0,
+            "avgUserSessionSeconds": 0,
+            "avgUserSessionDisplay": "0s",
+            "idleWaitingSeconds": 0,
+            "idleWaitingDisplay": "0s",
+            "idleWaitingOccurrences": 0,
+            "reworkRate": 0,
+            "reworkRateDisplay": "0.0%",
+            "autoClosedSessions": 0,
+            "scheduledWaitSeconds": 0,
+            "scheduledWaitDisplay": "0s",
+            "reprocessCycleElapsedSeconds": 0,
+            "reprocessCycleElapsedDisplay": "0s",
+            "systemTimeSeconds": 0,
+            "systemTimeDisplay": "0s",
+            "idleTimeSeconds": 0,
+            "idleTimeDisplay": "0s",
+        },
+        "summary": {"files": 0, "pages": 0, "rows": 0, "algorithmVersion": ALGORITHM_VERSION},
+        "contribution": [],
+        "flow": [],
+        "matrix": [],
+        "segments": [],
+    }
 
 
 def compute_user_performance() -> dict:
-    events = fetch_normalized_events()
-    if not events:
-        return {
-            "kpis": {
-                "activeUserTimeSeconds": 0,
-                "activeUserTimeDisplay": "0s",
-                "contributingUsers": 0,
-                "avgUserSessionSeconds": 0,
-                "avgUserSessionDisplay": "0s",
-                "idleWaitingSeconds": 0,
-                "idleWaitingDisplay": "0s",
-                "idleWaitingOccurrences": 0,
-                "reworkRate": 0,
-                "reworkRateDisplay": "0.0%",
-                "autoClosedSessions": 0,
-            },
-            "summary": {"files": 0, "pages": 0, "rows": 0},
-            "contribution": [],
-            "flow": [],
-            "matrix": [],
-            "segments": [],
-        }
+    global _USER_PERFORMANCE_CACHE_SIGNATURE, _USER_PERFORMANCE_CACHE_VALUE
+    signature = current_unified_rows_signature()
+    if _USER_PERFORMANCE_CACHE_VALUE is not None and _USER_PERFORMANCE_CACHE_SIGNATURE == signature:
+        return _USER_PERFORMANCE_CACHE_VALUE
 
-    source_summary = {"files": 0, "pages": 0, "rows": 0}
+    events = fetch_normalized_events(signature=signature)
+    if not events:
+        empty = empty_user_performance_response()
+        _USER_PERFORMANCE_CACHE_SIGNATURE = signature
+        _USER_PERFORMANCE_CACHE_VALUE = empty
+        return empty
+
+    source_summary = {"files": 0, "pages": 0, "rows": 0, "algorithmVersion": ALGORITHM_VERSION}
     with get_conn() as conn:
         row = conn.execute(
             "SELECT COUNT(*) AS files, COALESCE(SUM(total_pages),0) AS pages, COALESCE(SUM(total_rows),0) AS rows FROM source_files"
         ).fetchone()
         source_summary = {
-            "files": row["files"] if row else 0,
-            "pages": row["pages"] if row else 0,
-            "rows": row["rows"] if row else 0,
+            "files": int(row["files"] if row else 0),
+            "pages": int(row["pages"] if row else 0),
+            "rows": int(row["rows"] if row else 0),
+            "algorithmVersion": ALGORITHM_VERSION,
         }
 
-    grouped: dict[str, list[dict]] = defaultdict(list)
+    grouped_events: dict[str, list[dict]] = defaultdict(list)
     for event in events:
-        grouped[event["document_id"]].append(event)
+        grouped_events[event["document_id"]].append(event)
 
-    segments: list[dict] = []
-    transitions: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])  # duration_sum, count
+    all_segments: list[dict] = []
+    transitions: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
     user_stats: dict[str, dict] = defaultdict(
         lambda: {
             "review_seconds": 0.0,
@@ -899,8 +1738,35 @@ def compute_user_performance() -> dict:
         }
     )
 
+    for doc_id, doc_events in grouped_events.items():
+        all_segments.extend(build_segments_for_document(doc_events))
+
+        ordered = sorted(doc_events, key=lambda item: (item["event_time"], -int(item["row_number"])))
+        status_events = [
+            event
+            for event in ordered
+            if event["is_status_event"] and event["to_status"]
+        ]
+        for idx in range(len(status_events) - 1):
+            current = status_events[idx]
+            nxt = status_events[idx + 1]
+            transition_key = f"{current['to_status']} -> {nxt['to_status']}"
+            duration_seconds = seconds_between(nxt["event_time"], current["event_time"])
+            transitions[transition_key][0] += duration_seconds
+            transitions[transition_key][1] += 1
+
+    all_segments.sort(
+        key=lambda segment: (
+            segment["__start_dt"],
+            segment["__end_dt"],
+            segment["segmentType"],
+            segment["documentId"],
+        )
+    )
+
     total_active_user_seconds = 0.0
     total_idle_waiting_seconds = 0.0
+    total_system_seconds = 0.0
     total_scheduled_wait_seconds = 0.0
     total_reprocess_cycle_elapsed_seconds = 0.0
     idle_waiting_occurrences = 0
@@ -909,210 +1775,59 @@ def compute_user_performance() -> dict:
     total_rework_sessions = 0
     users_involved: set[str] = set()
 
-    for _, doc_events in grouped.items():
-        ordered = sorted(
-            doc_events,
-            key=lambda e: (e["event_time"], -int(e["row_number"])),
-        )
+    for segment in all_segments:
+        counted_seconds = countable_segment_seconds(segment)
+        segment_type = str(segment.get("segmentType") or "")
+        time_group = str(segment.get("timeGroup") or "")
+        user_name = str(segment.get("userName") or "").strip()
+        is_user_segment = segment_type.startswith("USER_")
+        is_system_actor = user_name.lower() == "system" or segment.get("actorType") == "System"
 
-        for idx, current in enumerate(ordered):
-            if current["actor_type"] != "user":
-                continue
-            if not is_upload_status(current.get("to_status_raw")):
-                continue
-            if idx >= len(ordered) - 1:
-                continue
-            next_event = ordered[idx + 1]
-            start = current["event_time"]
-            end = next_event["event_time"]
-            duration_seconds = (end - start).total_seconds()
-            if duration_seconds <= 0:
-                continue
+        if time_group == "User" and is_user_segment:
+            total_active_user_seconds += counted_seconds
+            if user_name and not is_system_actor and user_name.lower() != "unknown user":
+                users_involved.add(user_name)
+        elif time_group == "System":
+            total_system_seconds += counted_seconds
+        elif time_group == "Idle Time":
+            total_idle_waiting_seconds += counted_seconds
+            if segment.get("timeGroupCountable"):
+                idle_waiting_occurrences += 1
 
-            user_name = current["actor_name"] or "Unknown User"
-            segments.append(
-                {
-                    "segmentType": "USER_UPLOADING",
-                    "start": start.isoformat(),
-                    "end": end.isoformat(),
-                    "durationSeconds": duration_seconds,
-                    "effectiveDurationSeconds": duration_seconds,
-                    "documentId": current["document_id"],
-                    "userName": user_name,
-                    "fileName": current["file_name"],
-                    "pageName": current["page_name"],
-                    "autoTimeout": False,
-                }
-            )
+        if segment_type == "IDLE_WAITING_FOR_SCHEDULED_REPROCESS":
+            total_scheduled_wait_seconds += counted_seconds
+        if segment_type == "SYSTEM_SCHEDULED_REPROCESSING":
+            total_reprocess_cycle_elapsed_seconds += counted_seconds
+        if segment_type == "USER_REVIEW_AUTO_TIMEOUT":
+            auto_timeout_count += 1
 
-            users_involved.add(user_name)
-            total_active_user_seconds += duration_seconds
-            stats = user_stats[user_name]
-            stats["upload_seconds"] += duration_seconds
-            stats["total_effective_seconds"] += duration_seconds
-            stats["total_observed_seconds"] += duration_seconds
-            stats["documents"].add(current["document_id"])
-
-        status_indices = [idx for idx, ev in enumerate(ordered) if ev["to_status"]]
-        if len(status_indices) < 2:
+        if not is_user_segment or is_system_actor:
             continue
 
-        for pos in range(len(status_indices) - 1):
-            current_idx = status_indices[pos]
-            next_idx = status_indices[pos + 1]
-            current = ordered[current_idx]
-            next_event = ordered[next_idx]
-            start = current["event_time"]
-            end = next_event["event_time"]
-            duration_seconds = (end - start).total_seconds()
-            if duration_seconds <= 0:
-                continue
+        stats = user_stats[user_name or "Unknown User"]
+        stats["total_effective_seconds"] += counted_seconds
+        stats["total_observed_seconds"] += max(0.0, float(segment.get("durationSeconds") or 0.0))
+        stats["documents"].add(segment.get("documentId") or f"{segment.get('fileName', '')}::{segment.get('pageName', '')}")
 
-            current_bucket = status_bucket(current["to_status"])
-            next_bucket = status_bucket(next_event["to_status"])
-            transition_key = f"{current['to_status']} -> {next_event['to_status']}"
-            transitions[transition_key][0] += duration_seconds
-            transitions[transition_key][1] += 1
+        if segment_type == "USER_UPLOADING":
+            stats["upload_seconds"] += counted_seconds
+            continue
 
-            inner_events = ordered[current_idx + 1: next_idx]
+        if segment_type in CORE_USER_SESSION_SEGMENT_TYPES:
+            stats["sessions"] += 1
+            total_user_sessions += 1
 
-            if current_bucket in {"pending_review", "pending_rereview"}:
-                idle_waiting_occurrences += 1
-                first_system_detail = None
-                for candidate in inner_events:
-                    if candidate["actor_type"] == "system":
-                        first_system_detail = candidate
-                        break
+        if segment_type in {"USER_EDITING_CORRECTION", "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL"}:
+            stats["edit_seconds"] += counted_seconds
+            stats["rework_sessions"] += 1
+            total_rework_sessions += 1
+        elif segment_type == "USER_COMPLETION_APPROVAL":
+            stats["complete_seconds"] += counted_seconds
+        else:
+            stats["review_seconds"] += counted_seconds
 
-                if first_system_detail and first_system_detail["event_time"] > start:
-                    queue_seconds = (first_system_detail["event_time"] - start).total_seconds()
-                    system_seconds = (end - first_system_detail["event_time"]).total_seconds()
-                    if queue_seconds > 0:
-                        segments.append(
-                            {
-                                "segmentType": "IDLE_WAITING_FOR_SCHEDULED_REPROCESS",
-                                "start": start.isoformat(),
-                                "end": first_system_detail["event_time"].isoformat(),
-                                "durationSeconds": queue_seconds,
-                                "documentId": current["document_id"],
-                                "userName": current["actor_name"],
-                                "fileName": current["file_name"],
-                                "pageName": current["page_name"],
-                            }
-                        )
-                        total_scheduled_wait_seconds += queue_seconds
-                    if system_seconds > 0:
-                        segments.append(
-                            {
-                                "segmentType": "SYSTEM_SCHEDULED_REPROCESSING_ROUND_2",
-                                "start": first_system_detail["event_time"].isoformat(),
-                                "end": end.isoformat(),
-                                "durationSeconds": system_seconds,
-                                "documentId": current["document_id"],
-                                "userName": "System",
-                                "fileName": current["file_name"],
-                                "pageName": current["page_name"],
-                            }
-                        )
-                    total_reprocess_cycle_elapsed_seconds += duration_seconds
-                else:
-                    if current_bucket == "pending_review":
-                        segment_type = "IDLE_WAITING_FOR_REVIEW"
-                    else:
-                        segment_type = "IDLE_WAITING_FOR_REREVIEW"
-                    segments.append(
-                        {
-                            "segmentType": segment_type,
-                            "start": start.isoformat(),
-                            "end": end.isoformat(),
-                            "durationSeconds": duration_seconds,
-                            "documentId": current["document_id"],
-                            "userName": current["actor_name"],
-                            "fileName": current["file_name"],
-                            "pageName": current["page_name"],
-                        }
-                    )
-                    total_idle_waiting_seconds += duration_seconds
-                continue
-
-            if current_bucket == "in_review" and current["actor_type"] == "user":
-                user_name = current["actor_name"] or "Unknown User"
-                timeout_seconds = DEFAULT_TIMEOUT_SECONDS
-                timeout_minutes = current.get("timeout_minutes")
-                if timeout_minutes and timeout_minutes > 0:
-                    timeout_seconds = timeout_minutes * 60
-
-                segment_type = "USER_REVIEW_COMMENT_CHECK"
-                is_rework = False
-                is_auto_timeout = False
-
-                if next_bucket == "pending_rereview" or current["submitted_for_reanalysis"] or next_event["submitted_for_reanalysis"]:
-                    segment_type = "USER_EDITING_CORRECTION"
-                    is_rework = True
-                elif next_bucket == "completed":
-                    segment_type = "USER_COMPLETION_APPROVAL"
-
-                if next_event["actor_type"] == "system" and next_bucket in {"pending_review", "pending_rereview"}:
-                    segment_type = "USER_REVIEW_AUTO_TIMEOUT"
-                    is_auto_timeout = True
-                    auto_timeout_count += 1
-
-                effective_seconds = duration_seconds
-                if is_auto_timeout:
-                    effective_seconds = min(duration_seconds, timeout_seconds)
-
-                segments.append(
-                    {
-                        "segmentType": segment_type,
-                        "start": start.isoformat(),
-                        "end": end.isoformat(),
-                        "durationSeconds": duration_seconds,
-                        "effectiveDurationSeconds": effective_seconds,
-                        "documentId": current["document_id"],
-                        "userName": user_name,
-                        "fileName": current["file_name"],
-                        "pageName": current["page_name"],
-                        "autoTimeout": is_auto_timeout,
-                    }
-                )
-
-                users_involved.add(user_name)
-                total_user_sessions += 1
-                total_active_user_seconds += effective_seconds
-
-                stats = user_stats[user_name]
-                stats["sessions"] += 1
-                stats["total_effective_seconds"] += effective_seconds
-                stats["total_observed_seconds"] += duration_seconds
-                stats["documents"].add(current["document_id"])
-                if segment_type in {"USER_REVIEW_COMMENT_CHECK", "USER_REVIEW_AUTO_TIMEOUT"}:
-                    stats["review_seconds"] += effective_seconds
-                elif segment_type == "USER_EDITING_CORRECTION":
-                    stats["edit_seconds"] += effective_seconds
-                elif segment_type == "USER_COMPLETION_APPROVAL":
-                    stats["complete_seconds"] += effective_seconds
-
-                if is_rework:
-                    total_rework_sessions += 1
-                    stats["rework_sessions"] += 1
-                if is_auto_timeout:
-                    stats["auto_timeout_sessions"] += 1
-                continue
-
-            # Marker for reopen path (not active workload)
-            if current_bucket == "completed" and next_bucket == "pending_rereview":
-                segments.append(
-                    {
-                        "segmentType": "REOPEN_MARKER",
-                        "start": start.isoformat(),
-                        "end": end.isoformat(),
-                        "durationSeconds": duration_seconds,
-                        "documentId": current["document_id"],
-                        "userName": current["actor_name"],
-                        "fileName": current["file_name"],
-                        "pageName": current["page_name"],
-                    }
-                )
+        if segment.get("autoTimeout") or segment_type == "USER_REVIEW_AUTO_TIMEOUT":
+            stats["auto_timeout_sessions"] += 1
 
     avg_user_session_seconds = (
         total_active_user_seconds / total_user_sessions if total_user_sessions > 0 else 0.0
@@ -1136,7 +1851,7 @@ def compute_user_performance() -> dict:
                 "documents": len(stats["documents"]),
             }
         )
-    contribution_rows.sort(key=lambda row: row["totalSeconds"], reverse=True)
+    contribution_rows.sort(key=lambda item: item["totalSeconds"], reverse=True)
 
     flow_rows = []
     for transition, (duration_sum, count) in transitions.items():
@@ -1149,17 +1864,16 @@ def compute_user_performance() -> dict:
                 "count": int(count),
             }
         )
-    flow_rows.sort(key=lambda row: row["avgSeconds"], reverse=True)
+    flow_rows.sort(key=lambda item: item["avgSeconds"], reverse=True)
 
     matrix_rows = []
     for user_name, stats in user_stats.items():
         sessions = stats["sessions"] or 1
         docs_count = len(stats["documents"]) or 1
-        avg_time_per_doc = stats["total_effective_seconds"] / docs_count
         matrix_rows.append(
             {
                 "user": user_name,
-                "avgTimePerDocSeconds": avg_time_per_doc,
+                "avgTimePerDocSeconds": stats["total_effective_seconds"] / docs_count,
                 "reworkRate": stats["rework_sessions"] / sessions,
                 "autoClosedRate": stats["auto_timeout_sessions"] / sessions,
                 "totalActiveSeconds": stats["total_effective_seconds"],
@@ -1167,9 +1881,14 @@ def compute_user_performance() -> dict:
                 "sessionCount": stats["sessions"],
             }
         )
-    matrix_rows.sort(key=lambda row: row["totalActiveSeconds"], reverse=True)
+    matrix_rows.sort(key=lambda item: item["totalActiveSeconds"], reverse=True)
 
-    return {
+    response_segments = []
+    for segment in all_segments[:1200]:
+        clean = {key: value for key, value in segment.items() if not key.startswith("__")}
+        response_segments.append(clean)
+
+    result = {
         "kpis": {
             "activeUserTimeSeconds": total_active_user_seconds,
             "activeUserTimeDisplay": format_duration(total_active_user_seconds),
@@ -1186,13 +1905,20 @@ def compute_user_performance() -> dict:
             "scheduledWaitDisplay": format_duration(total_scheduled_wait_seconds),
             "reprocessCycleElapsedSeconds": total_reprocess_cycle_elapsed_seconds,
             "reprocessCycleElapsedDisplay": format_duration(total_reprocess_cycle_elapsed_seconds),
+            "systemTimeSeconds": total_system_seconds,
+            "systemTimeDisplay": format_duration(total_system_seconds),
+            "idleTimeSeconds": total_idle_waiting_seconds,
+            "idleTimeDisplay": format_duration(total_idle_waiting_seconds),
         },
         "summary": source_summary,
         "contribution": contribution_rows,
         "flow": flow_rows[:12],
         "matrix": matrix_rows,
-        "segments": segments[:1200],
+        "segments": response_segments,
     }
+    _USER_PERFORMANCE_CACHE_SIGNATURE = signature
+    _USER_PERFORMANCE_CACHE_VALUE = result
+    return result
 
 
 def _counter_to_rows(counter: Counter, limit: int = 10) -> list[dict]:
@@ -1232,6 +1958,7 @@ def build_debug_snapshot() -> dict:
         except json.JSONDecodeError:
             parse_stats["jsonDecodeErrors"] += 1
             continue
+        canonical = build_canonical_map(raw)
 
         if idx < 3:
             sample_keys.append(
@@ -1243,18 +1970,18 @@ def build_debug_snapshot() -> dict:
                 }
             )
 
-        event_time_raw = pick_field(raw, FIELD_ALIASES["event_time"])
+        event_time_raw = pick_field(raw, FIELD_ALIASES["event_time"], canonical)
         if parse_datetime(event_time_raw):
             parse_stats["rowsWithEventTime"] += 1
 
-        action_type = str(pick_field(raw, FIELD_ALIASES["action_type"]) or "").strip()
+        action_type = str(pick_field(raw, FIELD_ALIASES["action_type"], canonical) or "").strip()
         if action_type:
             action_counter[action_type] += 1
         if "status" in normalize_text(action_type):
             parse_stats["rowsWithSpreadStatusChangeType"] += 1
 
-        from_status = str(pick_field(raw, FIELD_ALIASES["from_status"]) or "").strip()
-        to_status = str(pick_field(raw, FIELD_ALIASES["to_status"]) or "").strip()
+        from_status = str(pick_field(raw, FIELD_ALIASES["from_status"], canonical) or "").strip()
+        to_status = str(pick_field(raw, FIELD_ALIASES["to_status"], canonical) or "").strip()
         if from_status:
             from_status_counter[from_status] += 1
             if looks_like_workflow_status(from_status):

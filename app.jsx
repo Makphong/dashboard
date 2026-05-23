@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-24-hotfix-text-01';
+const FRONTEND_BUILD_VERSION = '2026-05-24-hotfix-text-07';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -17,11 +17,17 @@ const SEGMENT_COLORS = {
   USER_REVIEW_COMMENT_CHECK: '#06B6D4',
   USER_EDITING_CORRECTION: '#F59E0B',
   USER_COMPLETION_APPROVAL: '#10B981',
+  USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL: '#059669',
   USER_UPLOADING: '#8B5CF6',
   USER_REVIEW_AUTO_TIMEOUT: '#EF4444',
+  SYSTEM_INITIAL_PROCESSING: '#334155',
+  SYSTEM_SCHEDULED_REPROCESSING: '#334155',
+  SYSTEM_INTERNAL_TRANSITION: '#334155',
   IDLE_WAITING_FOR_REVIEW: '#94A3B8',
   IDLE_WAITING_FOR_REREVIEW: '#64748B',
   IDLE_WAITING_FOR_SCHEDULED_REPROCESS: '#94A3B8',
+  IDLE_AFTER_SYSTEM_REPROCESS: '#94A3B8',
+  AUTO_TIMEOUT_MARKER: '#DC2626',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: '#475569',
   REOPEN_MARKER: '#A855F7',
 };
@@ -30,24 +36,65 @@ const SEGMENT_TYPE_SHORT_LABELS = {
   USER_REVIEW_AUTO_TIMEOUT: 'Auto Closed',
   USER_EDITING_CORRECTION: 'Edit',
   USER_COMPLETION_APPROVAL: 'Complete',
+  USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL: 'Edit & Complete',
   USER_UPLOADING: 'Upload',
+  SYSTEM_INITIAL_PROCESSING: 'Processing',
+  SYSTEM_SCHEDULED_REPROCESSING: 'Reprocessing',
+  SYSTEM_INTERNAL_TRANSITION: 'System Transition',
   IDLE_WAITING_FOR_REVIEW: 'Waiting Review',
   IDLE_WAITING_FOR_REREVIEW: 'Waiting Re-Review',
   IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Waiting Reprocess',
+  IDLE_AFTER_SYSTEM_REPROCESS: 'Waiting Reprocess',
+  AUTO_TIMEOUT_MARKER: 'Auto Timeout Marker',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: 'System Reprocess',
   REOPEN_MARKER: 'Reopen',
 };
 const GANTT_SEGMENT_DISPLAY_LABELS = {
-  USER_REVIEW_COMMENT_CHECK: 'Processing Round 1',
+  USER_REVIEW_COMMENT_CHECK: 'Review',
   USER_EDITING_CORRECTION: 'Edit',
   USER_COMPLETION_APPROVAL: 'Complete',
+  USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL: 'Edit & Complete',
   USER_UPLOADING: 'Upload',
   USER_REVIEW_AUTO_TIMEOUT: 'Auto Closed (Timeout)',
+  SYSTEM_INITIAL_PROCESSING: 'Processing',
+  SYSTEM_SCHEDULED_REPROCESSING: 'Reprocessing',
+  SYSTEM_INTERNAL_TRANSITION: 'System Transition',
+  AUTO_TIMEOUT_MARKER: 'Auto Timeout Marker',
   IDLE_WAITING_FOR_REVIEW: 'Waiting Review',
   IDLE_WAITING_FOR_REREVIEW: 'Waiting Re-Review',
   IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Waiting Reprocess',
+  IDLE_AFTER_SYSTEM_REPROCESS: 'Waiting Reprocess',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: 'System Reprocess Round 2',
   REOPEN_MARKER: 'Reopen Marker',
+};
+
+const GANTT_DRILL_GROUPS = [
+  { key: 'Uploading', label: 'Uploading', color: '#8B5CF6' },
+  { key: 'Processing', label: 'Processing', color: '#334155' },
+  { key: 'Review', label: 'Review', color: '#06B6D4' },
+  { key: 'ReviewAutoClose', label: 'Review Auto Close', color: '#06B6D4' },
+  { key: 'Edit', label: 'Edit', color: '#F59E0B' },
+  { key: 'EditAndComplete', label: 'Edit and Complete', color: '#10B981' },
+];
+
+const GANTT_DRILL_GROUP_COLORS = {
+  Uploading: '#8B5CF6',
+  Processing: '#334155',
+  Review: '#06B6D4',
+  ReviewAutoClose: '#06B6D4',
+  Reprocessing: '#334155',
+  Edit: '#F59E0B',
+  EditAndComplete: '#10B981',
+};
+
+const GANTT_DRILL_GROUP_LABELS = {
+  Uploading: 'Uploading',
+  Processing: 'Processing',
+  Review: 'Review',
+  ReviewAutoClose: 'Review Auto Close',
+  Reprocessing: 'Reprocessing',
+  Edit: 'Edit',
+  EditAndComplete: 'Edit and Complete',
 };
 
 const CORE_WORK_SESSION_TYPES = new Set([
@@ -166,6 +213,37 @@ function toGanttSegmentTypeLabel(segmentType) {
   const key = String(segmentType || '');
   if (GANTT_SEGMENT_DISPLAY_LABELS[key]) return GANTT_SEGMENT_DISPLAY_LABELS[key];
   return toSegmentTypeLabel(key);
+}
+
+function toDrillGroup(segmentType) {
+  const type = String(segmentType || '');
+  if (type === 'USER_UPLOADING') return 'Uploading';
+  if (type === 'SYSTEM_INITIAL_PROCESSING' || type === 'SYSTEM_INTERNAL_TRANSITION') return 'Processing';
+  if (type === 'USER_REVIEW_COMMENT_CHECK' || type === 'IDLE_WAITING_FOR_REVIEW' || type === 'IDLE_WAITING_FOR_REREVIEW') return 'Review';
+  if (type === 'USER_REVIEW_AUTO_TIMEOUT' || type === 'AUTO_TIMEOUT_MARKER') return 'ReviewAutoClose';
+  if (
+    type === 'SYSTEM_SCHEDULED_REPROCESSING'
+    || type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+    || type === 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS'
+    || type === 'IDLE_AFTER_SYSTEM_REPROCESS'
+  ) return 'Reprocessing';
+  if (type === 'USER_EDITING_CORRECTION') return 'Edit';
+  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL' || type === 'USER_COMPLETION_APPROVAL') return 'EditAndComplete';
+  return 'Processing';
+}
+
+function toTimelineLane(segmentType, userNameRaw) {
+  const type = String(segmentType || '');
+  if (type.startsWith('SYSTEM_') || type === 'AUTO_TIMEOUT_MARKER') return 'System';
+  if (type.startsWith('IDLE_')) return 'Idle';
+  const userName = String(userNameRaw || '').trim();
+  if (userName.toLowerCase() === 'system') return 'System';
+  return userName || 'Unknown User';
+}
+
+function isSystemContextSegment(segmentType) {
+  const type = String(segmentType || '');
+  return type.startsWith('SYSTEM_') || type === 'AUTO_TIMEOUT_MARKER';
 }
 
 function buildSheetKey(fileName, pageName) {
@@ -488,9 +566,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
         if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) return null;
 
         const segmentType = String(segment.segmentType || 'UNKNOWN');
-        let lane = String(segment.userName || 'Unknown User');
-        if (segmentType.startsWith('IDLE_')) lane = 'Idle / Waiting';
-        if (segmentType.startsWith('SYSTEM_') || lane.toLowerCase() === 'system') lane = 'System Context';
+        const lane = toTimelineLane(segmentType, segment.userName);
 
         return {
           id: `${segmentType}-${idx}`,
@@ -501,6 +577,8 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
           durationSeconds: safeNumber(segment.durationSeconds),
           start: segment.start,
           end: segment.end,
+          timeGroup: String(segment.timeGroup || ''),
+          drillGroup: toDrillGroup(segmentType),
           documentId: segment.documentId || '',
           fileName: segment.fileName || '',
           pageName: segment.pageName || '',
@@ -534,6 +612,9 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
 
   const visibleSegments = mapped.filter((segment) => segment.endTs >= displayMinTs && segment.startTs <= displayMaxTs);
   if (visibleSegments.length === 0) return null;
+  const legendItems = GANTT_DRILL_GROUPS.filter((item) => (
+    item.key !== 'Reprocessing' && item.key !== 'ReviewAutoClose'
+  ));
 
   const laneDurationMap = {};
   visibleSegments.forEach((item) => {
@@ -541,15 +622,11 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
     laneDurationMap[item.lane] += item.durationSeconds;
   });
 
-  const laneOrder = (laneName) => {
-    if (laneName === 'Idle / Waiting') return 1;
-    if (laneName === 'System Context') return 2;
-    return 0;
-  };
-
   const lanes = Object.keys(laneDurationMap).sort((a, b) => {
-    const orderDiff = laneOrder(a) - laneOrder(b);
-    if (orderDiff !== 0) return orderDiff;
+    if (a === 'System' && b !== 'System') return -1;
+    if (b === 'System' && a !== 'System') return 1;
+    if (a === 'Idle' && b !== 'Idle') return -1;
+    if (b === 'Idle' && a !== 'Idle') return 1;
     const durationDiff = laneDurationMap[b] - laneDurationMap[a];
     if (durationDiff !== 0) return durationDiff;
     return a.localeCompare(b);
@@ -638,13 +715,15 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
     const rawX = event.clientX - rect.left + 12;
     const rawY = event.clientY - rect.top + 12;
     const tooltipWidth = 310;
-    const tooltipHeight = 108;
+    const tooltipHeight = 124;
     const x = Math.max(8, Math.min(rawX, rect.width - tooltipWidth - 8));
     const y = Math.max(8, Math.min(rawY, rect.height - tooltipHeight - 8));
+    const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
     setHoveredSegment({
       x,
       y,
       lane,
+      groupLabel,
       segmentType: segment.segmentType,
       start: segment.start,
       end: segment.end,
@@ -677,22 +756,22 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
   };
 
   return (
-    <div className="space-y-3 relative" ref={containerRef}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600">
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.USER_REVIEW_COMMENT_CHECK }}></span>Processing Round 1</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.USER_EDITING_CORRECTION }}></span>Edit</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.USER_COMPLETION_APPROVAL }}></span>Complete</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.USER_UPLOADING }}></span>Upload</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.USER_REVIEW_AUTO_TIMEOUT }}></span>Auto Closed (Red)</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEGMENT_COLORS.SYSTEM_SCHEDULED_REPROCESSING_ROUND_2 }}></span>System Reprocess Round 2</span>
+    <div className="space-y-2 relative" ref={containerRef}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1 text-xs text-slate-600">
+        {legendItems.map((item) => (
+          <span key={item.key} className="inline-flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
+            {item.label}
+          </span>
+        ))}
       </div>
 
-      <div className="rounded-xl border border-slate-100 bg-slate-50/40 overflow-hidden">
+      <div className="rounded-xl bg-slate-50/30 overflow-hidden">
         <div className="sticky top-0 z-[6]">
           <div className="flex border-b border-slate-200 bg-slate-50">
             <svg width={laneLabelWidth} height={headerHeight} className="shrink-0 border-r border-slate-200 bg-slate-50/80">
               <text x="10" y="22" className="fill-slate-500 text-[10px] font-semibold uppercase tracking-[0.08em]">
-                User
+                Lane
               </text>
             </svg>
             <div
@@ -773,11 +852,13 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
                         const x2 = getX(clippedEnd);
                         const minBarWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
                         const barWidth = Math.max(minBarWidth, x2 - x1);
-                        const color = SEGMENT_COLORS[segment.segmentType] || '#64748B';
+                        const color = GANTT_DRILL_GROUP_COLORS[segment.drillGroup] || SEGMENT_COLORS[segment.segmentType] || '#64748B';
+                        const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
                         const typeLabel = toGanttSegmentTypeLabel(segment.segmentType);
-                        const label = `${typeLabel} (${segment.segmentType}) | ${lane} | ${formatTimeTick(segment.start)} → ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
+                        const label = `${groupLabel} | ${typeLabel} (${segment.segmentType}) | ${lane} | ${formatTimeTick(segment.start)} → ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
                         const isMarker = segment.segmentType === 'REOPEN_MARKER';
-                        const isUpload = segment.segmentType === 'USER_UPLOADING';
+                        const isUpload = segment.drillGroup === 'Uploading';
+                        const barOpacity = '0.94';
 
                         if (isMarker) {
                           const cx = x1 + 6;
@@ -809,7 +890,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
                             fill={color}
                             stroke={isUpload ? '#4C1D95' : 'none'}
                             strokeWidth={isUpload ? '1' : '0'}
-                            opacity={lane === 'System Context' ? '0.55' : '0.92'}
+                            opacity={barOpacity}
                             onClick={() => pickSegment(segment, lane)}
                             onMouseEnter={(event) => showHoverTooltip(event, segment, lane)}
                             onMouseMove={(event) => showHoverTooltip(event, segment, lane)}
@@ -836,6 +917,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
           <div className="text-[11px] font-semibold text-slate-800">
             {toGanttSegmentTypeLabel(hoveredSegment.segmentType)} ({hoveredSegment.segmentType})
           </div>
+          <div className="mt-0.5 text-[11px] text-slate-600">Group: {hoveredSegment.groupLabel || '-'}</div>
           <div className="mt-1 text-[11px] text-slate-600">Lane: {hoveredSegment.lane || '-'}</div>
           <div className="mt-0.5 text-[11px] text-slate-600">Start: {toDisplayDate(hoveredSegment.start)}</div>
           <div className="mt-0.5 text-[11px] text-slate-600">End: {toDisplayDate(hoveredSegment.end)}</div>
@@ -1504,15 +1586,19 @@ function App() {
       } else if (!explicitSelectedFileSet.has(segment.fileName)) {
         return false;
       }
-      if (selectedUserSet.size > 0 && !selectedUserSet.has(segment.userName)) return false;
+      const isUserOwnedSegment = String(segment.segmentType || '').startsWith('USER_');
+      if (selectedUserSet.size > 0 && isUserOwnedSegment && !selectedUserSet.has(segment.userName)) return false;
       return true;
     });
   }, [parsedSegments, dateRangeBounds, explicitSelectedFileSet, selectedSheetSet, selectedUserSet]);
 
   const ganttVisibleSegments = useMemo(() => (
     filteredBaseSegments.filter((segment) => {
-      if (!showIdle && segment.segmentType.startsWith('IDLE_')) return false;
-      if (selectedSegmentTypeSet.size > 0 && !selectedSegmentTypeSet.has(segment.segmentType)) return false;
+      const segmentType = String(segment.segmentType || '');
+      if (!showIdle && segmentType.startsWith('IDLE_')) return false;
+      if (selectedSegmentTypeSet.size > 0 && !selectedSegmentTypeSet.has(segmentType)) {
+        return isSystemContextSegment(segmentType);
+      }
       return true;
     })
   ), [filteredBaseSegments, showIdle, selectedSegmentTypeSet]);
@@ -1521,6 +1607,14 @@ function App() {
     () => (ganttVisibleSegments.length > 0
       ? buildKpiData(buildKpisFromSegments(ganttVisibleSegments))
       : initialKpiData),
+    [ganttVisibleSegments]
+  );
+  const visibleSystemSegmentCount = useMemo(
+    () => ganttVisibleSegments.filter((segment) => String(segment.segmentType || '').startsWith('SYSTEM_')).length,
+    [ganttVisibleSegments]
+  );
+  const visibleProcessingSegmentCount = useMemo(
+    () => ganttVisibleSegments.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INITIAL_PROCESSING').length,
     [ganttVisibleSegments]
   );
 
@@ -1859,17 +1953,21 @@ function App() {
     return null;
   };
 
-  const refreshAll = async () => {
+  const refreshAll = async (options = {}) => {
     setLoading(true);
     setErrorMessage('');
     setBackendWarning('');
     setDebugFetchError('');
     try {
+      const shouldFetchDebug = Boolean(options.includeDebug || showDebugPanel);
+      const debugPromise = shouldFetchDebug
+        ? requestJson('/api/debug').catch((error) => ({ __error: error.message || 'debug failed' }))
+        : Promise.resolve(null);
       const [sourcesRes, performanceRes, healthRes, debugRes] = await Promise.all([
         requestJson('/api/sources'),
         requestJson('/api/user-performance'),
         requestJson('/api/health').catch((error) => ({ __error: error.message || 'health failed' })),
-        requestJson('/api/debug').catch((error) => ({ __error: error.message || 'debug failed' })),
+        debugPromise,
       ]);
       setSources(sourcesRes.sources || []);
       setPerformance(performanceRes || null);
@@ -1886,11 +1984,16 @@ function App() {
         }
       }
 
-      if (debugRes?.__error) {
-        setDebugInfo(null);
-        setDebugFetchError(debugRes.__error);
+      if (shouldFetchDebug) {
+        if (debugRes?.__error) {
+          setDebugInfo(null);
+          setDebugFetchError(debugRes.__error);
+        } else {
+          setDebugInfo(debugRes || null);
+        }
       } else {
-        setDebugInfo(debugRes || null);
+        setDebugInfo(null);
+        setDebugFetchError('');
       }
     } catch (error) {
       setErrorMessage(error.message || 'Unable to load data');
@@ -2325,7 +2428,13 @@ function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowDebugPanel((v) => !v)}
+                    onClick={() => {
+                      const next = !showDebugPanel;
+                      setShowDebugPanel(next);
+                      if (next) {
+                        refreshAll({ includeDebug: true });
+                      }
+                    }}
                     className="px-2 py-1 rounded border border-slate-300 text-xs hover:bg-slate-50"
                   >
                     {showDebugPanel ? 'Hide Debug' : 'Show Debug'}
@@ -2354,6 +2463,8 @@ function App() {
                   <div>Normalized Events: {debugInfo?.parseStats?.normalizedEvents ?? '-'}</div>
                   <div>Normalized Events with ToStatus: {debugInfo?.parseStats?.normalizedEventsWithToStatus ?? '-'}</div>
                   <div>Active User Seconds: {performance?.kpis?.activeUserTimeSeconds ?? '-'}</div>
+                  <div>Visible System Segments: {visibleSystemSegmentCount}</div>
+                  <div>Visible Processing Segments: {visibleProcessingSegmentCount}</div>
                 </div>
               )}
             </div>
@@ -2403,7 +2514,9 @@ function App() {
                 <div className="flex justify-between items-center mb-6 pr-8">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Timeline by User</h2>
-                    <p className="text-sm text-slate-500">User activity and waiting windows across time | Segments: {ganttVisibleSegments.length.toLocaleString()}</p>
+                    <p className="text-sm text-slate-500">
+                      User activity and waiting windows across time | Segments: {ganttVisibleSegments.length.toLocaleString()} | System: {visibleSystemSegmentCount.toLocaleString()} | Processing: {visibleProcessingSegmentCount.toLocaleString()}
+                    </p>
                   </div>
                 </div>
                   <div className="space-y-2">
@@ -2617,4 +2730,3 @@ if (!rootNode) {
 }
 
 createRoot(rootNode).render(<App />);
-
