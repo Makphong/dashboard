@@ -24,7 +24,7 @@ const SEGMENT_COLORS = {
   SYSTEM_SCHEDULED_REPROCESSING: '#334155',
   SYSTEM_INTERNAL_TRANSITION: '#334155',
   IDLE_WAITING_FOR_REVIEW: '#94A3B8',
-  IDLE_WAITING_FOR_REREVIEW: '#64748B',
+  IDLE_WAITING_FOR_REREVIEW: '#94A3B8',
   IDLE_WAITING_FOR_SCHEDULED_REPROCESS: '#94A3B8',
   IDLE_AFTER_SYSTEM_REPROCESS: '#94A3B8',
   AUTO_TIMEOUT_MARKER: '#DC2626',
@@ -75,6 +75,7 @@ const GANTT_DRILL_GROUPS = [
   { key: 'ReviewAutoClose', label: 'Review Auto Close', color: '#06B6D4' },
   { key: 'Edit', label: 'Edit', color: '#F59E0B' },
   { key: 'EditAndComplete', label: 'Edit and Complete', color: '#10B981' },
+  { key: 'Idle', label: 'Idle', color: '#94A3B8' },
 ];
 
 const GANTT_DRILL_GROUP_COLORS = {
@@ -85,6 +86,7 @@ const GANTT_DRILL_GROUP_COLORS = {
   Reprocessing: '#334155',
   Edit: '#F59E0B',
   EditAndComplete: '#10B981',
+  Idle: '#94A3B8',
 };
 
 const GANTT_DRILL_GROUP_LABELS = {
@@ -95,6 +97,7 @@ const GANTT_DRILL_GROUP_LABELS = {
   Reprocessing: 'Reprocessing',
   Edit: 'Edit',
   EditAndComplete: 'Edit and Complete',
+  Idle: 'Idle',
 };
 
 const CORE_WORK_SESSION_TYPES = new Set([
@@ -219,13 +222,12 @@ function toDrillGroup(segmentType) {
   const type = String(segmentType || '');
   if (type === 'USER_UPLOADING') return 'Uploading';
   if (type === 'SYSTEM_INITIAL_PROCESSING' || type === 'SYSTEM_INTERNAL_TRANSITION') return 'Processing';
-  if (type === 'USER_REVIEW_COMMENT_CHECK' || type === 'IDLE_WAITING_FOR_REVIEW' || type === 'IDLE_WAITING_FOR_REREVIEW') return 'Review';
+  if (type === 'USER_REVIEW_COMMENT_CHECK') return 'Review';
+  if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
   if (type === 'USER_REVIEW_AUTO_TIMEOUT' || type === 'AUTO_TIMEOUT_MARKER') return 'ReviewAutoClose';
   if (
     type === 'SYSTEM_SCHEDULED_REPROCESSING'
     || type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
-    || type === 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS'
-    || type === 'IDLE_AFTER_SYSTEM_REPROCESS'
   ) return 'Reprocessing';
   if (type === 'USER_EDITING_CORRECTION') return 'Edit';
   if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL' || type === 'USER_COMPLETION_APPROVAL') return 'EditAndComplete';
@@ -852,7 +854,9 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
                         const x2 = getX(clippedEnd);
                         const minBarWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
                         const barWidth = Math.max(minBarWidth, x2 - x1);
-                        const color = GANTT_DRILL_GROUP_COLORS[segment.drillGroup] || SEGMENT_COLORS[segment.segmentType] || '#64748B';
+                        const color = lane === 'Idle'
+                          ? '#94A3B8'
+                          : (GANTT_DRILL_GROUP_COLORS[segment.drillGroup] || SEGMENT_COLORS[segment.segmentType] || '#64748B');
                         const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
                         const typeLabel = toGanttSegmentTypeLabel(segment.segmentType);
                         const label = `${groupLabel} | ${typeLabel} (${segment.segmentType}) | ${lane} | ${formatTimeTick(segment.start)} → ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
@@ -924,7 +928,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
           <div className="mt-0.5 text-[11px] text-slate-600">Duration: {formatDuration(hoveredSegment.durationSeconds)}</div>
         </div>
       ) : null}
-      <p className="text-xs text-slate-500">Tip: เลื่อนขึ้น-ลงเพื่อดูผู้ใช้เพิ่ม (แสดงครั้งละ 7), ลากซ้าย-ขวาเพื่อเลื่อนเวลา และคลิกแท่งเพื่อดูรายละเอียด</p>
+
     </div>
   );
 };
@@ -2482,9 +2486,7 @@ function App() {
               <div className="flex justify-between items-end mb-2">
                 <div>
                   <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">User Performance</h1>
-                  <p className="text-slate-500 mt-1">
-                    PRD-aligned metrics from central local DB. Files: {performance?.summary?.files || 0} | Pages: {performance?.summary?.pages || 0} | Rows: {(performance?.summary?.rows || 0).toLocaleString()}
-                  </p>
+
                 </div>
               </div>
 
@@ -2514,9 +2516,6 @@ function App() {
                 <div className="flex justify-between items-center mb-6 pr-8">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Timeline by User</h2>
-                    <p className="text-sm text-slate-500">
-                      User activity and waiting windows across time | Segments: {ganttVisibleSegments.length.toLocaleString()} | System: {visibleSystemSegmentCount.toLocaleString()} | Processing: {visibleProcessingSegmentCount.toLocaleString()}
-                    </p>
                   </div>
                 </div>
                   <div className="space-y-2">
