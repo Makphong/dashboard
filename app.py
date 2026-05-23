@@ -133,6 +133,26 @@ FIELD_ALIASES = {
     },
 }
 
+CSV_DECODE_CANDIDATES = (
+    "utf-8-sig",
+    "utf-8",
+    "utf-16",
+    "utf-16-le",
+    "utf-16-be",
+    "cp874",
+    "tis-620",
+    "cp1252",
+)
+MOJIBAKE_MARKERS = (
+    "\u00c3",
+    "\u00c2",
+    "\u00e0\u00b8",
+    "\u00e0\u00b9",
+    "\u00e1\u00bb",
+    "\u00e1\u00ba",
+    "\u00ef\u00bb\u00bf",
+)
+
 
 def utc_now_iso() -> str:
     return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -546,16 +566,47 @@ def parse_xlsx_bytes(payload: bytes) -> list[tuple[str, list[dict]]]:
     return result_pages
 
 
-def parse_csv_bytes(payload: bytes) -> list[dict]:
-    text = None
-    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+def score_text_quality(text: str) -> int:
+    score = 0
+    score += text.count("\ufffd") * 10
+    score += text.count("\x00") * 10
+    for marker in MOJIBAKE_MARKERS:
+        score += text.count(marker) * 4
+    score += sum(1 for ch in text if ch not in "\r\n\t" and ord(ch) < 32) * 6
+
+    thai_codes = [ord(ch) for ch in text if "\u0e00" <= ch <= "\u0e7f"]
+    if thai_codes:
+        thai_consonants = sum(1 for code in thai_codes if 0x0E01 <= code <= 0x0E2E)
+        thai_total = len(thai_codes)
+        # cp1252 decoded as cp874 often yields Thai marks but almost no consonants.
+        if thai_total >= 2 and thai_consonants == 0:
+            score += thai_total * 8
+        elif thai_total >= 4 and thai_consonants * 3 < thai_total:
+            score += (thai_total - (thai_consonants * 3)) * 3
+
+    return score
+
+
+def decode_csv_payload(payload: bytes) -> str:
+    candidates: list[tuple[int, int, str]] = []
+    for priority, encoding in enumerate(CSV_DECODE_CANDIDATES):
         try:
-            text = payload.decode(encoding)
-            break
+            decoded = payload.decode(encoding)
         except UnicodeDecodeError:
             continue
-    if text is None:
-        text = payload.decode("utf-8", errors="replace")
+        candidates.append((score_text_quality(decoded), priority, decoded))
+        if priority <= 1 and candidates[-1][0] == 0:
+            break
+
+    if not candidates:
+        return payload.decode("utf-8", errors="replace")
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates[0][2]
+
+
+def parse_csv_bytes(payload: bytes) -> list[dict]:
+    text = decode_csv_payload(payload)
 
     sample = text[:4096]
     delimiter = ","
@@ -1260,6 +1311,28 @@ def read_json_body(handler: SimpleHTTPRequestHandler) -> dict:
 
 
 class DashboardHandler(SimpleHTTPRequestHandler):
+    extensions_map = {
+        **SimpleHTTPRequestHandler.extensions_map,
+        ".html": "text/html; charset=utf-8",
+        ".htm": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".mjs": "application/javascript; charset=utf-8",
+        ".jsx": "application/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".txt": "text/plain; charset=utf-8",
+        ".md": "text/markdown; charset=utf-8",
+        ".csv": "text/csv; charset=utf-8",
+        ".svg": "image/svg+xml; charset=utf-8",
+    }
+
+    def end_headers(self) -> None:
+        # Avoid stale cached JSX/HTML in browsers; always fetch latest local file.
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
     def log_message(self, fmt: str, *args) -> None:
         # Keep logs compact but still visible in terminal
         super().log_message(fmt, *args)

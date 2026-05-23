@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Users, Server, Clock, Timer, Hourglass, RefreshCw, AlertTriangle,
@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-22-prd-ui-20';
+const FRONTEND_BUILD_VERSION = '2026-05-24-hotfix-text-01';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -2612,5 +2612,4 @@ if (!rootNode) {
 }
 
 createRoot(rootNode).render(<App />);
-
 
