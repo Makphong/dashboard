@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import {
   Users, Server, Clock, Timer, Hourglass, RefreshCw, AlertTriangle,
   Search, Calendar, ChevronDown, Bell, User, LayoutDashboard,
@@ -376,7 +377,10 @@ const FilterPopover = ({
   useEffect(() => {
     if (!isOpen) return undefined;
     const onDocumentMouseDown = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
+      const target = event.target;
+      const clickedAnchor = rootRef.current && rootRef.current.contains(target);
+      const clickedPanel = panelRef.current && panelRef.current.contains(target);
+      if (!clickedAnchor && !clickedPanel) {
         setOpenDropdown('');
       }
     };
@@ -434,14 +438,15 @@ const FilterPopover = ({
         </div>
         <ChevronDown className={`w-4 h-4 transition-transform ${active ? 'text-blue-400' : 'text-slate-400'} ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-      {isOpen ? (
+      {isOpen ? createPortal(
         <div
           ref={panelRef}
           style={panelStyle}
           className={`fixed z-[120] rounded-2xl border border-slate-200 bg-white shadow-[0_20px_45px_-18px_rgba(15,23,42,0.35)] overflow-y-auto no-scrollbar ${panelClassName}`}
         >
           {children}
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );
