@@ -111,8 +111,61 @@ const WORKFLOW_FLOW_SEGMENT_TYPES = new Set([
   'USER_REVIEW_AUTO_TIMEOUT',
   'USER_EDITING_CORRECTION',
   'USER_COMPLETION_APPROVAL',
+  'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
   'USER_UPLOADING',
+  'SYSTEM_INITIAL_PROCESSING',
+  'SYSTEM_SCHEDULED_REPROCESSING',
+  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2',
+  'SYSTEM_INTERNAL_TRANSITION',
+  'IDLE_WAITING_FOR_REVIEW',
+  'IDLE_WAITING_FOR_REREVIEW',
+  'IDLE_WAITING_FOR_SCHEDULED_REPROCESS',
+  'IDLE_AFTER_SYSTEM_REPROCESS',
 ]);
+
+const TRANSITION_FRIENDLY_LABELS = {
+  // อัปโหลด → ขั้นต่อไป
+  'USER_UPLOADING=>SYSTEM_INITIAL_PROCESSING': 'อัปโหลดเสร็จ → ระบบเริ่มประมวลผล',
+  'USER_UPLOADING=>IDLE_WAITING_FOR_REVIEW': 'อัปโหลดเสร็จ → รอผู้ตรวจ',
+  'USER_UPLOADING=>USER_REVIEW_COMMENT_CHECK': 'อัปโหลดเสร็จ → เริ่ม Review ทันที',
+  'USER_UPLOADING=>USER_REVIEW_AUTO_TIMEOUT': 'อัปโหลดเสร็จ → ไม่มีคนตรวจ (หมดเวลา)',
+  // ระบบประมวลผล → ขั้นต่อไป
+  'SYSTEM_INITIAL_PROCESSING=>IDLE_WAITING_FOR_REVIEW': 'ประมวลผลเสร็จ → รอผู้ตรวจ',
+  'SYSTEM_INITIAL_PROCESSING=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลเสร็จ → เริ่ม Review ทันที',
+  'SYSTEM_INITIAL_PROCESSING=>USER_EDITING_CORRECTION': 'ประมวลผลเสร็จ → เริ่มแก้ไขทันที',
+  // รอตรวจ → ผู้ใช้มาทำงาน
+  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_COMMENT_CHECK': 'รอผู้ตรวจ → เริ่ม Review',
+  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_AUTO_TIMEOUT': 'รอผู้ตรวจนานเกิน → หมดเวลา',
+  'IDLE_WAITING_FOR_REREVIEW=>USER_REVIEW_COMMENT_CHECK': 'รอตรวจซ้ำ → เริ่ม Review',
+  'IDLE_WAITING_FOR_REREVIEW=>USER_EDITING_CORRECTION': 'รอตรวจซ้ำ → เริ่มแก้ไข',
+  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลซ้ำเสร็จ → เริ่ม Review',
+  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_EDITING_CORRECTION': 'ประมวลผลซ้ำเสร็จ → เริ่มแก้ไข',
+  'IDLE_WAITING_FOR_SCHEDULED_REPROCESS=>SYSTEM_SCHEDULED_REPROCESSING': 'รอคิว → ระบบประมวลผลซ้ำ',
+  // Review → ขั้นต่อไป
+  'USER_REVIEW_COMMENT_CHECK=>USER_COMPLETION_APPROVAL': 'Review ผ่าน → อนุมัติ',
+  'USER_REVIEW_COMMENT_CHECK=>USER_EDITING_CORRECTION': 'Review ไม่ผ่าน → ส่งแก้ไข',
+  'USER_REVIEW_COMMENT_CHECK=>IDLE_WAITING_FOR_REREVIEW': 'Review เสร็จ → รอตรวจซ้ำ',
+  'USER_REVIEW_COMMENT_CHECK=>SYSTEM_SCHEDULED_REPROCESSING': 'Review เสร็จ → ส่งระบบประมวลผลซ้ำ',
+  // แก้ไข → ขั้นต่อไป
+  'USER_EDITING_CORRECTION=>USER_COMPLETION_APPROVAL': 'แก้ไขเสร็จ → อนุมัติ',
+  'USER_EDITING_CORRECTION=>IDLE_WAITING_FOR_REREVIEW': 'แก้ไขเสร็จ → รอตรวจซ้ำ',
+  'USER_EDITING_CORRECTION=>SYSTEM_SCHEDULED_REPROCESSING': 'แก้ไขเสร็จ → ส่งระบบประมวลผลซ้ำ',
+  'USER_EDITING_CORRECTION=>USER_REVIEW_COMMENT_CHECK': 'แก้ไขเสร็จ → กลับมา Review',
+  // หมดเวลา → กลับมาทำงาน
+  'USER_REVIEW_AUTO_TIMEOUT=>USER_EDITING_CORRECTION': 'หมดเวลา Review → กลับมาแก้ไข',
+  'USER_REVIEW_AUTO_TIMEOUT=>USER_REVIEW_COMMENT_CHECK': 'หมดเวลา Review → กลับมา Review',
+  'USER_REVIEW_AUTO_TIMEOUT=>IDLE_WAITING_FOR_REREVIEW': 'หมดเวลา Review → รอตรวจซ้ำ',
+  // อนุมัติ → ขั้นต่อไป
+  'USER_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'อนุมัติแล้ว → รอตรวจซ้ำ',
+  'USER_COMPLETION_APPROVAL=>SYSTEM_SCHEDULED_REPROCESSING': 'อนุมัติแล้ว → ส่งระบบประมวลผลซ้ำ',
+  'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'แก้ไข+อนุมัติ → รอตรวจซ้ำ',
+  // ระบบประมวลผลซ้ำ
+  'SYSTEM_SCHEDULED_REPROCESSING=>IDLE_AFTER_SYSTEM_REPROCESS': 'ระบบประมวลผลซ้ำเสร็จ → รอผู้ตรวจ',
+  'SYSTEM_SCHEDULED_REPROCESSING=>USER_REVIEW_COMMENT_CHECK': 'ระบบประมวลผลซ้ำเสร็จ → เริ่ม Review',
+  'SYSTEM_SCHEDULED_REPROCESSING=>USER_EDITING_CORRECTION': 'ระบบประมวลผลซ้ำเสร็จ → เริ่มแก้ไข',
+  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>IDLE_AFTER_SYSTEM_REPROCESS': 'ประมวลผลซ้ำรอบ 2 เสร็จ → รอผู้ตรวจ',
+  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลซ้ำรอบ 2 เสร็จ → เริ่ม Review',
+};
 
 const initialKpiData = [
   { id: 1, label: 'Active User Time', value: '-', subtext: 'No data', icon: Clock, color: 'text-slate-400', bg: 'bg-slate-50' },
@@ -268,7 +321,7 @@ function buildKpiData(kpis) {
       id: 1,
       label: 'Active User Time',
       value: kpis.activeUserTimeDisplay || '-',
-      subtext: `${Math.round(kpis.activeUserTimeSeconds || 0).toLocaleString()} seconds`,
+      subtext: `Avg per user: ${kpis.avgTimePerUserDisplay || '-'}`,
       icon: Clock,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
@@ -277,7 +330,9 @@ function buildKpiData(kpis) {
       id: 2,
       label: 'Contributing Users',
       value: String(kpis.contributingUsers || 0),
-      subtext: 'Users with active segments',
+      subtext: kpis.topContributorName
+        ? `Top: ${kpis.topContributorName} (${kpis.topContributorDisplay})`
+        : 'No user data',
       icon: Users,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
@@ -286,7 +341,7 @@ function buildKpiData(kpis) {
       id: 3,
       label: 'Avg User Session',
       value: kpis.avgUserSessionDisplay || '-',
-      subtext: `${Math.round(kpis.avgUserSessionSeconds || 0).toLocaleString()} seconds/session`,
+      subtext: `Med ${kpis.medianSessionDisplay || '-'} · ${kpis.minSessionDisplay || '-'} – ${kpis.maxSessionDisplay || '-'}`,
       icon: Timer,
       color: 'text-sky-600',
       bg: 'bg-sky-50',
@@ -295,7 +350,7 @@ function buildKpiData(kpis) {
       id: 4,
       label: 'Idle Waiting for User',
       value: kpis.idleWaitingDisplay || '-',
-      subtext: `${kpis.idleWaitingOccurrences || 0} occurrences`,
+      subtext: `${kpis.idlePercentOfCycle?.toFixed(1) || '0.0'}% of cycle time`,
       icon: Hourglass,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
@@ -304,7 +359,7 @@ function buildKpiData(kpis) {
       id: 5,
       label: 'Rework Rate',
       value: kpis.reworkRateDisplay || '0.0%',
-      subtext: 'User sessions to Pending Re-Review',
+      subtext: `${kpis.reworkSessions || 0} / ${kpis.totalSessions || 0} sessions`,
       icon: RefreshCw,
       color: 'text-violet-600',
       bg: 'bg-violet-50',
@@ -313,7 +368,7 @@ function buildKpiData(kpis) {
       id: 6,
       label: 'Auto Closed Sessions',
       value: String(kpis.autoClosedSessions || 0),
-      subtext: 'In Review closed by system',
+      subtext: `${kpis.autoClosedRate?.toFixed(1) || '0.0'}% of all sessions`,
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
@@ -348,6 +403,33 @@ function buildKpisFromSegments(segments) {
   const reworkSessions = coreUserSegments.filter((segment) => String(segment.segmentType || '') === 'USER_EDITING_CORRECTION').length;
   const reworkRate = coreUserSegments.length > 0 ? (reworkSessions / coreUserSegments.length) : 0;
 
+  // --- Additional insight metrics ---
+  const totalCycleSeconds = activeUserTimeSeconds + idleWaitingSeconds +
+    safeSegments.filter((s) => String(s.segmentType || '').startsWith('SYSTEM_')).reduce((sum, s) => sum + safeNumber(s.durationSeconds), 0);
+  const idlePercentOfCycle = totalCycleSeconds > 0 ? (idleWaitingSeconds / totalCycleSeconds) * 100 : 0;
+  const avgTimePerUser = contributingUsers > 0 ? activeUserTimeSeconds / contributingUsers : 0;
+
+  // Per-user time map for top contributor
+  const userTimeMap = {};
+  for (const seg of userSegments) {
+    const name = String(seg.userName || '').trim();
+    if (name && name.toLowerCase() !== 'system') {
+      userTimeMap[name] = (userTimeMap[name] || 0) + effectiveDuration(seg);
+    }
+  }
+  const topContributor = Object.entries(userTimeMap).sort((a, b) => b[1] - a[1])[0];
+
+  // Session duration distribution
+  const sessionDurations = coreUserSegments.map((s) => effectiveDuration(s)).sort((a, b) => a - b);
+  const medianSessionSeconds = sessionDurations.length > 0
+    ? sessionDurations[Math.floor(sessionDurations.length / 2)]
+    : 0;
+  const minSessionSeconds = sessionDurations.length > 0 ? sessionDurations[0] : 0;
+  const maxSessionSeconds = sessionDurations.length > 0 ? sessionDurations[sessionDurations.length - 1] : 0;
+
+  const totalSessions = coreUserSegments.length;
+  const autoClosedRate = totalSessions > 0 ? (autoClosedSessions / totalSessions) * 100 : 0;
+
   return {
     activeUserTimeSeconds,
     activeUserTimeDisplay: formatDuration(activeUserTimeSeconds),
@@ -360,6 +442,20 @@ function buildKpisFromSegments(segments) {
     reworkRate,
     reworkRateDisplay: formatPercent(reworkRate),
     autoClosedSessions,
+    // New insight fields
+    avgTimePerUser,
+    avgTimePerUserDisplay: formatDuration(avgTimePerUser),
+    idlePercentOfCycle,
+    topContributorName: topContributor ? topContributor[0] : '',
+    topContributorTime: topContributor ? topContributor[1] : 0,
+    topContributorDisplay: topContributor ? formatDuration(topContributor[1]) : '',
+    medianSessionSeconds,
+    medianSessionDisplay: formatDuration(medianSessionSeconds),
+    minSessionDisplay: formatDuration(minSessionSeconds),
+    maxSessionDisplay: formatDuration(maxSessionSeconds),
+    reworkSessions,
+    totalSessions,
+    autoClosedRate,
   };
 }
 
@@ -402,11 +498,6 @@ const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, act
           ${isCollapsed ? 'justify-center px-0' : 'px-3'}`} title="System Performance">
           <Server className="w-5 h-5 flex-shrink-0" />
           {!isCollapsed && <span>System Performance</span>}
-        </a>
-        <a href="#" className={`flex items-center gap-3 py-2.5 text-slate-600 hover:bg-slate-50 border border-transparent rounded-xl font-medium transition-colors
-          ${isCollapsed ? 'justify-center px-0' : 'px-3'}`} title="Process Bottleneck">
-          <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-          {!isCollapsed && <span>Process Bottleneck</span>}
         </a>
       </nav>
 
@@ -1875,62 +1966,111 @@ function App() {
   );
 
   const flowRows = useMemo(() => {
+    // --- Group segments by document + user for sequential analysis ---
     const groupedByDocumentAndUser = new Map();
     filteredBaseSegments.forEach((segment) => {
-      const userName = String(segment.userName || '');
-      if (!userName || userName.toLowerCase() === 'system') return;
       const segmentType = String(segment.segmentType || '');
       if (!WORKFLOW_FLOW_SEGMENT_TYPES.has(segmentType)) return;
-
       const documentKey = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
+      const userName = String(segment.userName || '') || 'System';
       const sequenceKey = `${documentKey}||${userName}`;
       if (!groupedByDocumentAndUser.has(sequenceKey)) groupedByDocumentAndUser.set(sequenceKey, []);
       groupedByDocumentAndUser.get(sequenceKey).push(segment);
     });
 
-    const transitionMap = new Map();
+    // --- Collect all consecutive transition gaps ---
+    const allTransitions = [];
     groupedByDocumentAndUser.forEach((segmentsByGroup) => {
       const sorted = [...segmentsByGroup].sort((a, b) => safeNumber(a.startTs) - safeNumber(b.startTs));
       for (let idx = 1; idx < sorted.length; idx += 1) {
         const prev = sorted[idx - 1];
         const current = sorted[idx];
-        if (
-          selectedSegmentTypeSet.size > 0
-          && (!selectedSegmentTypeSet.has(prev.segmentType) || !selectedSegmentTypeSet.has(current.segmentType))
-        ) {
-          continue;
-        }
         if (prev.segmentType === current.segmentType) continue;
-        const transition = `${prev.segmentType}=>${current.segmentType}`;
         const gapSeconds = Math.max(0, Math.round((safeNumber(current.startTs) - safeNumber(prev.endTs)) / 1000));
         if (gapSeconds > FLOW_SESSION_GAP_MAX_SECONDS) continue;
-        if (!transitionMap.has(transition)) {
-          transitionMap.set(transition, { fromType: prev.segmentType, toType: current.segmentType, totalSeconds: 0, count: 0 });
-        }
-        const stats = transitionMap.get(transition);
-        stats.totalSeconds += gapSeconds;
-        stats.count += 1;
+        allTransitions.push({
+          fromType: String(prev.segmentType || ''),
+          toType: String(current.segmentType || ''),
+          gapSeconds,
+        });
       }
     });
 
-    const derivedAll = Array.from(transitionMap.entries())
-      .map(([transitionKey, stats]) => ({
-        transitionKey,
-        fromType: stats.fromType,
-        toType: stats.toType,
-        transitionLabel: `${toSegmentTypeLabel(stats.fromType)} -> ${toSegmentTypeLabel(stats.toType)}`,
-        count: stats.count,
-        totalSeconds: stats.totalSeconds,
-        avgSeconds: stats.count > 0 ? stats.totalSeconds / stats.count : 0,
-      }))
+    // --- Define insight groups ---
+    const INSIGHT_GROUPS = [
+      {
+        id: 'user-after-processing',
+        label: 'Post-Processing Pickup',
+        match: (f, t) =>
+          (f.startsWith('SYSTEM_') || f === 'IDLE_WAITING_FOR_REVIEW' || f === 'IDLE_AFTER_SYSTEM_REPROCESS')
+          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION' || t === 'USER_COMPLETION_APPROVAL'),
+      },
+      {
+        id: 'user-rework-cycle',
+        label: 'Rework Turnaround',
+        match: (f, t) =>
+          (f === 'USER_REVIEW_COMMENT_CHECK' || f === 'USER_EDITING_CORRECTION'
+            || f === 'USER_COMPLETION_APPROVAL' || f === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL'
+            || f === 'IDLE_WAITING_FOR_REREVIEW')
+          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION' || t === 'USER_COMPLETION_APPROVAL')
+          && f !== t,
+      },
+      {
+        id: 'reviewer-pickup',
+        label: 'Reviewer Queue Wait',
+        match: (f, t) =>
+          (f === 'IDLE_WAITING_FOR_REVIEW' || f === 'IDLE_WAITING_FOR_REREVIEW')
+          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION'),
+      },
+      {
+        id: 'upload-to-start',
+        label: 'Upload to First Action',
+        match: (f, t) =>
+          f === 'USER_UPLOADING'
+          && (t.startsWith('SYSTEM_') || t.startsWith('USER_') || t.startsWith('IDLE_')),
+      },
+      {
+        id: 'timeout-recovery',
+        label: 'Timeout Recovery',
+        match: (f, t) =>
+          f === 'USER_REVIEW_AUTO_TIMEOUT'
+          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION'),
+      },
+      {
+        id: 'review-to-decision',
+        label: 'Post-Review Decision',
+        match: (f, t) =>
+          f === 'USER_REVIEW_COMMENT_CHECK'
+          && (t === 'USER_COMPLETION_APPROVAL' || t === 'USER_EDITING_CORRECTION'
+            || t.startsWith('SYSTEM_') || t === 'IDLE_WAITING_FOR_REREVIEW'),
+      },
+    ];
+
+    // --- Aggregate transitions into groups ---
+    const groupStats = INSIGHT_GROUPS.map((group) => {
+      let totalSeconds = 0;
+      let count = 0;
+      for (const t of allTransitions) {
+        if (group.match(t.fromType, t.toType)) {
+          totalSeconds += t.gapSeconds;
+          count += 1;
+        }
+      }
+      return {
+        transitionKey: group.id,
+        transitionLabel: group.label,
+        count,
+        totalSeconds,
+        avgSeconds: count > 0 ? totalSeconds / count : 0,
+      };
+    });
+
+    return groupStats
       .filter((row) => row.count > 0)
       .sort((a, b) => b.avgSeconds - a.avgSeconds);
+  }, [filteredBaseSegments]);
 
-    const stableRows = derivedAll.filter((row) => row.count >= FLOW_MIN_OCCURRENCES);
-    return stableRows.length > 0 ? stableRows : derivedAll;
-  }, [filteredBaseSegments, selectedSegmentTypeSet]);
-
-  const flowTopRows = useMemo(() => flowRows.slice(0, 4), [flowRows]);
+  const flowTopRows = useMemo(() => flowRows.slice(0, 6), [flowRows]);
 
   useEffect(() => {
     setSelectedGanttSegment(null);
@@ -1974,8 +2114,8 @@ function App() {
       subtitle: 'Compare Review / Edit / Complete time by user',
     },
     flow: {
-      title: 'Process Delay Between Steps',
-      subtitle: 'Average delay per transition (not sum)',
+      title: 'Step Delay Analysis',
+      subtitle: 'Average wait time between workflow steps',
     },
     matrix: {
       title: 'Quality vs Rework by User',
@@ -2042,7 +2182,7 @@ function App() {
             valueLabel: `${formatDuration(row.avgSeconds)} avg`,
             meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
           }))}
-          maxVisibleRows={4}
+          maxVisibleRows={6}
         />
       );
     }
@@ -2643,8 +2783,8 @@ function App() {
                       </div>
                     </div>
                     <div className="text-slate-500 text-sm font-semibold mb-1">{kpi.label}</div>
-                    <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{kpi.value}</div>
-                    <div className="text-xs text-slate-400 mt-2 font-medium">{kpi.subtext}</div>
+                    <div className="text-3xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">{kpi.value}</div>
+                    <div className="text-xs text-slate-400 mt-2 font-medium whitespace-nowrap overflow-hidden text-ellipsis" title={kpi.subtext}>{kpi.subtext}</div>
                   </div>
                 ))}
               </div>
@@ -2737,8 +2877,8 @@ function App() {
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
                   </button>
                   <div className="mb-4 pr-8">
-                    <h2 className="text-lg font-bold text-slate-900">Process Delay Between Steps</h2>
-                    <p className="text-sm text-slate-500">Average delay per transition (not sum)</p>
+                    <h2 className="text-lg font-bold text-slate-900">Step Delay Analysis</h2>
+                    <p className="text-sm text-slate-500">Average wait time between workflow steps</p>
                   </div>
                   <div className="space-y-2 flex-1 min-h-0 overflow-hidden">
                     {flowTopRows.length === 0 ? (
@@ -2756,7 +2896,7 @@ function App() {
                             valueLabel: `${formatDuration(row.avgSeconds)} avg`,
                             meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
                           }))}
-                          maxVisibleRows={4}
+                          maxVisibleRows={6}
                         />
                     )}
                   </div>
