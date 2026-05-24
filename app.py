@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import uuid
 import zipfile
 from collections import Counter, defaultdict
@@ -24,7 +25,9 @@ DB_PATH = ROOT / "local_dashboard.db"
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
 APP_VERSION = "2026-05-24-perf-1"
 SERVER_STARTED_AT = dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-ALGORITHM_VERSION = "1.3_RAW_3_TIME_GROUP_EDIT_COMPLETED_SAME_TIMESTAMP_HANDOFF_PROCESSING_BACKFILL_1"
+ALGORITHM_VERSION = (
+    "1.3_RAW_3_TIME_GROUP_EDIT_COMPLETED_SAME_TIMESTAMP_HANDOFF_PROCESSING_BACKFILL_1"
+)
 
 # In-memory caches for expensive reads; invalidated on upload/delete.
 _NORMALIZED_EVENTS_CACHE_SIGNATURE: tuple[int, int] | None = None
@@ -113,7 +116,23 @@ COMPLETED_STATUSES = {
 }
 
 DATE_NUMBER_FORMAT_IDS = {
-    14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 30, 36, 45, 46, 47, 50, 57,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    27,
+    30,
+    36,
+    45,
+    46,
+    47,
+    50,
+    57,
 }
 
 FIELD_ALIASES = {
@@ -434,7 +453,9 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
-def current_unified_rows_signature(conn: sqlite3.Connection | None = None) -> tuple[int, int]:
+def current_unified_rows_signature(
+    conn: sqlite3.Connection | None = None,
+) -> tuple[int, int]:
     owns_conn = conn is None
     local_conn = conn or get_conn()
     try:
@@ -492,6 +513,17 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_unified_file_page ON unified_rows(file_name, page_name);
             CREATE INDEX IF NOT EXISTS idx_unified_source ON unified_rows(source_id);
+            CREATE TABLE IF NOT EXISTS connected_sheets (
+                connection_id TEXT PRIMARY KEY,
+                url TEXT NOT NULL,
+                spreadsheet_id TEXT NOT NULL,
+                label TEXT NOT NULL,
+                connected_at TEXT NOT NULL,
+                last_sync_at TEXT,
+                last_sync_rows INTEGER DEFAULT 0,
+                last_sync_pages INTEGER DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1
+            );
             """
         )
 
@@ -576,7 +608,9 @@ def parse_cell_value(
         is_date_style = style_index in date_style_indexes
         if not is_date_style and header_hint:
             hint = normalize_text(header_hint)
-            is_date_style = any(token in hint for token in ("date", "time", "timestamp"))
+            is_date_style = any(
+                token in hint for token in ("date", "time", "timestamp")
+            )
         if is_date_style:
             return excel_serial_to_datetime(number).strftime("%Y-%m-%d %H:%M:%S")
         if number.is_integer():
@@ -606,7 +640,9 @@ def dedupe_headers(headers: dict[int, str]) -> dict[int, str]:
 def detect_header_row(rows: list[tuple[int, dict[int, object]]]) -> int:
     for idx, (_, row_values) in enumerate(rows):
         non_empty = [v for v in row_values.values() if v not in (None, "")]
-        text_cells = [v for v in non_empty if isinstance(v, str) and not str(v).strip().isdigit()]
+        text_cells = [
+            v for v in non_empty if isinstance(v, str) and not str(v).strip().isdigit()
+        ]
         if len(non_empty) >= 2 and len(text_cells) >= 1:
             return idx
     return 0
@@ -632,7 +668,9 @@ def parse_xlsx_bytes(payload: bytes) -> list[tuple[str, list[dict]]]:
         result_pages: list[tuple[str, list[dict]]] = []
         for sheet in workbook.findall("m:sheets/m:sheet", ns):
             sheet_name = sheet.attrib.get("name", "Sheet")
-            rel_id = sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+            rel_id = sheet.attrib.get(
+                "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+            )
             if not rel_id:
                 continue
 
@@ -671,11 +709,13 @@ def parse_xlsx_bytes(payload: bytes) -> list[tuple[str, list[dict]]]:
 
             header_row_index = detect_header_row(parsed_rows)
             header_row_num, header_values = parsed_rows[header_row_index]
-            headers = {col_idx: str(value).strip() for col_idx, value in header_values.items()}
+            headers = {
+                col_idx: str(value).strip() for col_idx, value in header_values.items()
+            }
             headers = dedupe_headers(headers)
 
             page_rows: list[dict] = []
-            for row_num, row_values in parsed_rows[header_row_index + 1:]:
+            for row_num, row_values in parsed_rows[header_row_index + 1 :]:
                 row_obj: dict[str, object] = {"__sheet_row_number": row_num}
                 data_cells = 0
                 for col_idx, value in row_values.items():
@@ -764,7 +804,9 @@ def parse_uploaded_file(file_name: str, payload: bytes) -> list[tuple[str, list[
     if suffix == ".csv":
         return [("CSV", parse_csv_bytes(payload))]
     if suffix == ".xls":
-        raise ValueError("Unsupported .xls format. Please save as .xlsx and upload again.")
+        raise ValueError(
+            "Unsupported .xls format. Please save as .xlsx and upload again."
+        )
     raise ValueError(f"Unsupported file type: {suffix or '(no extension)'}")
 
 
@@ -779,6 +821,277 @@ def clear_source_by_file_name(conn: sqlite3.Connection, file_name: str) -> None:
     conn.execute("DELETE FROM unified_rows WHERE source_id = ?", (source_id,))
     conn.execute("DELETE FROM source_pages WHERE source_id = ?", (source_id,))
     conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
+
+
+def _extract_gsheet_id(url: str) -> str | None:
+    """Extract the spreadsheet ID from various Google Sheets URL formats."""
+    m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", url)
+    if m:
+        return m.group(1)
+    m = re.match(r"^([a-zA-Z0-9_-]{20,})$", url.strip())
+    if m:
+        return m.group(1)
+    return None
+
+
+def _fetch_url_bytes(url: str, timeout: int = 60) -> bytes:
+    """Download a URL and return raw bytes. Follows redirects."""
+    import urllib.request
+    import urllib.error
+
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _discover_gsheet_gids(spreadsheet_id: str) -> list[tuple[str, int]]:
+    """Try to discover sheet names and gids from a public Google Sheet.
+    Returns list of (sheet_name, gid) tuples.
+    Falls back to [(\"Sheet1\", 0)] if discovery fails."""
+    try:
+        html_url = (
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit?usp=sharing"
+        )
+        html_bytes = _fetch_url_bytes(html_url, timeout=30)
+        html_text = html_bytes.decode("utf-8", errors="replace")
+        # Google embeds sheet metadata in the HTML in various patterns
+        # Pattern: "name":"SheetName" ... "id":123456
+        sheets: list[tuple[str, int]] = []
+        # Try ritz/bootstrapData pattern
+        for m in re.finditer(
+            r'\{[^}]*"name"\s*:\s*"([^"]+)"[^}]*"id"\s*:\s*(\d+)', html_text
+        ):
+            sheets.append((m.group(1), int(m.group(2))))
+        if not sheets:
+            # Try reversed pattern: "id":X ... "name":"Y"
+            for m in re.finditer(
+                r'\{[^}]*"id"\s*:\s*(\d+)[^}]*"name"\s*:\s*"([^"]+)"', html_text
+            ):
+                sheets.append((m.group(2), int(m.group(1))))
+        if sheets:
+            # Remove duplicates preserving order
+            seen = set()
+            unique = []
+            for name, gid in sheets:
+                if gid not in seen:
+                    seen.add(gid)
+                    unique.append((name, gid))
+            return unique
+    except Exception:
+        pass
+    return [("Sheet1", 0)]
+
+
+def _download_gsheet_pages(spreadsheet_id: str) -> list[tuple[str, list[dict]]]:
+    """Download all tabs from a public Google Sheet as parsed CSV rows."""
+    sheet_tabs = _discover_gsheet_gids(spreadsheet_id)
+    all_pages: list[tuple[str, list[dict]]] = []
+    for sheet_name, gid in sheet_tabs:
+        export_url = (
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
+            f"/export?format=csv&gid={gid}"
+        )
+        try:
+            csv_bytes = _fetch_url_bytes(export_url, timeout=120)
+            if not csv_bytes or len(csv_bytes) < 5:
+                continue
+            rows = parse_csv_bytes(csv_bytes)
+            if rows:
+                all_pages.append((sheet_name, rows))
+        except Exception as exc:
+            print(
+                f"[GSheet] Failed to download sheet '{sheet_name}' (gid={gid}): {exc}"
+            )
+            continue
+    return all_pages
+
+
+def _ingest_gsheet_pages(
+    spreadsheet_id: str, all_pages: list[tuple[str, list[dict]]]
+) -> dict:
+    """Ingest downloaded Google Sheet pages into the DB (replaces existing data for this sheet)."""
+    file_name = f"gsheet_{spreadsheet_id[:12]}.csv"
+    now = utc_now_iso()
+    source_id = uuid.uuid4().hex
+    total_rows = 0
+    with get_conn() as conn:
+        clear_source_by_file_name(conn, file_name)
+        conn.execute(
+            """
+            INSERT INTO source_files (source_id, file_name, file_ext, uploaded_at, total_rows, total_pages)
+            VALUES (?, ?, ?, ?, 0, 0)
+            """,
+            (source_id, file_name, ".gsheet", now),
+        )
+        for page_name, rows in all_pages:
+            conn.execute(
+                "INSERT INTO source_pages (source_id, page_name, row_count) VALUES (?, ?, ?)",
+                (source_id, page_name, len(rows)),
+            )
+            for idx, row in enumerate(rows, start=1):
+                row_number = parse_int(row.get("__sheet_row_number")) or idx
+                data_json = json.dumps(row, ensure_ascii=False)
+                conn.execute(
+                    """
+                    INSERT INTO unified_rows (source_id, file_name, page_name, row_number, data_json, ingested_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (source_id, file_name, page_name, row_number, data_json, now),
+                )
+            total_rows += len(rows)
+        conn.execute(
+            "UPDATE source_files SET total_rows = ?, total_pages = ? WHERE source_id = ?",
+            (total_rows, len(all_pages), source_id),
+        )
+    invalidate_runtime_caches()
+    return {"total_rows": total_rows, "total_pages": len(all_pages)}
+
+
+def connect_gsheet(url: str) -> dict:
+    """Persistently connect a Google Sheet. Saves URL to DB and performs initial sync."""
+    spreadsheet_id = _extract_gsheet_id(url)
+    if not spreadsheet_id:
+        raise ValueError(
+            "Invalid Google Sheet URL. Please provide a valid URL like: "
+            "https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit"
+        )
+    # Check if already connected
+    with get_conn() as conn:
+        existing = conn.execute(
+            "SELECT connection_id FROM connected_sheets WHERE spreadsheet_id = ? AND is_active = 1",
+            (spreadsheet_id,),
+        ).fetchone()
+        if existing:
+            raise ValueError("This Google Sheet is already connected.")
+
+    # Download data first to validate the sheet is accessible
+    all_pages = _download_gsheet_pages(spreadsheet_id)
+    if not all_pages:
+        raise ValueError(
+            "Could not download any data. Make sure the Google Sheet is shared as "
+            "'Anyone with the link' (Viewer)."
+        )
+
+    # Ingest data
+    result = _ingest_gsheet_pages(spreadsheet_id, all_pages)
+
+    # Save connection to DB
+    connection_id = uuid.uuid4().hex
+    now = utc_now_iso()
+    label = f"Google Sheet ({spreadsheet_id[:8]}…)"
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO connected_sheets (connection_id, url, spreadsheet_id, label, connected_at, last_sync_at, last_sync_rows, last_sync_pages, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (
+                connection_id,
+                url,
+                spreadsheet_id,
+                label,
+                now,
+                now,
+                result["total_rows"],
+                result["total_pages"],
+            ),
+        )
+
+    return {
+        "connection_id": connection_id,
+        "spreadsheet_id": spreadsheet_id,
+        "label": label,
+        "total_rows": result["total_rows"],
+        "total_pages": result["total_pages"],
+        "connected_at": now,
+    }
+
+
+def _sync_single_gsheet(connection_row: dict) -> dict:
+    """Re-download and replace data for one connected sheet."""
+    spreadsheet_id = connection_row["spreadsheet_id"]
+    connection_id = connection_row["connection_id"]
+    try:
+        all_pages = _download_gsheet_pages(spreadsheet_id)
+        if not all_pages:
+            return {
+                "connection_id": connection_id,
+                "status": "no_data",
+                "error": "No data returned",
+            }
+        result = _ingest_gsheet_pages(spreadsheet_id, all_pages)
+        now = utc_now_iso()
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE connected_sheets SET last_sync_at = ?, last_sync_rows = ?, last_sync_pages = ? WHERE connection_id = ?",
+                (now, result["total_rows"], result["total_pages"], connection_id),
+            )
+        return {
+            "connection_id": connection_id,
+            "status": "ok",
+            "total_rows": result["total_rows"],
+            "total_pages": result["total_pages"],
+            "synced_at": now,
+        }
+    except Exception as exc:
+        return {"connection_id": connection_id, "status": "error", "error": str(exc)}
+
+
+def sync_all_gsheets() -> list[dict]:
+    """Sync all active connected Google Sheets. Called on every page load/refresh."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT connection_id, url, spreadsheet_id, label FROM connected_sheets WHERE is_active = 1"
+        ).fetchall()
+    if not rows:
+        return []
+    results = []
+    for row in rows:
+        r = _sync_single_gsheet(dict(row))
+        results.append(r)
+    return results
+
+
+def disconnect_gsheet(connection_id: str) -> None:
+    """Remove a connected Google Sheet and its data."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT spreadsheet_id FROM connected_sheets WHERE connection_id = ?",
+            (connection_id,),
+        ).fetchone()
+        if row:
+            file_name = f"gsheet_{row['spreadsheet_id'][:12]}.csv"
+            clear_source_by_file_name(conn, file_name)
+        conn.execute(
+            "DELETE FROM connected_sheets WHERE connection_id = ?", (connection_id,)
+        )
+    invalidate_runtime_caches()
+
+
+def list_gsheet_connections() -> list[dict]:
+    """Return all active Google Sheet connections."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT connection_id, url, spreadsheet_id, label, connected_at, last_sync_at, last_sync_rows, last_sync_pages FROM connected_sheets WHERE is_active = 1 ORDER BY connected_at DESC"
+        ).fetchall()
+    return [
+        {
+            "connectionId": r["connection_id"],
+            "url": r["url"],
+            "spreadsheetId": r["spreadsheet_id"],
+            "label": r["label"],
+            "connectedAt": r["connected_at"],
+            "lastSyncAt": r["last_sync_at"],
+            "lastSyncRows": r["last_sync_rows"],
+            "lastSyncPages": r["last_sync_pages"],
+        }
+        for r in rows
+    ]
+
+
+# Keep legacy import function for backward compat
+def import_google_sheet(url: str) -> dict:
+    return connect_gsheet(url)
 
 
 def ingest_file(file_name: str, payload: bytes) -> dict:
@@ -848,7 +1161,9 @@ def list_sources() -> list[dict]:
     for row in rows:
         page_names = []
         if row["page_names"]:
-            page_names = [name.strip() for name in row["page_names"].split("|") if name.strip()]
+            page_names = [
+                name.strip() for name in row["page_names"].split("|") if name.strip()
+            ]
         result.append(
             {
                 "sourceId": row["source_id"],
@@ -880,7 +1195,9 @@ def build_canonical_map(row: dict) -> dict[str, object]:
     return result
 
 
-def pick_field(row: dict, aliases: set[str], canonical: dict[str, object] | None = None):
+def pick_field(
+    row: dict, aliases: set[str], canonical: dict[str, object] | None = None
+):
     canonical_row = canonical if canonical is not None else build_canonical_map(row)
     for alias in aliases:
         if alias in canonical_row:
@@ -896,16 +1213,38 @@ def assign_time_group(
     is_queue_wait: bool = False,
 ) -> tuple[str, str, str, bool]:
     if segment_type in SYSTEM_TIME_SEGMENT_TYPES:
-        return "System", "SYSTEM_SEGMENT_TYPE", "SYSTEM_ACTIVE_TIME", not (metric_only or is_milestone)
+        return (
+            "System",
+            "SYSTEM_SEGMENT_TYPE",
+            "SYSTEM_ACTIVE_TIME",
+            not (metric_only or is_milestone),
+        )
     if segment_type in USER_TIME_SEGMENT_TYPES:
-        return "User", "USER_SEGMENT_TYPE", "USER_ACTIVE_TIME", not (metric_only or is_milestone)
+        return (
+            "User",
+            "USER_SEGMENT_TYPE",
+            "USER_ACTIVE_TIME",
+            not (metric_only or is_milestone),
+        )
     if segment_type in IDLE_TIME_SEGMENT_TYPES:
-        original_bucket = "QUEUE_OR_SCHEDULED_WAIT_TIME" if is_queue_wait else "IDLE_WAITING_TIME"
-        return "Idle Time", "IDLE_SEGMENT_TYPE", original_bucket, not (metric_only or is_milestone)
+        original_bucket = (
+            "QUEUE_OR_SCHEDULED_WAIT_TIME" if is_queue_wait else "IDLE_WAITING_TIME"
+        )
+        return (
+            "Idle Time",
+            "IDLE_SEGMENT_TYPE",
+            original_bucket,
+            not (metric_only or is_milestone),
+        )
     if segment_type in {"REOPEN_MARKER", "REOPEN_TO_REVIEW_HANDOFF_MARKER"}:
         group = "User" if actor_type == "User" else "System"
         return group, "REOPEN_OR_HANDOFF_MARKER_BY_ACTOR", "MILESTONE_OR_MARKER", False
-    return "Idle Time", "UNKNOWN_FALLBACK_TO_IDLE", "UNKNOWN_OR_LOW_CONFIDENCE", not (metric_only or is_milestone)
+    return (
+        "Idle Time",
+        "UNKNOWN_FALLBACK_TO_IDLE",
+        "UNKNOWN_OR_LOW_CONFIDENCE",
+        not (metric_only or is_milestone),
+    )
 
 
 def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[dict]:
@@ -934,7 +1273,9 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
             raw = {}
         canonical = build_canonical_map(raw)
 
-        event_time = parse_datetime(pick_field(raw, FIELD_ALIASES["event_time"], canonical))
+        event_time = parse_datetime(
+            pick_field(raw, FIELD_ALIASES["event_time"], canonical)
+        )
         if not event_time:
             continue
 
@@ -954,18 +1295,30 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
         from_value_raw = pick_field(raw, FIELD_ALIASES["from_value"], canonical)
         to_value_raw = pick_field(raw, FIELD_ALIASES["to_value"], canonical)
 
-        change_type = str(change_type_raw).strip() if change_type_raw is not None else ""
-        statement_type = str(statement_type_raw).strip() if statement_type_raw is not None else ""
-        changed_value_text = str(changed_value_raw).strip() if changed_value_raw is not None else ""
-        from_status_text = str(from_value_raw).strip() if from_value_raw is not None else ""
+        change_type = (
+            str(change_type_raw).strip() if change_type_raw is not None else ""
+        )
+        statement_type = (
+            str(statement_type_raw).strip() if statement_type_raw is not None else ""
+        )
+        changed_value_text = (
+            str(changed_value_raw).strip() if changed_value_raw is not None else ""
+        )
+        from_status_text = (
+            str(from_value_raw).strip() if from_value_raw is not None else ""
+        )
         to_status_text = str(to_value_raw).strip() if to_value_raw is not None else ""
 
         is_status_event = (
             normalize_text(change_type) == "spreadstatus"
             and normalize_text(changed_value_text) == "status"
         )
-        workflow_from_state = canonicalize_workflow_state(from_status_text) if is_status_event else ""
-        workflow_to_state = canonicalize_workflow_state(to_status_text) if is_status_event else ""
+        workflow_from_state = (
+            canonicalize_workflow_state(from_status_text) if is_status_event else ""
+        )
+        workflow_to_state = (
+            canonicalize_workflow_state(to_status_text) if is_status_event else ""
+        )
 
         document_id_raw = pick_field(raw, FIELD_ALIASES["document_id"], canonical)
         document_id = (
@@ -982,7 +1335,8 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
                 "page_name": db_row["page_name"],
                 "row_number": int(db_row["row_number"]),
                 "event_time": event_time,
-                "actor_name": actor_name or ("System" if actor_type == "System" else "Unknown User"),
+                "actor_name": actor_name
+                or ("System" if actor_type == "System" else "Unknown User"),
                 "actor_type": actor_type,
                 "document_id": document_id,
                 "change_type": change_type,
@@ -996,10 +1350,16 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
                 "to_status_raw": to_status_text,
                 "action_type": change_type,
                 "submitted_for_reanalysis": parse_bool(
-                    pick_field(raw, FIELD_ALIASES["submitted_for_reanalysis"], canonical)
+                    pick_field(
+                        raw, FIELD_ALIASES["submitted_for_reanalysis"], canonical
+                    )
                 ),
-                "auto_closed": parse_bool(pick_field(raw, FIELD_ALIASES["auto_closed"], canonical)),
-                "timeout_minutes": parse_int(pick_field(raw, FIELD_ALIASES["timeout_minutes"], canonical)),
+                "auto_closed": parse_bool(
+                    pick_field(raw, FIELD_ALIASES["auto_closed"], canonical)
+                ),
+                "timeout_minutes": parse_int(
+                    pick_field(raw, FIELD_ALIASES["timeout_minutes"], canonical)
+                ),
                 "is_status_event": is_status_event,
                 "is_detail_event": not is_status_event,
                 "order_index": -1,
@@ -1012,7 +1372,10 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
 
 
 def is_system_evidence(event: dict) -> bool:
-    if event["actor_type"] == "System" and event["change_type"] in SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES:
+    if (
+        event["actor_type"] == "System"
+        and event["change_type"] in SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES
+    ):
         return True
     if (
         event["actor_type"] == "System"
@@ -1044,7 +1407,9 @@ def first_system_evidence(events: list[dict]) -> dict | None:
     return None
 
 
-def previous_system_event_before(events: list[dict], before_order_index: int) -> dict | None:
+def previous_system_event_before(
+    events: list[dict], before_order_index: int
+) -> dict | None:
     candidates = [
         event
         for event in events
@@ -1079,7 +1444,9 @@ def last_system_event_after(events: list[dict], after_order_index: int) -> dict 
     return sorted(candidates, key=lambda item: item["order_index"])[-1]
 
 
-def find_system_reprocess_cycle_end(first_system_event: dict, events: list[dict]) -> dict:
+def find_system_reprocess_cycle_end(
+    first_system_event: dict, events: list[dict]
+) -> dict:
     ordered = sorted(events, key=lambda item: item["order_index"])
     for event in ordered:
         if event["order_index"] < first_system_event["order_index"]:
@@ -1105,25 +1472,36 @@ def find_system_reprocess_cycle_end(first_system_event: dict, events: list[dict]
             and event["from_status"] in PENDING_STATES
             and event["to_status"] == IN_REVIEW_STATE
         ):
-            previous_system = previous_system_event_before(ordered, event["order_index"])
+            previous_system = previous_system_event_before(
+                ordered, event["order_index"]
+            )
             return previous_system or first_system_event
-    return last_system_event_after(ordered, first_system_event["order_index"]) or first_system_event
+    return (
+        last_system_event_after(ordered, first_system_event["order_index"])
+        or first_system_event
+    )
 
 
 def calculate_effective_user_duration(interval: dict, is_auto_timeout: bool) -> float:
     if not is_auto_timeout:
         return interval["duration_seconds"]
-    user_details = [event for event in interval["inner_events"] if event["actor_type"] == "User"]
+    user_details = [
+        event for event in interval["inner_events"] if event["actor_type"] == "User"
+    ]
     if user_details:
-        last_user_detail = sorted(user_details, key=lambda item: item["order_index"])[-1]
+        last_user_detail = sorted(user_details, key=lambda item: item["order_index"])[
+            -1
+        ]
         effective_end = min(
             interval["end_time"],
-            last_user_detail["event_time"] + dt.timedelta(minutes=ACTIVITY_GRACE_MINUTES_DEFAULT),
+            last_user_detail["event_time"]
+            + dt.timedelta(minutes=ACTIVITY_GRACE_MINUTES_DEFAULT),
         )
     else:
         effective_end = min(
             interval["end_time"],
-            interval["start_time"] + dt.timedelta(minutes=SESSION_TIMEOUT_MINUTES_DEFAULT),
+            interval["start_time"]
+            + dt.timedelta(minutes=SESSION_TIMEOUT_MINUTES_DEFAULT),
         )
     return seconds_between(effective_end, interval["start_time"])
 
@@ -1135,10 +1513,10 @@ def is_same_timestamp_reopen_to_review_handoff(interval: dict) -> bool:
         (interval["start_event"]["from_status"], interval["start_event"]["to_status"]),
         (interval["end_event"]["from_status"], interval["end_event"]["to_status"]),
     }
-    return (
-        ("Completed", "Pending Re-Review by Moodys") in transitions
-        and ("Pending Re-Review by Moodys", "In Review by Moodys") in transitions
-    )
+    return ("Completed", "Pending Re-Review by Moodys") in transitions and (
+        "Pending Re-Review by Moodys",
+        "In Review by Moodys",
+    ) in transitions
 
 
 def build_segment(
@@ -1165,12 +1543,14 @@ def build_segment(
     if is_auto_timeout:
         effective_duration_seconds = calculate_effective_user_duration(interval, True)
 
-    time_group, time_group_rule_id, original_bucket, time_group_countable = assign_time_group(
-        segment_type,
-        actor_type,
-        is_milestone=is_milestone,
-        metric_only=metric_only,
-        is_queue_wait=is_queue_wait,
+    time_group, time_group_rule_id, original_bucket, time_group_countable = (
+        assign_time_group(
+            segment_type,
+            actor_type,
+            is_milestone=is_milestone,
+            metric_only=metric_only,
+            is_queue_wait=is_queue_wait,
+        )
     )
 
     user_name = actor_name or ""
@@ -1214,11 +1594,15 @@ def build_segment(
     }
 
 
-def segment_events_between(events: list[dict], start_event: dict, end_event: dict) -> list[dict]:
+def segment_events_between(
+    events: list[dict], start_event: dict, end_event: dict
+) -> list[dict]:
     return [
         event
         for event in events
-        if start_event["order_index"] <= event["order_index"] <= end_event["order_index"]
+        if start_event["order_index"]
+        <= event["order_index"]
+        <= end_event["order_index"]
     ]
 
 
@@ -1227,7 +1611,11 @@ def build_interval_segments(interval: dict, all_events: list[dict]) -> list[dict
 
     if is_same_timestamp_reopen_to_review_handoff(interval):
         actor_name = interval["exit_actor"] or interval["enter_actor"]
-        actor_type = interval["exit_actor_type"] if interval["exit_actor_type"] in {"System", "User"} else interval["enter_actor_type"]
+        actor_type = (
+            interval["exit_actor_type"]
+            if interval["exit_actor_type"] in {"System", "User"}
+            else interval["enter_actor_type"]
+        )
         return [
             build_segment(
                 interval,
@@ -1347,7 +1735,8 @@ def build_interval_segments(interval: dict, all_events: list[dict]) -> list[dict
             [
                 event
                 for event in interval["inner_events"]
-                if event["actor_type"] == "User" and event["change_type"] in USER_EDIT_CHANGE_TYPES
+                if event["actor_type"] == "User"
+                and event["change_type"] in USER_EDIT_CHANGE_TYPES
             ]
         )
 
@@ -1564,14 +1953,14 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
     if not doc_events:
         return []
 
-    ordered = sorted(doc_events, key=lambda item: (item["event_time"], -int(item["row_number"])))
+    ordered = sorted(
+        doc_events, key=lambda item: (item["event_time"], -int(item["row_number"]))
+    )
     for idx, event in enumerate(ordered):
         event["order_index"] = idx
 
     status_events = [
-        event
-        for event in ordered
-        if event["is_status_event"] and event["to_status"]
+        event for event in ordered if event["is_status_event"] and event["to_status"]
     ]
     if len(status_events) < 2:
         return []
@@ -1595,7 +1984,9 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
             bootstrap_inner = [
                 event
                 for event in ordered
-                if first_pre_status_event["order_index"] < event["order_index"] < first_status_event["order_index"]
+                if first_pre_status_event["order_index"]
+                < event["order_index"]
+                < first_status_event["order_index"]
             ]
             intervals.append(
                 {
@@ -1605,7 +1996,10 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
                     "inner_events": bootstrap_inner,
                     "start_time": first_pre_status_event["event_time"],
                     "end_time": first_status_event["event_time"],
-                    "duration_seconds": seconds_between(first_status_event["event_time"], first_pre_status_event["event_time"]),
+                    "duration_seconds": seconds_between(
+                        first_status_event["event_time"],
+                        first_pre_status_event["event_time"],
+                    ),
                     "state": "Processing",
                     "enter_from": "Processing",
                     "enter_to": "Processing",
@@ -1634,7 +2028,9 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
                 "inner_events": inner,
                 "start_time": current["event_time"],
                 "end_time": nxt["event_time"],
-                "duration_seconds": seconds_between(nxt["event_time"], current["event_time"]),
+                "duration_seconds": seconds_between(
+                    nxt["event_time"], current["event_time"]
+                ),
                 "state": current["to_status"],
                 "enter_from": current["from_status"],
                 "enter_to": current["to_status"],
@@ -1656,7 +2052,10 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
 def countable_segment_seconds(segment: dict) -> float:
     if not segment.get("timeGroupCountable"):
         return 0.0
-    if segment.get("timeGroup") == "User" and segment.get("segmentType") == "USER_REVIEW_AUTO_TIMEOUT":
+    if (
+        segment.get("timeGroup") == "User"
+        and segment.get("segmentType") == "USER_REVIEW_AUTO_TIMEOUT"
+    ):
         return max(0.0, float(segment.get("effectiveDurationSeconds") or 0.0))
     return max(0.0, float(segment.get("durationSeconds") or 0.0))
 
@@ -1684,7 +2083,12 @@ def empty_user_performance_response() -> dict:
             "idleTimeSeconds": 0,
             "idleTimeDisplay": "0s",
         },
-        "summary": {"files": 0, "pages": 0, "rows": 0, "algorithmVersion": ALGORITHM_VERSION},
+        "summary": {
+            "files": 0,
+            "pages": 0,
+            "rows": 0,
+            "algorithmVersion": ALGORITHM_VERSION,
+        },
         "contribution": [],
         "flow": [],
         "matrix": [],
@@ -1695,7 +2099,10 @@ def empty_user_performance_response() -> dict:
 def compute_user_performance() -> dict:
     global _USER_PERFORMANCE_CACHE_SIGNATURE, _USER_PERFORMANCE_CACHE_VALUE
     signature = current_unified_rows_signature()
-    if _USER_PERFORMANCE_CACHE_VALUE is not None and _USER_PERFORMANCE_CACHE_SIGNATURE == signature:
+    if (
+        _USER_PERFORMANCE_CACHE_VALUE is not None
+        and _USER_PERFORMANCE_CACHE_SIGNATURE == signature
+    ):
         return _USER_PERFORMANCE_CACHE_VALUE
 
     events = fetch_normalized_events(signature=signature)
@@ -1705,7 +2112,12 @@ def compute_user_performance() -> dict:
         _USER_PERFORMANCE_CACHE_VALUE = empty
         return empty
 
-    source_summary = {"files": 0, "pages": 0, "rows": 0, "algorithmVersion": ALGORITHM_VERSION}
+    source_summary = {
+        "files": 0,
+        "pages": 0,
+        "rows": 0,
+        "algorithmVersion": ALGORITHM_VERSION,
+    }
     with get_conn() as conn:
         row = conn.execute(
             "SELECT COUNT(*) AS files, COALESCE(SUM(total_pages),0) AS pages, COALESCE(SUM(total_rows),0) AS rows FROM source_files"
@@ -1741,7 +2153,9 @@ def compute_user_performance() -> dict:
     for doc_id, doc_events in grouped_events.items():
         all_segments.extend(build_segments_for_document(doc_events))
 
-        ordered = sorted(doc_events, key=lambda item: (item["event_time"], -int(item["row_number"])))
+        ordered = sorted(
+            doc_events, key=lambda item: (item["event_time"], -int(item["row_number"]))
+        )
         status_events = [
             event
             for event in ordered
@@ -1781,11 +2195,17 @@ def compute_user_performance() -> dict:
         time_group = str(segment.get("timeGroup") or "")
         user_name = str(segment.get("userName") or "").strip()
         is_user_segment = segment_type.startswith("USER_")
-        is_system_actor = user_name.lower() == "system" or segment.get("actorType") == "System"
+        is_system_actor = (
+            user_name.lower() == "system" or segment.get("actorType") == "System"
+        )
 
         if time_group == "User" and is_user_segment:
             total_active_user_seconds += counted_seconds
-            if user_name and not is_system_actor and user_name.lower() != "unknown user":
+            if (
+                user_name
+                and not is_system_actor
+                and user_name.lower() != "unknown user"
+            ):
                 users_involved.add(user_name)
         elif time_group == "System":
             total_system_seconds += counted_seconds
@@ -1806,8 +2226,13 @@ def compute_user_performance() -> dict:
 
         stats = user_stats[user_name or "Unknown User"]
         stats["total_effective_seconds"] += counted_seconds
-        stats["total_observed_seconds"] += max(0.0, float(segment.get("durationSeconds") or 0.0))
-        stats["documents"].add(segment.get("documentId") or f"{segment.get('fileName', '')}::{segment.get('pageName', '')}")
+        stats["total_observed_seconds"] += max(
+            0.0, float(segment.get("durationSeconds") or 0.0)
+        )
+        stats["documents"].add(
+            segment.get("documentId")
+            or f"{segment.get('fileName', '')}::{segment.get('pageName', '')}"
+        )
 
         if segment_type == "USER_UPLOADING":
             stats["upload_seconds"] += counted_seconds
@@ -1817,7 +2242,10 @@ def compute_user_performance() -> dict:
             stats["sessions"] += 1
             total_user_sessions += 1
 
-        if segment_type in {"USER_EDITING_CORRECTION", "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL"}:
+        if segment_type in {
+            "USER_EDITING_CORRECTION",
+            "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL",
+        }:
             stats["edit_seconds"] += counted_seconds
             stats["rework_sessions"] += 1
             total_rework_sessions += 1
@@ -1830,9 +2258,13 @@ def compute_user_performance() -> dict:
             stats["auto_timeout_sessions"] += 1
 
     avg_user_session_seconds = (
-        total_active_user_seconds / total_user_sessions if total_user_sessions > 0 else 0.0
+        total_active_user_seconds / total_user_sessions
+        if total_user_sessions > 0
+        else 0.0
     )
-    rework_rate = total_rework_sessions / total_user_sessions if total_user_sessions > 0 else 0.0
+    rework_rate = (
+        total_rework_sessions / total_user_sessions if total_user_sessions > 0 else 0.0
+    )
 
     contribution_rows = []
     for user_name, stats in user_stats.items():
@@ -1885,7 +2317,9 @@ def compute_user_performance() -> dict:
 
     response_segments = []
     for segment in all_segments[:1200]:
-        clean = {key: value for key, value in segment.items() if not key.startswith("__")}
+        clean = {
+            key: value for key, value in segment.items() if not key.startswith("__")
+        }
         response_segments.append(clean)
 
     result = {
@@ -1904,7 +2338,9 @@ def compute_user_performance() -> dict:
             "scheduledWaitSeconds": total_scheduled_wait_seconds,
             "scheduledWaitDisplay": format_duration(total_scheduled_wait_seconds),
             "reprocessCycleElapsedSeconds": total_reprocess_cycle_elapsed_seconds,
-            "reprocessCycleElapsedDisplay": format_duration(total_reprocess_cycle_elapsed_seconds),
+            "reprocessCycleElapsedDisplay": format_duration(
+                total_reprocess_cycle_elapsed_seconds
+            ),
             "systemTimeSeconds": total_system_seconds,
             "systemTimeDisplay": format_duration(total_system_seconds),
             "idleTimeSeconds": total_idle_waiting_seconds,
@@ -1922,7 +2358,10 @@ def compute_user_performance() -> dict:
 
 
 def _counter_to_rows(counter: Counter, limit: int = 10) -> list[dict]:
-    return [{"value": str(key), "count": int(count)} for key, count in counter.most_common(limit)]
+    return [
+        {"value": str(key), "count": int(count)}
+        for key, count in counter.most_common(limit)
+    ]
 
 
 def build_debug_snapshot() -> dict:
@@ -1930,7 +2369,9 @@ def build_debug_snapshot() -> dict:
         source_row = conn.execute(
             "SELECT COUNT(*) AS files, COALESCE(SUM(total_pages),0) AS pages, COALESCE(SUM(total_rows),0) AS rows FROM source_files"
         ).fetchone()
-        unified_count_row = conn.execute("SELECT COUNT(*) AS c FROM unified_rows").fetchone()
+        unified_count_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM unified_rows"
+        ).fetchone()
         raw_rows = conn.execute(
             """
             SELECT file_name, page_name, row_number, data_json
@@ -1974,14 +2415,20 @@ def build_debug_snapshot() -> dict:
         if parse_datetime(event_time_raw):
             parse_stats["rowsWithEventTime"] += 1
 
-        action_type = str(pick_field(raw, FIELD_ALIASES["action_type"], canonical) or "").strip()
+        action_type = str(
+            pick_field(raw, FIELD_ALIASES["action_type"], canonical) or ""
+        ).strip()
         if action_type:
             action_counter[action_type] += 1
         if "status" in normalize_text(action_type):
             parse_stats["rowsWithSpreadStatusChangeType"] += 1
 
-        from_status = str(pick_field(raw, FIELD_ALIASES["from_status"], canonical) or "").strip()
-        to_status = str(pick_field(raw, FIELD_ALIASES["to_status"], canonical) or "").strip()
+        from_status = str(
+            pick_field(raw, FIELD_ALIASES["from_status"], canonical) or ""
+        ).strip()
+        to_status = str(
+            pick_field(raw, FIELD_ALIASES["to_status"], canonical) or ""
+        ).strip()
         if from_status:
             from_status_counter[from_status] += 1
             if looks_like_workflow_status(from_status):
@@ -2020,7 +2467,9 @@ def build_debug_snapshot() -> dict:
     }
 
 
-def json_response(handler: SimpleHTTPRequestHandler, payload: dict, status: int = 200) -> None:
+def json_response(
+    handler: SimpleHTTPRequestHandler, payload: dict, status: int = 200
+) -> None:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
@@ -2055,7 +2504,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self) -> None:
         # Avoid stale cached JSX/HTML in browsers; always fetch latest local file.
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header(
+            "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
+        )
         self.send_header("Pragma", "no-cache")
         self.send_header("Expires", "0")
         super().end_headers()
@@ -2076,7 +2527,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     "version": APP_VERSION,
                     "processId": os.getpid(),
                     "serverStartedAt": SERVER_STARTED_AT,
-                    "appFileMtime": dt.datetime.fromtimestamp(Path(__file__).stat().st_mtime).isoformat(),
+                    "appFileMtime": dt.datetime.fromtimestamp(
+                        Path(__file__).stat().st_mtime
+                    ).isoformat(),
                 },
             )
             return True
@@ -2091,6 +2544,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/user-performance":
             json_response(self, compute_user_performance())
+            return True
+
+        if parsed.path == "/api/gsheet/connections":
+            json_response(self, {"connections": list_gsheet_connections()})
             return True
 
         return False
@@ -2124,6 +2581,52 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 )
                 return True
 
+        if parsed.path == "/api/gsheet/connect":
+            try:
+                payload = read_json_body(self)
+                url = str(payload.get("url", "")).strip()
+                if not url:
+                    raise ValueError(
+                        "Request must include a 'url' field with the Google Sheet URL."
+                    )
+                result = connect_gsheet(url)
+                json_response(
+                    self,
+                    {
+                        "connected": result,
+                        "connections": list_gsheet_connections(),
+                        "sources": list_sources(),
+                    },
+                )
+                return True
+            except Exception as exc:
+                json_response(
+                    self,
+                    {"error": str(exc)},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return True
+
+        if parsed.path == "/api/gsheet/sync":
+            try:
+                results = sync_all_gsheets()
+                json_response(
+                    self,
+                    {
+                        "synced": results,
+                        "sources": list_sources(),
+                        "connections": list_gsheet_connections(),
+                    },
+                )
+                return True
+            except Exception as exc:
+                json_response(
+                    self,
+                    {"error": str(exc)},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+                return True
+
         return False
 
     def _handle_api_delete(self, parsed) -> bool:
@@ -2134,6 +2637,21 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 return True
             delete_source(source_id)
             json_response(self, {"ok": True, "sources": list_sources()})
+            return True
+        if parsed.path.startswith("/api/gsheet/"):
+            connection_id = unquote(parsed.path.replace("/api/gsheet/", "", 1)).strip()
+            if not connection_id:
+                json_response(self, {"error": "Missing connection id"}, status=400)
+                return True
+            disconnect_gsheet(connection_id)
+            json_response(
+                self,
+                {
+                    "ok": True,
+                    "connections": list_gsheet_connections(),
+                    "sources": list_sources(),
+                },
+            )
             return True
         return False
 
@@ -2180,7 +2698,9 @@ def run_server(port: int) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Dashboard local server with SQLite backend")
+    parser = argparse.ArgumentParser(
+        description="Dashboard local server with SQLite backend"
+    )
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
     run_server(args.port)
