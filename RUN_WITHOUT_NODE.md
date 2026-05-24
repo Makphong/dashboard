@@ -4,10 +4,11 @@
 2. Start server:
    `./start.ps1`
 3. Open browser:
-   `http://localhost:8000/index.html`
+   `http://localhost:8000/`
 
 ## What this setup does
 - Uses local Python server (`app.py`) + SQLite database (`local_dashboard.db`).
+- If `LOCAL_DB_PATH` env is set, app will use that path instead.
 - Upload Excel/CSV from **Data Management** page.
 - If Excel has multiple sheets, each sheet is ingested as a separate page.
 - All rows are merged into one central table `unified_rows` with:
