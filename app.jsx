@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import {
   Users, Server, Clock, Timer, Hourglass, RefreshCw, AlertTriangle,
-  Search, Calendar, ChevronDown, Bell, User, LayoutDashboard,
+  Search, Calendar, ChevronDown, User, LayoutDashboard,
   Menu, X, ChevronLeft, ChevronRight, Database, UploadCloud, Link2,
   FileText, FileSpreadsheet, Trash2, CheckCircle2, Plus, Maximize2
 } from 'lucide-react';
@@ -78,6 +78,10 @@ const GANTT_DRILL_GROUPS = [
   { key: 'Idle', label: 'Idle', color: '#94A3B8' },
 ];
 
+const GANTT_MIN_ZOOM_SCALE = 0.35;
+const GANTT_MAX_ZOOM_SCALE = 8000; // 1000x more than previous 8x ceiling.
+const GANTT_MAX_TIMELINE_WIDTH_PX = 120000000;
+
 const GANTT_DRILL_GROUP_COLORS = {
   Uploading: '#8B5CF6',
   Processing: '#334155',
@@ -121,7 +125,31 @@ const WORKFLOW_FLOW_SEGMENT_TYPES = new Set([
   'IDLE_WAITING_FOR_REREVIEW',
   'IDLE_WAITING_FOR_SCHEDULED_REPROCESS',
   'IDLE_AFTER_SYSTEM_REPROCESS',
+  'POST_COMPLETED_ELAPSED',
 ]);
+
+const FLOW_INSIGHT_GROUPS = [
+  {
+    id: 'processing-round-1-to-user',
+    label: 'Round 1 Processing -> User Action',
+    description: '',
+  },
+  {
+    id: 'user-review-edit-to-next-user-step',
+    label: 'User Action -> Next User Step',
+    description: '',
+  },
+  {
+    id: 'upload-to-latest-complete',
+    label: 'Upload -> Final Complete',
+    description: '',
+  },
+  {
+    id: 'processing-round-2-to-user',
+    label: 'Round 2 Processing -> User Action',
+    description: '',
+  },
+];
 
 const TRANSITION_FRIENDLY_LABELS = {
   // อัปโหลด → ขั้นต่อไป
@@ -289,8 +317,8 @@ function toDrillGroup(segmentType) {
 
 function toTimelineLane(segmentType, userNameRaw) {
   const type = String(segmentType || '');
-  if (type.startsWith('SYSTEM_') || type === 'AUTO_TIMEOUT_MARKER') return 'System';
-  if (type.startsWith('IDLE_')) return 'Idle';
+  if (type.startsWith('SYSTEM_')) return 'System';
+  if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
   const userName = String(userNameRaw || '').trim();
   if (userName.toLowerCase() === 'system') return 'System';
   return userName || 'Unknown User';
@@ -298,7 +326,33 @@ function toTimelineLane(segmentType, userNameRaw) {
 
 function isSystemContextSegment(segmentType) {
   const type = String(segmentType || '');
-  return type.startsWith('SYSTEM_') || type === 'AUTO_TIMEOUT_MARKER';
+  return type.startsWith('SYSTEM_');
+}
+
+function isIdleContextSegment(segmentType) {
+  const type = String(segmentType || '');
+  return type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE';
+}
+
+function isUserContextSegment(segmentType, userNameRaw) {
+  const type = String(segmentType || '');
+  if (type.startsWith('USER_')) return true;
+  if (type === 'AUTO_TIMEOUT_MARKER') {
+    const userName = String(userNameRaw || '').trim().toLowerCase();
+    return userName.length > 0 && userName !== 'system';
+  }
+  return false;
+}
+
+function buildAsteriskPoints(cx, cy, outerRadius = 6, innerRadius = 2.6, spikes = 5) {
+  const points = [];
+  const step = Math.PI / spikes;
+  for (let i = 0; i < spikes * 2; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + i * step;
+    points.push(`${cx + Math.cos(angle) * radius},${cy + Math.sin(angle) * radius}`);
+  }
+  return points.join(' ');
 }
 
 function buildSheetKey(fileName, pageName) {
@@ -380,7 +434,7 @@ function buildKpisFromSegments(segments) {
   const safeSegments = Array.isArray(segments) ? segments : [];
   const userSegments = safeSegments.filter((segment) => String(segment.segmentType || '').startsWith('USER_'));
   const coreUserSegments = userSegments.filter((segment) => CORE_WORK_SESSION_TYPES.has(String(segment.segmentType || '')));
-  const idleSegments = safeSegments.filter((segment) => String(segment.segmentType || '').startsWith('IDLE_'));
+  const idleSegments = safeSegments.filter((segment) => isIdleContextSegment(segment.segmentType));
 
   // Use full segment time for KPI calculations.
   const effectiveDuration = (segment) => safeNumber(segment?.durationSeconds);
@@ -640,13 +694,25 @@ const EmptyState = ({ icon: Icon, title, subtitle }) => (
   </div>
 );
 
-const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => {
+const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singleLane = false }) => {
   const containerRef = useRef(null);
   const headerScrollRef = useRef(null);
   const bodyScrollRef = useRef(null);
   const verticalScrollRef = useRef(null);
   const dragRef = useRef({ active: false, startX: 0, startScrollLeft: 0 });
   const [hoveredSegment, setHoveredSegment] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const zoomScaleRef = useRef(1);
+  const pendingZoomAnchorRef = useRef(null);
+  const timelineMetricsRef = useRef({
+    displayMinTs: 0,
+    displaySpanMs: 1,
+    baseTimelineWidth: 2200,
+    timelineWidth: 2200,
+    timelinePadLeft: 14,
+    timelinePadRight: 18,
+    timelineSvgWidth: 2232,
+  });
 
   const mapped = useMemo(() => (
     (segments || [])
@@ -656,7 +722,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
         if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) return null;
 
         const segmentType = String(segment.segmentType || 'UNKNOWN');
-        const lane = toTimelineLane(segmentType, segment.userName);
+        const lane = singleLane ? 'All user' : toTimelineLane(segmentType, segment.userName);
 
         return {
           id: `${segmentType}-${idx}`,
@@ -676,7 +742,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
         };
       })
       .filter(Boolean)
-  ), [segments]);
+  ), [segments, singleLane]);
 
   useEffect(() => {
     const bodyViewport = bodyScrollRef.current;
@@ -730,7 +796,11 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
   });
 
   const laneLabelWidth = 210;
-  const timelineWidth = Math.min(120000, Math.max(2200, Math.round(displaySpanHours * pxPerHour)));
+  const baseTimelineWidth = Math.min(120000, Math.max(2200, Math.round(displaySpanHours * pxPerHour)));
+  const timelineWidth = Math.min(
+    GANTT_MAX_TIMELINE_WIDTH_PX,
+    Math.max(900, Math.round(baseTimelineWidth * zoomScale))
+  );
   const timelinePadLeft = 14;
   const timelinePadRight = 18;
   const timelineSvgWidth = timelinePadLeft + timelineWidth + timelinePadRight;
@@ -773,6 +843,17 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
 
   const getX = (timeValue) => timelinePadLeft + ((timeValue - displayMinTs) / displaySpanMs) * timelineWidth;
 
+  zoomScaleRef.current = zoomScale;
+  timelineMetricsRef.current = {
+    displayMinTs,
+    displaySpanMs,
+    baseTimelineWidth,
+    timelineWidth,
+    timelinePadLeft,
+    timelinePadRight,
+    timelineSvgWidth,
+  };
+
   const onBodyScroll = (event) => {
     const headerViewport = headerScrollRef.current;
     if (!headerViewport) return;
@@ -798,6 +879,58 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
   const onDragEnd = () => {
     dragRef.current.active = false;
   };
+
+  useEffect(() => {
+    const viewport = bodyScrollRef.current;
+    if (!viewport) return undefined;
+
+    const onNativeWheel = (event) => {
+      if (!event.ctrlKey) return;
+      const wheelDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      if (!wheelDelta) return;
+
+      event.preventDefault();
+      const metrics = timelineMetricsRef.current;
+      const currentZoom = zoomScaleRef.current;
+      const nextZoom = Math.max(
+        GANTT_MIN_ZOOM_SCALE,
+        Math.min(GANTT_MAX_ZOOM_SCALE, currentZoom * (wheelDelta < 0 ? 1.12 : (1 / 1.12)))
+      );
+      if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
+
+      const viewportRect = viewport.getBoundingClientRect();
+      const anchorX = Math.max(0, Math.min(viewportRect.width, event.clientX - viewportRect.left));
+      const absoluteContentX = viewport.scrollLeft + anchorX;
+      const anchorTimelineX = Math.max(0, Math.min(metrics.timelineWidth, absoluteContentX - metrics.timelinePadLeft));
+      const anchorTime = metrics.displayMinTs + (anchorTimelineX / Math.max(1, metrics.timelineWidth)) * metrics.displaySpanMs;
+
+      pendingZoomAnchorRef.current = { anchorX, anchorTime };
+      zoomScaleRef.current = nextZoom;
+      setZoomScale(nextZoom);
+    };
+
+    viewport.addEventListener('wheel', onNativeWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener('wheel', onNativeWheel);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const viewport = bodyScrollRef.current;
+    const pending = pendingZoomAnchorRef.current;
+    if (!viewport || !pending) return;
+
+    const metrics = timelineMetricsRef.current;
+    const anchorTimeRatio = (pending.anchorTime - metrics.displayMinTs) / Math.max(1, metrics.displaySpanMs);
+    const nextAnchorTimelineX = metrics.timelinePadLeft + (anchorTimeRatio * metrics.timelineWidth);
+    const nextRawScrollLeft = nextAnchorTimelineX - pending.anchorX;
+    const nextMaxScrollLeft = Math.max(0, metrics.timelineSvgWidth - viewport.clientWidth);
+    const nextScrollLeft = Math.max(0, Math.min(nextMaxScrollLeft, nextRawScrollLeft));
+
+    viewport.scrollLeft = nextScrollLeft;
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = nextScrollLeft;
+    pendingZoomAnchorRef.current = null;
+  }, [zoomScale]);
 
   const showHoverTooltip = (event, segment, lane) => {
     if (!containerRef.current) return;
@@ -948,7 +1081,9 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
                         const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
                         const typeLabel = toGanttSegmentTypeLabel(segment.segmentType);
                         const label = `${groupLabel} | ${typeLabel} (${segment.segmentType}) | ${lane} | ${formatTimeTick(segment.start)} → ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
-                        const isMarker = segment.segmentType === 'REOPEN_MARKER';
+                        const isReopenMarker = segment.segmentType === 'REOPEN_MARKER';
+                        const isAutoTimeoutMarker = segment.segmentType === 'AUTO_TIMEOUT_MARKER';
+                        const isMarker = isReopenMarker || isAutoTimeoutMarker;
                         const isUpload = segment.drillGroup === 'Uploading';
                         const barOpacity = '0.94';
 
@@ -964,9 +1099,15 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false }) => 
                               onMouseLeave={hideHoverTooltip}
                               style={{ cursor: 'pointer' }}
                             >
-                              <rect x={cx - 5} y={cy - 5} width="10" height="10" transform={`rotate(45 ${cx} ${cy})`} fill={color}>
-                                <title>{label}</title>
-                              </rect>
+                              {isAutoTimeoutMarker ? (
+                                <polygon points={buildAsteriskPoints(cx, cy)} fill={color}>
+                                  <title>{label}</title>
+                                </polygon>
+                              ) : (
+                                <rect x={cx - 5} y={cy - 5} width="10" height="10" transform={`rotate(45 ${cx} ${cy})`} fill={color}>
+                                  <title>{label}</title>
+                                </rect>
+                              )}
                             </g>
                           );
                         }
@@ -1030,7 +1171,7 @@ const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
     <div className={`space-y-3 ${useScroll ? 'overflow-y-auto no-scrollbar pr-1' : ''}`} style={wrapperStyle}>
       {rows.map((row, idx) => {
         const rawValue = safeNumber(row.value);
-        const width = clampPercent(Math.max((rawValue / maxValue) * 100, 2));
+        const width = rawValue <= 0 ? 0 : clampPercent(Math.max((rawValue / maxValue) * 100, 2));
         const color = CHART_PALETTE[idx % CHART_PALETTE.length];
         return (
           <div key={row.id || row.label} className="py-2">
@@ -1256,7 +1397,9 @@ const ReworkMatrixScatterChart = ({ rows, expanded = false }) => {
   const innerHeight = height - margin.top - margin.bottom;
   const ticks = [0, 0.25, 0.5, 0.75, 1];
 
-  const x = (v) => margin.left + (safeNumber(v) / maxX) * innerWidth;
+  // Add right-side headroom so the max bubble and label don't get pinned to the chart edge.
+  const xDomainMax = Math.max(1, maxX * 1.08);
+  const x = (v) => margin.left + (safeNumber(v) / xDomainMax) * innerWidth;
   const y = (v) => margin.top + (1 - Math.max(0, Math.min(1, safeNumber(v)))) * innerHeight;
   const bubbleRadius = (active) => {
     const base = expanded ? 7 : 5;
@@ -1297,23 +1440,28 @@ const ReworkMatrixScatterChart = ({ rows, expanded = false }) => {
         ))}
         {ticks.map((tick) => (
           <text key={`xt-${tick}`} x={margin.left + tick * innerWidth} y={height - 16} textAnchor="middle" className="fill-slate-500 text-[10px]">
-            {formatDuration(maxX * tick)}
+            {formatDuration(xDomainMax * tick)}
           </text>
         ))}
 
         {prepared.map((row, idx) => {
           const px = x(row.avgTimePerDocSeconds);
           const py = y(row.reworkRate);
+          const pointRadius = bubbleRadius(row.totalActiveSeconds);
           const color = CHART_PALETTE[idx % CHART_PALETTE.length];
           const shortUserLabel = row.user.length > 14 ? `${row.user.slice(0, 14)}...` : row.user;
-          const labelX = Math.min(width - margin.right - 98, px + 8);
-          const labelY = Math.max(margin.top + 10, py - 7);
+          const placeLabelRight = (px + pointRadius + 86) <= (width - margin.right);
+          const labelX = placeLabelRight
+            ? Math.min(width - margin.right - 6, px + pointRadius + 8)
+            : Math.max(margin.left + 6, px - pointRadius - 8);
+          const labelAnchor = placeLabelRight ? 'start' : 'end';
+          const labelY = Math.max(margin.top + 10, py - pointRadius - 6);
           return (
             <g key={row.user}>
-              <circle cx={px} cy={py} r={bubbleRadius(row.totalActiveSeconds)} fill={color} opacity="0.8" stroke="#ffffff" strokeWidth="2">
+              <circle cx={px} cy={py} r={pointRadius} fill={color} opacity="0.8" stroke="#ffffff" strokeWidth="2">
                 <title>{`${row.user} | Avg/Doc ${formatDuration(row.avgTimePerDocSeconds)} | Rework ${formatPercent(row.reworkRate)} | Auto Closed ${formatPercent(row.autoClosedRate)}`}</title>
               </circle>
-              <text x={labelX} y={labelY} className="fill-slate-700 text-[10px] font-medium">
+              <text x={labelX} y={labelY} textAnchor={labelAnchor} className="fill-slate-700 text-[10px] font-medium">
                 {shortUserLabel}
               </text>
             </g>
@@ -1398,24 +1546,23 @@ const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectG
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div
           onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-sm ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300'}`}
+          className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-sm ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300'}`}
         >
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <UploadCloud className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Upload Excel / CSV</h3>
-          <button className="mt-6 px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 pointer-events-none">
+          <button className="mt-6 h-12 px-6 bg-blue-600 text-white text-base font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 pointer-events-none">
             <Plus className="w-4 h-4" /> {uploading ? 'Uploading...' : 'Select Files'}
           </button>
         </div>
 
-        <div className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center shadow-sm transition-all ${gsheetLoading ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-300'}`}>
+        <div className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center shadow-sm transition-all ${gsheetLoading ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-300'}`}>
           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4">
             <Link2 className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Google Sheet Connector</h3>
-          <p className="text-xs text-slate-400 mt-1 mb-3">วาง URL ของ Google Sheet ที่แชร์เป็น "Anyone with the link" — ข้อมูลจะ sync อัตโนมัติทุกครั้งที่เปิด/รีเฟรช</p>
-          <div className="flex gap-2 w-full max-w-sm">
+          <div className="mt-6 flex items-stretch gap-2 w-full max-w-sm">
             <input
               type="text"
               placeholder="https://docs.google.com/spreadsheets/d/..."
@@ -1423,12 +1570,12 @@ const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectG
               onChange={(e) => { setGsheetUrl(e.target.value); setGsheetError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && handleGSheetConnect()}
               disabled={gsheetLoading}
-              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 disabled:bg-slate-50 disabled:text-slate-400"
+              className="h-12 flex-1 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 disabled:bg-slate-50 disabled:text-slate-400"
             />
             <button
               onClick={handleGSheetConnect}
               disabled={gsheetLoading || !gsheetUrl.trim()}
-              className="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="h-12 px-5 bg-emerald-600 text-white text-base font-semibold rounded-lg shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               {gsheetLoading ? (
                 <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="31.4" strokeDashoffset="10" /></svg> Connecting...</>
@@ -1579,6 +1726,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedGanttSegment, setSelectedGanttSegment] = useState(null);
   const [expandedVisualizationId, setExpandedVisualizationId] = useState('');
+  const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(false);
+  const [showWorkloadIdle, setShowWorkloadIdle] = useState(false);
 
   const [isMobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1822,7 +1971,7 @@ function App() {
       }
       if (selectedUserSet.size > 0) {
         const segType = String(segment.segmentType || '');
-        const isUserSegment = segType.startsWith('USER_');
+        const isUserSegment = isUserContextSegment(segType, segment.userName);
         if (isUserSegment) {
           if (!selectedUserSet.has(segment.userName)) return false;
         } else {
@@ -1837,7 +1986,7 @@ function App() {
   const ganttVisibleSegments = useMemo(() => (
     filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
-      if (!showIdle && segmentType.startsWith('IDLE_')) return false;
+      if (!showIdle && isIdleContextSegment(segmentType)) return false;
       if (selectedSegmentTypeSet.size > 0 && !selectedSegmentTypeSet.has(segmentType)) {
         return isSystemContextSegment(segmentType);
       }
@@ -1845,11 +1994,14 @@ function App() {
     })
   ), [filteredBaseSegments, showIdle, selectedSegmentTypeSet]);
 
-  const kpiData = useMemo(
-    () => (ganttVisibleSegments.length > 0
-      ? buildKpiData(buildKpisFromSegments(ganttVisibleSegments))
-      : initialKpiData),
+  const visibleKpis = useMemo(
+    () => (ganttVisibleSegments.length > 0 ? buildKpisFromSegments(ganttVisibleSegments) : null),
     [ganttVisibleSegments]
+  );
+
+  const kpiData = useMemo(
+    () => (visibleKpis ? buildKpiData(visibleKpis) : initialKpiData),
+    [visibleKpis]
   );
   const visibleSystemSegmentCount = useMemo(
     () => ganttVisibleSegments.filter((segment) => String(segment.segmentType || '').startsWith('SYSTEM_')).length,
@@ -2007,111 +2159,170 @@ function App() {
   );
 
   const flowRows = useMemo(() => {
-    // --- Group segments by document + user for sequential analysis ---
-    const groupedByDocumentAndUser = new Map();
+    // --- Group by document to follow full workflow path end-to-end ---
+    const groupedByDocument = new Map();
     filteredBaseSegments.forEach((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!WORKFLOW_FLOW_SEGMENT_TYPES.has(segmentType)) return;
       const documentKey = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
-      const userName = String(segment.userName || '') || 'System';
-      const sequenceKey = `${documentKey}||${userName}`;
-      if (!groupedByDocumentAndUser.has(sequenceKey)) groupedByDocumentAndUser.set(sequenceKey, []);
-      groupedByDocumentAndUser.get(sequenceKey).push(segment);
+      if (!groupedByDocument.has(documentKey)) groupedByDocument.set(documentKey, []);
+      groupedByDocument.get(documentKey).push(segment);
     });
 
-    // --- Collect all consecutive transition gaps ---
-    const allTransitions = [];
-    groupedByDocumentAndUser.forEach((segmentsByGroup) => {
-      const sorted = [...segmentsByGroup].sort((a, b) => safeNumber(a.startTs) - safeNumber(b.startTs));
-      for (let idx = 1; idx < sorted.length; idx += 1) {
-        const prev = sorted[idx - 1];
+    const REVIEW_OR_EDIT_TYPES = new Set([
+      'USER_REVIEW_COMMENT_CHECK',
+      'USER_EDITING_CORRECTION',
+      'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
+    ]);
+    const REVIEW_EDIT_OR_COMPLETE_TYPES = new Set([
+      'USER_REVIEW_COMMENT_CHECK',
+      'USER_EDITING_CORRECTION',
+      'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
+      'USER_COMPLETION_APPROVAL',
+    ]);
+    const COMPLETE_TYPES = new Set([
+      'USER_COMPLETION_APPROVAL',
+      'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
+    ]);
+
+    const statsById = Object.fromEntries(
+      FLOW_INSIGHT_GROUPS.map((group) => [group.id, { totalSeconds: 0, count: 0 }])
+    );
+
+    const addMetric = (metricId, seconds, { capSeconds = FLOW_SESSION_GAP_MAX_SECONDS } = {}) => {
+      const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+      if (!Number.isFinite(safeSeconds)) return;
+      if (capSeconds > 0 && safeSeconds > capSeconds) return;
+      statsById[metricId].totalSeconds += safeSeconds;
+      statsById[metricId].count += 1;
+    };
+
+    groupedByDocument.forEach((segmentsByDoc) => {
+      const sorted = [...segmentsByDoc].sort((a, b) => safeNumber(a.startTs) - safeNumber(b.startTs));
+      if (sorted.length === 0) return;
+
+      const reprocessIndices = [];
+
+      for (let idx = 0; idx < sorted.length; idx += 1) {
         const current = sorted[idx];
-        if (prev.segmentType === current.segmentType) continue;
-        const gapSeconds = Math.max(0, Math.round((safeNumber(current.startTs) - safeNumber(prev.endTs)) / 1000));
-        if (gapSeconds > FLOW_SESSION_GAP_MAX_SECONDS) continue;
-        allTransitions.push({
-          fromType: String(prev.segmentType || ''),
-          toType: String(current.segmentType || ''),
-          gapSeconds,
+        const currentType = String(current.segmentType || '');
+
+        if (
+          currentType === 'SYSTEM_SCHEDULED_REPROCESSING'
+          || currentType === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+        ) {
+          reprocessIndices.push(idx);
+        }
+
+        // 1) Processing round 1 -> first user review/edit
+        if (currentType === 'SYSTEM_INITIAL_PROCESSING') {
+          const nextUserIdx = sorted.findIndex((candidate, candidateIdx) => (
+            candidateIdx > idx && REVIEW_OR_EDIT_TYPES.has(String(candidate.segmentType || ''))
+          ));
+          if (nextUserIdx > idx) {
+            const next = sorted[nextUserIdx];
+            addMetric(
+              'processing-round-1-to-user',
+              (safeNumber(next.startTs) - safeNumber(current.endTs)) / 1000
+            );
+          }
+        }
+
+        // 2) User review/edit -> next user review/edit/complete
+        if (REVIEW_OR_EDIT_TYPES.has(currentType)) {
+          const nextUserStepIdx = sorted.findIndex((candidate, candidateIdx) => (
+            candidateIdx > idx && REVIEW_EDIT_OR_COMPLETE_TYPES.has(String(candidate.segmentType || ''))
+          ));
+          if (nextUserStepIdx > idx) {
+            const next = sorted[nextUserStepIdx];
+            addMetric(
+              'user-review-edit-to-next-user-step',
+              (safeNumber(next.startTs) - safeNumber(current.endTs)) / 1000
+            );
+          }
+        }
+
+      }
+
+      // 4) Processing round 2 -> first user review/edit
+      // Backend emits SYSTEM_SCHEDULED_REPROCESSING for every cycle, so round-2 is the 2nd occurrence.
+      // Fallback: if round-2 marker is not explicit, use idle-after-reprocess style segments after a reprocess.
+      let round2AnchorIdx = reprocessIndices.length >= 2 ? reprocessIndices[1] : -1;
+      if (round2AnchorIdx < 0) {
+        round2AnchorIdx = sorted.findIndex((segment, idx) => {
+          const type = String(segment.segmentType || '');
+          if (
+            type !== 'IDLE_AFTER_SYSTEM_REPROCESS'
+            && type !== 'IDLE_WAITING_FOR_REREVIEW'
+            && type !== 'POST_COMPLETED_ELAPSED'
+          ) {
+            return false;
+          }
+          return reprocessIndices.some((reprocessIdx) => reprocessIdx < idx);
         });
       }
-    });
 
-    // --- Define insight groups ---
-    const INSIGHT_GROUPS = [
-      {
-        id: 'user-after-processing',
-        label: 'Post-Processing Pickup',
-        match: (f, t) =>
-          (f.startsWith('SYSTEM_') || f === 'IDLE_WAITING_FOR_REVIEW' || f === 'IDLE_AFTER_SYSTEM_REPROCESS')
-          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION' || t === 'USER_COMPLETION_APPROVAL'),
-      },
-      {
-        id: 'user-rework-cycle',
-        label: 'Rework Turnaround',
-        match: (f, t) =>
-          (f === 'USER_REVIEW_COMMENT_CHECK' || f === 'USER_EDITING_CORRECTION'
-            || f === 'USER_COMPLETION_APPROVAL' || f === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL'
-            || f === 'IDLE_WAITING_FOR_REREVIEW')
-          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION' || t === 'USER_COMPLETION_APPROVAL')
-          && f !== t,
-      },
-      {
-        id: 'reviewer-pickup',
-        label: 'Reviewer Queue Wait',
-        match: (f, t) =>
-          (f === 'IDLE_WAITING_FOR_REVIEW' || f === 'IDLE_WAITING_FOR_REREVIEW')
-          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION'),
-      },
-      {
-        id: 'upload-to-start',
-        label: 'Upload to First Action',
-        match: (f, t) =>
-          f === 'USER_UPLOADING'
-          && (t.startsWith('SYSTEM_') || t.startsWith('USER_') || t.startsWith('IDLE_')),
-      },
-      {
-        id: 'timeout-recovery',
-        label: 'Timeout Recovery',
-        match: (f, t) =>
-          f === 'USER_REVIEW_AUTO_TIMEOUT'
-          && (t === 'USER_REVIEW_COMMENT_CHECK' || t === 'USER_EDITING_CORRECTION'),
-      },
-      {
-        id: 'review-to-decision',
-        label: 'Post-Review Decision',
-        match: (f, t) =>
-          f === 'USER_REVIEW_COMMENT_CHECK'
-          && (t === 'USER_COMPLETION_APPROVAL' || t === 'USER_EDITING_CORRECTION'
-            || t.startsWith('SYSTEM_') || t === 'IDLE_WAITING_FOR_REREVIEW'),
-      },
-    ];
+      if (round2AnchorIdx >= 0) {
+        const nextUserIdx = sorted.findIndex((candidate, candidateIdx) => (
+          candidateIdx > round2AnchorIdx && REVIEW_OR_EDIT_TYPES.has(String(candidate.segmentType || ''))
+        ));
+        if (nextUserIdx > round2AnchorIdx) {
+          const anchorSegment = sorted[round2AnchorIdx];
+          const next = sorted[nextUserIdx];
+          const anchorType = String(anchorSegment.segmentType || '');
+          let anchorEndTs = safeNumber(anchorSegment.endTs);
 
-    // --- Aggregate transitions into groups ---
-    const groupStats = INSIGHT_GROUPS.map((group) => {
-      let totalSeconds = 0;
-      let count = 0;
-      for (const t of allTransitions) {
-        if (group.match(t.fromType, t.toType)) {
-          totalSeconds += t.gapSeconds;
-          count += 1;
+          if (
+            anchorType === 'IDLE_AFTER_SYSTEM_REPROCESS'
+            || anchorType === 'IDLE_WAITING_FOR_REREVIEW'
+            || anchorType === 'POST_COMPLETED_ELAPSED'
+          ) {
+            const priorReprocessIdx = [...reprocessIndices].reverse().find(
+              (reprocessIdx) => reprocessIdx < round2AnchorIdx
+            );
+            if (Number.isInteger(priorReprocessIdx)) {
+              anchorEndTs = safeNumber(sorted[priorReprocessIdx].endTs);
+            }
+          }
+
+          addMetric(
+            'processing-round-2-to-user',
+            (safeNumber(next.startTs) - anchorEndTs) / 1000,
+            { capSeconds: 0 }
+          );
         }
       }
+
+      // 3) Upload -> latest complete (end-to-end, no 2h cap)
+      const firstUpload = sorted.find((segment) => String(segment.segmentType || '') === 'USER_UPLOADING');
+      const completedSegments = sorted.filter((segment) => COMPLETE_TYPES.has(String(segment.segmentType || '')));
+      const latestComplete = completedSegments.length > 0 ? completedSegments[completedSegments.length - 1] : null;
+      if (firstUpload && latestComplete && safeNumber(latestComplete.endTs) >= safeNumber(firstUpload.startTs)) {
+        addMetric(
+          'upload-to-latest-complete',
+          (safeNumber(latestComplete.endTs) - safeNumber(firstUpload.startTs)) / 1000,
+          { capSeconds: 0 }
+        );
+      }
+    });
+
+    // --- Aggregate transitions into groups ---
+    const groupStats = FLOW_INSIGHT_GROUPS.map((group) => {
+      const stats = statsById[group.id] || { totalSeconds: 0, count: 0 };
       return {
         transitionKey: group.id,
         transitionLabel: group.label,
-        count,
-        totalSeconds,
-        avgSeconds: count > 0 ? totalSeconds / count : 0,
+        transitionDescription: group.description,
+        count: stats.count,
+        totalSeconds: stats.totalSeconds,
+        avgSeconds: stats.count > 0 ? stats.totalSeconds / stats.count : 0,
       };
     });
 
-    return groupStats
-      .filter((row) => row.count > 0)
-      .sort((a, b) => b.avgSeconds - a.avgSeconds);
+    return groupStats;
   }, [filteredBaseSegments]);
 
-  const flowTopRows = useMemo(() => flowRows.slice(0, 6), [flowRows]);
+  const flowTopRows = useMemo(() => flowRows, [flowRows]);
 
   useEffect(() => {
     setSelectedGanttSegment(null);
@@ -2125,14 +2336,48 @@ function App() {
     setExpandedVisualizationId('');
   }, [activeView]);
 
+  useEffect(() => {
+    // Ensure donut idle toggle starts disabled on initial load.
+    setShowWorkloadIdle(false);
+  }, []);
+
   const workloadContributors = useMemo(() => {
-    const total = contributionRows.reduce((sum, row) => sum + (row.totalSeconds || 0), 0);
+    const laneDurationMap = new Map();
+    ganttVisibleSegments.forEach((segment) => {
+      const segmentType = String(segment.segmentType || '');
+      const durationSeconds = safeNumber(segment.durationSeconds);
+      if (durationSeconds <= 0) return;
+
+      let lane = toTimelineLane(segmentType, segment.userName);
+      if (segmentType.startsWith('SYSTEM_')) lane = 'System';
+      if (isIdleContextSegment(segmentType)) lane = 'Idle';
+      // Keep donut idle aligned with "Idle Waiting for User" KPI (explicit IDLE_* only).
+      if (lane === 'Idle' && !isIdleContextSegment(segmentType)) return;
+      if (!showWorkloadIdle && lane === 'Idle') return;
+
+      laneDurationMap.set(lane, (laneDurationMap.get(lane) || 0) + durationSeconds);
+    });
+
+    if (showWorkloadIdle && visibleKpis) {
+      const idleSeconds = safeNumber(visibleKpis.idleWaitingSeconds);
+      if (idleSeconds > 0) {
+        laneDurationMap.set('Idle', idleSeconds);
+      } else {
+        laneDurationMap.delete('Idle');
+      }
+    }
+
+    const rows = Array.from(laneDurationMap.entries())
+      .map(([user, totalSeconds]) => ({ user, totalSeconds }))
+      .sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+    const total = rows.reduce((sum, row) => sum + row.totalSeconds, 0);
     if (total <= 0) return [];
-    return contributionRows.map((row) => ({
+    return rows.map((row) => ({
       ...row,
-      share: (row.totalSeconds || 0) / total,
+      share: row.totalSeconds / total,
     }));
-  }, [contributionRows]);
+  }, [ganttVisibleSegments, showWorkloadIdle, visibleKpis]);
 
   const suspiciousZeroState = useMemo(() => {
     const summaryRows = Number(performance?.summary?.rows || 0);
@@ -2156,7 +2401,7 @@ function App() {
     },
     flow: {
       title: 'Step Delay Analysis',
-      subtitle: 'Average wait time between workflow steps',
+      subtitle: '4 key workflow delays',
     },
     matrix: {
       title: 'Quality vs Rework by User',
@@ -2175,7 +2420,14 @@ function App() {
           />
         );
       }
-      return <GanttTimelineChart segments={ganttVisibleSegments} onSelectSegment={setSelectedGanttSegment} expanded />;
+      return (
+        <GanttTimelineChart
+          segments={ganttVisibleSegments}
+          onSelectSegment={setSelectedGanttSegment}
+          expanded
+          singleLane={ganttSingleLaneMode}
+        />
+      );
     }
 
     if (expandedVisualizationId === 'donut') {
@@ -2184,7 +2436,7 @@ function App() {
           <EmptyState
             icon={Users}
             title="ยังไม่มี Contribution Data"
-            subtitle="ยังไม่มี Active User Time จากข้อมูลที่อัปโหลด"
+            subtitle="ยังไม่มี Active Time จากข้อมูลที่อัปโหลด"
           />
         );
       }
@@ -2220,10 +2472,10 @@ function App() {
             id: row.transitionKey,
             label: row.transitionLabel,
             value: row.avgSeconds,
-            valueLabel: `${formatDuration(row.avgSeconds)} avg`,
+            valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
             meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
           }))}
-          maxVisibleRows={6}
+          maxVisibleRows={4}
         />
       );
     }
@@ -2720,14 +2972,14 @@ function App() {
             </FilterPopover>
 
             <div className="ml-auto flex items-center gap-4 pl-4 border-l border-slate-200">
-              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600 whitespace-nowrap">
-                <div className={`relative w-10 h-5 rounded-full transition-colors ${showIdle ? 'bg-blue-600' : 'bg-slate-300'}`} onClick={() => setShowIdle(!showIdle)}>
-                  <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${showIdle ? 'translate-x-5' : ''}`}></div>
-                </div>
-                Show Idle
-              </label>
-              <button className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
-                <Bell className="w-5 h-5" />
+              <button
+                onClick={() => refreshAll()}
+                disabled={loading || syncing}
+                className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                title="Refresh all dashboard data"
+              >
+                <RefreshCw className={`w-4 h-4 ${(loading || syncing) ? 'animate-spin' : ''}`} />
+                {loading || syncing ? 'Refreshing...' : 'Refresh Data'}
               </button>
             </div>
           </div>
@@ -2831,13 +3083,27 @@ function App() {
               </div>
 
               <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 overflow-hidden">
-                <button
-                  onClick={() => setExpandedVisualizationId('gantt')}
-                  className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                  title="Expand visualization"
-                >
-                  <Maximize2 className="w-3.5 h-3.5 mx-auto" />
-                </button>
+                <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
+                  <button
+                    onClick={() => setGanttSingleLaneMode((prev) => !prev)}
+                    className={`h-7 w-7 rounded-md border transition-all ${
+                      ganttSingleLaneMode
+                        ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                        : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                    }`}
+                    title="Toggle single-lane timeline (All user)"
+                    aria-pressed={ganttSingleLaneMode}
+                  >
+                    <Users className="w-3.5 h-3.5 mx-auto" />
+                  </button>
+                  <button
+                    onClick={() => setExpandedVisualizationId('gantt')}
+                    className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    title="Expand visualization"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 mx-auto" />
+                  </button>
+                </div>
                 <div className="flex justify-between items-center mb-6 pr-8">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Timeline by User</h2>
@@ -2851,20 +3117,38 @@ function App() {
                         subtitle="อัปโหลดไฟล์ Audit Log เพื่อคำนวณ Gantt segment"
                       />
                     ) : (
-                      <GanttTimelineChart segments={ganttVisibleSegments} onSelectSegment={setSelectedGanttSegment} />
+                      <GanttTimelineChart
+                        segments={ganttVisibleSegments}
+                        onSelectSegment={setSelectedGanttSegment}
+                        singleLane={ganttSingleLaneMode}
+                      />
                     )}
                   </div>
                 </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[430px] lg:col-span-2">
-                  <button
-                    onClick={() => setExpandedVisualizationId('donut')}
-                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                    title="Expand visualization"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5 mx-auto" />
-                  </button>
+                  <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
+                    <button
+                      onClick={() => setShowWorkloadIdle((prev) => !prev)}
+                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all ${
+                        showWorkloadIdle
+                          ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                      }`}
+                      title="Toggle idle time in donut"
+                      aria-pressed={showWorkloadIdle}
+                    >
+                      Idle Time
+                    </button>
+                    <button
+                      onClick={() => setExpandedVisualizationId('donut')}
+                      className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      title="Expand visualization"
+                    >
+                      <Maximize2 className="w-3.5 h-3.5 mx-auto" />
+                    </button>
+                  </div>
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Workload Share by User</h2>
                     <p className="text-sm text-slate-500">Active-time share of all contributors</p>
@@ -2874,7 +3158,7 @@ function App() {
                       <EmptyState
                         icon={Users}
                         title="ยังไม่มี Contribution Data"
-                        subtitle="ยังไม่มี Active User Time จากข้อมูลที่อัปโหลด"
+                        subtitle="ยังไม่มี Active Time จากข้อมูลที่อัปโหลด"
                       />
                     ) : (
                       <DonutWorkloadChart rows={workloadContributors} />
@@ -2919,7 +3203,7 @@ function App() {
                   </button>
                   <div className="mb-4 pr-8">
                     <h2 className="text-lg font-bold text-slate-900">Step Delay Analysis</h2>
-                    <p className="text-sm text-slate-500">Average wait time between workflow steps</p>
+                    <p className="text-sm text-slate-500">4 key workflow delays</p>
                   </div>
                   <div className="space-y-2 flex-1 min-h-0 overflow-hidden">
                     {flowTopRows.length === 0 ? (
@@ -2934,10 +3218,10 @@ function App() {
                             id: row.transitionKey,
                             label: row.transitionLabel,
                             value: row.avgSeconds,
-                            valueLabel: `${formatDuration(row.avgSeconds)} avg`,
+                            valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
                             meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
                           }))}
-                          maxVisibleRows={6}
+                          maxVisibleRows={4}
                         />
                     )}
                   </div>
@@ -2989,13 +3273,43 @@ function App() {
                       {visualizationMeta[expandedVisualizationId]?.subtitle || ''}
                     </div>
                   </div>
-                  <button
-                    onClick={() => setExpandedVisualizationId('')}
-                    className="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
-                    title="Close expanded view"
-                  >
-                    <X className="w-4 h-4 mx-auto" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {expandedVisualizationId === 'gantt' ? (
+                      <button
+                        onClick={() => setGanttSingleLaneMode((prev) => !prev)}
+                        className={`h-9 w-9 rounded-lg border transition-colors ${
+                          ganttSingleLaneMode
+                            ? 'border-blue-200 bg-blue-50 text-blue-600'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                        title="Toggle single-lane timeline (All user)"
+                        aria-pressed={ganttSingleLaneMode}
+                      >
+                        <Users className="w-4 h-4 mx-auto" />
+                      </button>
+                    ) : null}
+                    {expandedVisualizationId === 'donut' ? (
+                      <button
+                        onClick={() => setShowWorkloadIdle((prev) => !prev)}
+                        className={`h-9 rounded-lg border px-3 text-xs font-semibold transition-colors ${
+                          showWorkloadIdle
+                            ? 'border-blue-200 bg-blue-50 text-blue-600'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                        title="Toggle idle time in donut"
+                        aria-pressed={showWorkloadIdle}
+                      >
+                        Idle Time
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => setExpandedVisualizationId('')}
+                      className="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                      title="Close expanded view"
+                    >
+                      <X className="w-4 h-4 mx-auto" />
+                    </button>
+                  </div>
                 </div>
                 <div className="p-5 md:p-6 overflow-auto no-scrollbar flex-1">
                   {renderExpandedVisualization()}

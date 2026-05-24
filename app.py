@@ -834,6 +834,23 @@ def _extract_gsheet_id(url: str) -> str | None:
     return None
 
 
+def _extract_gsheet_gid(url: str) -> int | None:
+    """Extract gid from query or fragment (e.g. .../edit#gid=123)."""
+    try:
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query or "")
+        if query.get("gid"):
+            return int(str(query["gid"][0]).strip())
+
+        fragment = parsed.fragment or ""
+        m = re.search(r"(?:^|&)gid=(\d+)", fragment)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        return None
+    return None
+
+
 def _fetch_url_bytes(url: str, timeout: int = 60) -> bytes:
     """Download a URL and return raw bytes. Follows redirects."""
     import urllib.request
@@ -882,11 +899,23 @@ def _discover_gsheet_gids(spreadsheet_id: str) -> list[tuple[str, int]]:
     return [("Sheet1", 0)]
 
 
-def _download_gsheet_pages(spreadsheet_id: str) -> list[tuple[str, list[dict]]]:
+def _download_gsheet_pages(
+    spreadsheet_id: str, preferred_gid: int | None = None
+) -> list[tuple[str, list[dict]]]:
     """Download all tabs from a public Google Sheet as parsed CSV rows."""
-    sheet_tabs = _discover_gsheet_gids(spreadsheet_id)
     all_pages: list[tuple[str, list[dict]]] = []
-    for sheet_name, gid in sheet_tabs:
+    sheet_tabs = _discover_gsheet_gids(spreadsheet_id)
+
+    ordered_tabs: list[tuple[str, int]] = []
+    if preferred_gid is not None:
+        ordered_tabs.append((f"Sheet {preferred_gid}", preferred_gid))
+    ordered_tabs.extend(sheet_tabs)
+
+    seen_gid: set[int] = set()
+    for sheet_name, gid in ordered_tabs:
+        if gid in seen_gid:
+            continue
+        seen_gid.add(gid)
         export_url = (
             f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
             f"/export?format=csv&gid={gid}"
@@ -903,6 +932,34 @@ def _download_gsheet_pages(spreadsheet_id: str) -> list[tuple[str, list[dict]]]:
                 f"[GSheet] Failed to download sheet '{sheet_name}' (gid={gid}): {exc}"
             )
             continue
+
+    # Fallback for cases where gid discovery is blocked/failed.
+    if all_pages:
+        return all_pages
+
+    fallback_exports = [
+        (
+            "Default Tab",
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv",
+        ),
+        (
+            "Sheet 0",
+            f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid=0",
+        ),
+    ]
+    for sheet_name, export_url in fallback_exports:
+        try:
+            csv_bytes = _fetch_url_bytes(export_url, timeout=120)
+            if not csv_bytes or len(csv_bytes) < 5:
+                continue
+            rows = parse_csv_bytes(csv_bytes)
+            if rows:
+                all_pages.append((sheet_name, rows))
+                break
+        except Exception as exc:
+            print(f"[GSheet] Failed fallback export '{sheet_name}': {exc}")
+            continue
+
     return all_pages
 
 
@@ -964,12 +1021,15 @@ def connect_gsheet(url: str) -> dict:
         if existing:
             raise ValueError("This Google Sheet is already connected.")
 
+    preferred_gid = _extract_gsheet_gid(url)
+
     # Download data first to validate the sheet is accessible
-    all_pages = _download_gsheet_pages(spreadsheet_id)
+    all_pages = _download_gsheet_pages(spreadsheet_id, preferred_gid=preferred_gid)
     if not all_pages:
         raise ValueError(
-            "Could not download any data. Make sure the Google Sheet is shared as "
-            "'Anyone with the link' (Viewer)."
+            "Could not download any data. Ensure the sheet is shared as "
+            "'Anyone with the link (Viewer)' and try using a full tab URL "
+            "(.../edit#gid=123456789)."
         )
 
     # Ingest data
@@ -978,7 +1038,7 @@ def connect_gsheet(url: str) -> dict:
     # Save connection to DB
     connection_id = uuid.uuid4().hex
     now = utc_now_iso()
-    label = f"Google Sheet ({spreadsheet_id[:8]}…)"
+    label = f"Google Sheet ({spreadsheet_id[:8]}...)"
     with get_conn() as conn:
         conn.execute(
             """
@@ -1012,7 +1072,8 @@ def _sync_single_gsheet(connection_row: dict) -> dict:
     spreadsheet_id = connection_row["spreadsheet_id"]
     connection_id = connection_row["connection_id"]
     try:
-        all_pages = _download_gsheet_pages(spreadsheet_id)
+        preferred_gid = _extract_gsheet_gid(str(connection_row.get("url") or ""))
+        all_pages = _download_gsheet_pages(spreadsheet_id, preferred_gid=preferred_gid)
         if not all_pages:
             return {
                 "connection_id": connection_id,
@@ -2708,3 +2769,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
