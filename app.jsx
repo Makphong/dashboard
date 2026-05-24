@@ -382,11 +382,8 @@ function buildKpisFromSegments(segments) {
   const coreUserSegments = userSegments.filter((segment) => CORE_WORK_SESSION_TYPES.has(String(segment.segmentType || '')));
   const idleSegments = safeSegments.filter((segment) => String(segment.segmentType || '').startsWith('IDLE_'));
 
-  const effectiveDuration = (segment) => {
-    const effective = safeNumber(segment?.effectiveDurationSeconds);
-    if (effective > 0) return effective;
-    return safeNumber(segment?.durationSeconds);
-  };
+  // Use full segment time for KPI calculations.
+  const effectiveDuration = (segment) => safeNumber(segment?.durationSeconds);
 
   const activeUserTimeSeconds = userSegments.reduce((sum, segment) => sum + effectiveDuration(segment), 0);
   const coreActiveUserTimeSeconds = coreUserSegments.reduce((sum, segment) => sum + effectiveDuration(segment), 0);
@@ -1053,6 +1050,7 @@ const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
 };
 
 const DonutWorkloadChart = ({ rows, expanded = false }) => {
+  const [focusedUser, setFocusedUser] = useState('');
   const totalSeconds = rows.reduce((sum, row) => sum + safeNumber(row.totalSeconds), 0);
   if (totalSeconds <= 0) return null;
 
@@ -1074,47 +1072,90 @@ const DonutWorkloadChart = ({ rows, expanded = false }) => {
     })
     .filter(Boolean);
 
+  const focusedSegment = focusedUser ? segments.find((segment) => segment.user === focusedUser) || null : null;
+  const hasFocus = Boolean(focusedSegment);
+  const legendSegments = focusedSegment ? [focusedSegment] : segments;
+
+  useEffect(() => {
+    if (!focusedUser) return;
+    if (!segments.some((segment) => segment.user === focusedUser)) {
+      setFocusedUser('');
+    }
+  }, [segments, focusedUser]);
+
   const size = expanded ? 440 : 220;
   const center = size / 2;
   const radius = expanded ? 150 : 70;
   const stroke = expanded ? 56 : 28;
   const circumference = 2 * Math.PI * radius;
+  const focusLabel = focusedSegment
+    ? (focusedSegment.user.length > (expanded ? 24 : 14) ? `${focusedSegment.user.slice(0, expanded ? 24 : 14)}...` : focusedSegment.user)
+    : '';
+
+  const showFocus = (segment) => {
+    setFocusedUser(segment.user);
+  };
+
+  const clearFocus = () => {
+    setFocusedUser('');
+  };
 
   return (
-    <div className={`mt-4 grid grid-cols-1 ${expanded ? 'xl:grid-cols-[460px_360px] justify-center gap-8 items-start' : 'xl:grid-cols-[220px_1fr] gap-5 items-center'}`}>
-      <div className={`mx-auto ${expanded ? 'w-[440px]' : 'w-[220px]'}`}>
+    <div className={`mt-4 grid grid-cols-1 ${expanded ? 'xl:grid-cols-[460px_360px] justify-center gap-8 items-start' : 'lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start'}`}>
+      <div
+        onMouseLeave={clearFocus}
+        className={`mx-auto relative ${expanded ? 'w-[440px]' : 'w-[210px] xl:w-[220px]'}`}
+      >
         <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
           <circle cx={center} cy={center} r={radius} stroke="#E2E8F0" strokeWidth={stroke} fill="none" />
           <g transform={`rotate(-90 ${center} ${center})`}>
-            {segments.map((segment) => (
-              <circle
-                key={segment.user}
-                cx={center}
-                cy={center}
-                r={radius}
-                fill="none"
-                stroke={segment.color}
-                strokeWidth={stroke}
-                strokeDasharray={`${segment.fraction * circumference} ${circumference}`}
-                strokeDashoffset={-segment.startRatio * circumference}
-              />
-            ))}
+            {segments.map((segment) => {
+              const isFocused = focusedSegment?.user === segment.user;
+              return (
+                <circle
+                  key={segment.user}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  fill="none"
+                  stroke={hasFocus && !isFocused ? '#CBD5E1' : segment.color}
+                  strokeWidth={stroke}
+                  strokeDasharray={`${segment.fraction * circumference} ${circumference}`}
+                  strokeDashoffset={-segment.startRatio * circumference}
+                  strokeLinecap="round"
+                  opacity={hasFocus && !isFocused ? 0.4 : 1}
+                  style={{ cursor: 'pointer', transition: 'all 160ms ease' }}
+                  onMouseEnter={() => showFocus(segment)}
+                />
+              );
+            })}
           </g>
           <text x={center} y={center - 4} textAnchor="middle" className={`fill-slate-900 font-bold ${expanded ? 'text-[18px]' : 'text-[16px]'}`}>
-            {formatDuration(totalSeconds)}
+            {formatDuration(focusedSegment ? focusedSegment.value : totalSeconds)}
           </text>
-          <text x={center} y={center + 16} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[12px]' : 'text-[11px]'}`}>
-            Active Time
-          </text>
+          {focusedSegment ? (
+            <>
+              <text x={center} y={center + 16} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[12px]' : 'text-[11px]'}`}>
+                {formatPercent(focusedSegment.fraction)}
+              </text>
+              <text x={center} y={center + 30} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[11px]' : 'text-[10px]'}`}>
+                {focusLabel}
+              </text>
+            </>
+          ) : (
+            <text x={center} y={center + 16} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[12px]' : 'text-[11px]'}`}>
+              Active Time
+            </text>
+          )}
         </svg>
       </div>
 
-      <div className={`space-y-2 min-w-0 ${expanded ? 'w-full max-w-[360px] mx-auto max-h-[62vh] overflow-y-auto no-scrollbar pr-1' : ''}`}>
-        {segments.map((segment) => (
-          <div key={segment.user} className={`flex items-center justify-between gap-3 rounded-lg border border-slate-100 ${expanded ? 'px-3 py-2.5' : 'px-3 py-2'}`}>
-            <div className="flex items-center gap-2 min-w-0">
+      <div className={`space-y-2 min-w-0 w-full ${expanded ? 'max-w-[360px] mx-auto max-h-[62vh] overflow-y-auto no-scrollbar pr-1' : 'max-h-[260px] lg:max-h-[300px] overflow-y-auto no-scrollbar pr-1'}`}>
+        {legendSegments.map((segment) => (
+          <div key={segment.user} className={`flex items-center justify-between gap-3 rounded-lg border ${focusedSegment ? 'border-blue-200 bg-blue-50/50' : 'border-slate-100'} ${expanded ? 'px-3 py-2.5' : 'px-3 py-2'}`}>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: segment.color }}></span>
-              <span className={`font-medium text-slate-700 truncate ${expanded ? 'text-sm max-w-[190px]' : 'text-sm max-w-[130px]'}`} title={segment.user}>{segment.user}</span>
+              <span className={`font-medium text-slate-700 truncate ${expanded ? 'text-sm max-w-[220px]' : 'text-sm'}`} title={segment.user}>{segment.user}</span>
             </div>
             <div className="text-xs text-slate-500 whitespace-nowrap" title={`${segment.user}: ${formatDuration(segment.value)}`}>
               {expanded ? `${formatPercent(segment.fraction)} | ${formatDuration(segment.value)}` : formatPercent(segment.fraction)}
@@ -2084,10 +2125,10 @@ function App() {
     setExpandedVisualizationId('');
   }, [activeView]);
 
-  const topContributors = useMemo(() => {
+  const workloadContributors = useMemo(() => {
     const total = contributionRows.reduce((sum, row) => sum + (row.totalSeconds || 0), 0);
     if (total <= 0) return [];
-    return contributionRows.slice(0, 5).map((row) => ({
+    return contributionRows.map((row) => ({
       ...row,
       share: (row.totalSeconds || 0) / total,
     }));
@@ -2107,7 +2148,7 @@ function App() {
     },
     donut: {
       title: 'Workload Share by User',
-      subtitle: 'Active-time share of top contributors',
+      subtitle: 'Active-time share of all contributors',
     },
     contribution: {
       title: 'Top User Work Mix',
@@ -2138,7 +2179,7 @@ function App() {
     }
 
     if (expandedVisualizationId === 'donut') {
-      if (topContributors.length === 0) {
+      if (workloadContributors.length === 0) {
         return (
           <EmptyState
             icon={Users}
@@ -2147,7 +2188,7 @@ function App() {
           />
         );
       }
-      return <DonutWorkloadChart rows={topContributors} expanded />;
+      return <DonutWorkloadChart rows={workloadContributors} expanded />;
     }
 
     if (expandedVisualizationId === 'contribution') {
@@ -2815,8 +2856,8 @@ function App() {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[430px]">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[430px] lg:col-span-2">
                   <button
                     onClick={() => setExpandedVisualizationId('donut')}
                     className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -2826,22 +2867,22 @@ function App() {
                   </button>
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Workload Share by User</h2>
-                    <p className="text-sm text-slate-500">Active-time share of top contributors</p>
+                    <p className="text-sm text-slate-500">Active-time share of all contributors</p>
                   </div>
                   <div className="mt-4 flex-1 min-h-0">
-                    {topContributors.length === 0 ? (
+                    {workloadContributors.length === 0 ? (
                       <EmptyState
                         icon={Users}
                         title="ยังไม่มี Contribution Data"
                         subtitle="ยังไม่มี Active User Time จากข้อมูลที่อัปโหลด"
                       />
                     ) : (
-                      <DonutWorkloadChart rows={topContributors} />
+                      <DonutWorkloadChart rows={workloadContributors} />
                     )}
                   </div>
                 </div>
 
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 lg:col-span-2 flex flex-col lg:h-[430px] overflow-hidden">
+                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 lg:col-span-3 flex flex-col lg:h-[430px] overflow-hidden">
                   <button
                     onClick={() => setExpandedVisualizationId('contribution')}
                     className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
