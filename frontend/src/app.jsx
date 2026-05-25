@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-25-duration-scale-01';
+const FRONTEND_BUILD_VERSION = '2026-05-25-mobile-motion-01';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -525,13 +525,13 @@ function buildKpisFromSegments(segments) {
 }
 
 const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, activeView, setActiveView }) => (
-  <aside className={`fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200 transform transition-all duration-300 ease-in-out flex flex-col relative
+  <aside className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-all duration-300 ease-in-out flex flex-col
     ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
-    md:translate-x-0 ${isCollapsed ? 'md:w-20' : 'md:w-64'} md:static`}>
+    lg:translate-x-0 ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} lg:static`}>
 
     <button
       onClick={toggleCollapse}
-      className="hidden md:flex absolute -right-3 top-8 w-6 h-6 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-300 shadow-sm z-50 transition-colors"
+      className="hidden lg:flex absolute -right-3 top-8 w-6 h-6 bg-white border border-slate-200 rounded-full items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-300 shadow-sm z-50 transition-colors"
     >
       {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
     </button>
@@ -545,7 +545,7 @@ const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, act
       ) : (
         <div className="w-8 h-8 flex-shrink-0 bg-blue-600 rounded flex items-center justify-center text-white text-sm font-extrabold">KTB</div>
       )}
-      <button className="ml-auto md:hidden" onClick={() => setMobileOpen(false)}>
+      <button className="ml-auto lg:hidden" onClick={() => setMobileOpen(false)}>
         <X className="w-5 h-5 text-slate-500" />
       </button>
     </div>
@@ -809,7 +809,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
       .sort((a, b) => a.startTs - b.startTs);
   });
 
-  const laneLabelWidth = 210;
+  const laneLabelWidth = expanded ? 210 : 132;
   const baseTimelineWidth = Math.min(120000, Math.max(2200, Math.round(displaySpanHours * pxPerHour)));
   const timelineWidth = Math.min(
     GANTT_MAX_TIMELINE_WIDTH_PX,
@@ -2721,10 +2721,17 @@ function App() {
         activeView={activeView}
         setActiveView={setActiveView}
       />
+      {isMobileOpen ? (
+        <button
+          className="fixed inset-0 z-40 bg-slate-900/35 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close sidebar overlay"
+        ></button>
+      ) : null}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <header className="h-[72px] bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center px-4 md:px-8 gap-3 flex-shrink-0 z-20">
-          <button className="md:hidden p-2 text-slate-500" onClick={() => setMobileOpen(true)}>
+          <button className="lg:hidden p-2 text-slate-500" onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
           </button>
 
@@ -3149,37 +3156,41 @@ function App() {
               syncing={syncing}
             />
           ) : (
-            <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-300">
+            <div className="max-w-[1600px] mx-auto space-y-5 sm:space-y-6 animate-in fade-in duration-300">
               <div className="flex justify-between items-end mb-2">
                 <div>
-                  <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">User Performance</h1>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">User Performance</h1>
 
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                {kpiData.map((kpi) => (
-                  <div key={kpi.id} className={`bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] ${loading ? 'opacity-70' : ''}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+                {kpiData.map((kpi, idx) => (
+                  <div
+                    key={kpi.id}
+                    className={`card-rise-in bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] ${loading ? 'opacity-70' : ''}`}
+                    style={{ animationDelay: `${idx * 45}ms` }}
+                  >
                     <div className="flex justify-between items-start mb-4">
                       <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center`}>
                         <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
                       </div>
                     </div>
                     <div className="text-slate-500 text-sm font-semibold mb-1">{kpi.label}</div>
-                    <div className="text-3xl font-extrabold text-slate-900 tracking-tight whitespace-nowrap">{kpi.value}</div>
-                    <div className="text-xs text-slate-400 mt-2 font-medium whitespace-nowrap overflow-hidden text-ellipsis" title={kpi.subtext}>{kpi.subtext}</div>
+                    <div className="text-[2rem] sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">{kpi.value}</div>
+                    <div className="text-xs text-slate-400 mt-2 font-medium leading-snug break-words" title={kpi.subtext}>{kpi.subtext}</div>
                   </div>
                 ))}
               </div>
 
-              <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 overflow-hidden">
+              <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 overflow-hidden" style={{ animationDelay: '220ms' }}>
                 <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
                   <button
                     onClick={() => setGanttSingleLaneMode((prev) => !prev)}
-                    className={`h-7 w-7 rounded-md border transition-all ${
+                    className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
                       ganttSingleLaneMode
-                        ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
-                        : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                        ? 'border-blue-200 bg-blue-50/90 text-blue-600'
+                        : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
                     }`}
                     title="Toggle single-lane timeline (All user)"
                     aria-pressed={ganttSingleLaneMode}
@@ -3188,7 +3199,7 @@ function App() {
                   </button>
                   <button
                     onClick={() => setExpandedVisualizationId('gantt')}
-                    className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
                     title="Expand visualization"
                   >
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
@@ -3216,15 +3227,15 @@ function App() {
                   </div>
                 </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[430px] lg:col-span-2">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+                <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 flex flex-col lg:h-[430px] lg:col-span-2" style={{ animationDelay: '260ms' }}>
                   <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
                     <button
                       onClick={() => setShowWorkloadIdle((prev) => !prev)}
-                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all ${
+                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
                         showWorkloadIdle
-                          ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
-                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                          ? 'border-blue-200 bg-blue-50/90 text-blue-600'
+                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
                       }`}
                       title="Toggle idle time in donut"
                       aria-pressed={showWorkloadIdle}
@@ -3233,10 +3244,10 @@ function App() {
                     </button>
                     <button
                       onClick={() => setShowWorkloadSystem((prev) => !prev)}
-                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all ${
+                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
                         showWorkloadSystem
-                          ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
-                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                          ? 'border-blue-200 bg-blue-50/90 text-blue-600'
+                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
                       }`}
                       title="Toggle system time in donut"
                       aria-pressed={showWorkloadSystem}
@@ -3245,7 +3256,7 @@ function App() {
                     </button>
                     <button
                       onClick={() => setExpandedVisualizationId('donut')}
-                      className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
                       title="Expand visualization"
                     >
                       <Maximize2 className="w-3.5 h-3.5 mx-auto" />
@@ -3268,10 +3279,10 @@ function App() {
                   </div>
                 </div>
 
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 lg:col-span-3 flex flex-col lg:h-[430px] overflow-hidden">
+                <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 lg:col-span-3 flex flex-col lg:h-[430px] overflow-hidden" style={{ animationDelay: '300ms' }}>
                   <button
                     onClick={() => setExpandedVisualizationId('contribution')}
-                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
                     title="Expand visualization"
                   >
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
@@ -3294,11 +3305,11 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:min-h-[420px] overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 pb-8 sm:pb-10">
+                <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 flex flex-col lg:min-h-[420px] overflow-hidden" style={{ animationDelay: '340ms' }}>
                   <button
                     onClick={() => setExpandedVisualizationId('flow')}
-                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
                     title="Expand visualization"
                   >
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
@@ -3333,10 +3344,10 @@ function App() {
                   </div>
                 </div>
 
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:min-h-[420px] overflow-hidden">
+                <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 flex flex-col lg:min-h-[420px] overflow-hidden" style={{ animationDelay: '380ms' }}>
                   <button
                     onClick={() => setExpandedVisualizationId('matrix')}
-                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
                     title="Expand visualization"
                   >
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
