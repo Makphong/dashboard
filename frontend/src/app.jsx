@@ -1,11 +1,12 @@
-﻿import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import {
   Users, Server, Clock, Timer, RefreshCw, AlertTriangle,
   Search, Calendar, ChevronDown, User, LayoutDashboard,
   Menu, X, ChevronLeft, ChevronRight, Database, UploadCloud, Link2,
-  FileText, FileSpreadsheet, Trash2, CheckCircle2, Plus, Maximize2
+  FileText, FileSpreadsheet, Trash2, CheckCircle2, Plus, Maximize2,
+  SlidersHorizontal, Eye, EyeOff
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -933,7 +934,7 @@ const EmptyState = ({ icon: Icon, title, subtitle }) => (
   </div>
 );
 
-const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singleLane = false }) => {
+const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singleLane = false, showSystemLane = true, showIdleLane = true, showStarMarkers = true }) => {
   const containerRef = useRef(null);
   const headerScrollRef = useRef(null);
   const bodyScrollRef = useRef(null);
@@ -1066,6 +1067,10 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
     const durationDiff = laneDurationMap[b] - laneDurationMap[a];
     if (durationDiff !== 0) return durationDiff;
     return a.localeCompare(b);
+  }).filter((lane) => {
+    if (!showSystemLane && lane === 'System') return false;
+    if (!showIdleLane && lane === 'Idle') return false;
+    return true;
   });
 
   const laneToSegments = {};
@@ -1393,7 +1398,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
                   );
                 })}
 
-                {lanes.map((lane, laneIdx) => {
+                {showStarMarkers && lanes.map((lane, laneIdx) => {
                   const y = rowTopPadding + laneIdx * rowSlotHeight;
                   const bars = laneToSegments[lane] || [];
                   return (
@@ -2339,6 +2344,28 @@ const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectG
   );
 };
 
+// Helper to safely load state from localStorage
+function getSavedState(key, defaultValue) {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error("Failed to load saved state for " + key, e);
+  }
+  return defaultValue;
+}
+
+// Helper to safely save state to localStorage
+function saveState(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error("Failed to save state for " + key, e);
+  }
+}
+
 function App() {
   const [sources, setSources] = useState([]);
   const [gsheetConnections, setGsheetConnections] = useState([]);
@@ -2353,28 +2380,36 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedGanttSegment, setSelectedGanttSegment] = useState(null);
   const [expandedVisualizationId, setExpandedVisualizationId] = useState('');
-  const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(false);
-  const [showWorkloadIdle, setShowWorkloadIdle] = useState(false);
-  const [showWorkloadSystem, setShowWorkloadSystem] = useState(false);
+  const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(() => getSavedState('filter_ganttSingleLaneMode', false));
+  const [showSystemLane, setShowSystemLane] = useState(() => getSavedState('filter_showSystemLane', true));
+  const [showIdleLane, setShowIdleLane] = useState(() => getSavedState('filter_showIdleLane', true));
+  const [showStarMarkers, setShowStarMarkers] = useState(() => getSavedState('filter_showStarMarkers', true));
+  const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const timelineFilterRef = useRef(null);
+  const [showWorkloadIdle, setShowWorkloadIdle] = useState(() => getSavedState('filter_showWorkloadIdle', false));
+  const [showWorkloadSystem, setShowWorkloadSystem] = useState(() => getSavedState('filter_showWorkloadSystem', false));
+  const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
+  const workloadFilterRef = useRef(null);
 
   const [isMobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showIdle, setShowIdle] = useState(true);
+  const [showIdle, setShowIdle] = useState(() => getSavedState('filter_showIdle', true));
   const [activeView, setActiveView] = useState('user-performance');
   const [openDropdown, setOpenDropdown] = useState('');
-  const [datePreset, setDatePreset] = useState('all');
-  const [dateStart, setDateStart] = useState('');
-  const [dateEnd, setDateEnd] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [selectedSheets, setSelectedSheets] = useState([]);
-  const [activeDocumentFile, setActiveDocumentFile] = useState('');
+  const [datePreset, setDatePreset] = useState(() => getSavedState('filter_datePreset', 'all'));
+  const [dateStart, setDateStart] = useState(() => getSavedState('filter_dateStart', ''));
+  const [dateEnd, setDateEnd] = useState(() => getSavedState('filter_dateEnd', ''));
+  const [selectedFiles, setSelectedFiles] = useState(() => getSavedState('filter_selectedFiles', []));
+  const [selectedSheets, setSelectedSheets] = useState(() => getSavedState('filter_selectedSheets', []));
+  const [activeDocumentFile, setActiveDocumentFile] = useState(() => getSavedState('filter_activeDocumentFile', ''));
   const [documentFileSearch, setDocumentFileSearch] = useState('');
   const [documentSheetSearch, setDocumentSheetSearch] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState(() => getSavedState('filter_selectedUsers', []));
   const [userSearchText, setUserSearchText] = useState('');
-  const [selectedSegmentTypes, setSelectedSegmentTypes] = useState([]);
+  const [selectedSegmentTypes, setSelectedSegmentTypes] = useState(() => getSavedState('filter_selectedSegmentTypes', []));
   const [segmentTypeSearchText, setSegmentTypeSearchText] = useState('');
-  const [selectedSystemStages, setSelectedSystemStages] = useState([]);
+  const [selectedSystemStages, setSelectedSystemStages] = useState(() => getSavedState('filter_selectedSystemStages', []));
   const [systemStageSearchText, setSystemStageSearchText] = useState('');
   const [showDebugPanel, setShowDebugPanel] = useState(
     new URLSearchParams(window.location.search).get('debug') === '1'
@@ -2586,17 +2621,21 @@ function App() {
   );
 
   useEffect(() => {
-    if (documentTree.length === 0 || !documentTree.some((item) => item.fileName === activeDocumentFile)) {
+    if (documentTree.length === 0) return; // Prevent resetting saved active document while loading
+    if (!documentTree.some((item) => item.fileName === activeDocumentFile)) {
       if (activeDocumentFile) setActiveDocumentFile('');
     }
   }, [documentTree, activeDocumentFile]);
 
   useEffect(() => {
+    if (documentTree.length === 0) return; // Prevent wiping saved filters while loading source data
     const allFiles = documentTree.map((item) => item.fileName);
     const validFiles = new Set(allFiles);
     setSelectedFiles((prev) => {
       const next = prev.filter((fileName) => validFiles.has(fileName));
-      if (!didInitDocumentDefaultRef.current && next.length === 0 && selectedSheets.length === 0 && allFiles.length > 0) {
+      // Only set to all files on first init if there is absolutely no saved preference in localStorage
+      const hasSavedFiles = getSavedState('filter_selectedFiles', null) !== null;
+      if (!didInitDocumentDefaultRef.current && !hasSavedFiles && next.length === 0 && selectedSheets.length === 0 && allFiles.length > 0) {
         didInitDocumentDefaultRef.current = true;
         return allFiles;
       }
@@ -2615,6 +2654,7 @@ function App() {
   }, [documentTree, selectedSheets.length]);
 
   useEffect(() => {
+    if (documentTree.length === 0) return; // Prevent updating active file while loading
     const validFiles = new Set(documentTree.map((item) => item.fileName));
     if (validFiles.size === 0) return;
     if (activeDocumentFile && validFiles.has(activeDocumentFile)) return;
@@ -2628,6 +2668,7 @@ function App() {
   }, [documentTree, selectedFiles, activeDocumentFile]);
 
   useEffect(() => {
+    if (userOptions.length === 0) return; // Prevent wiping saved users while loading source data
     const userSet = new Set(userOptions);
     setSelectedUsers((prev) => {
       const next = prev.filter((userName) => userSet.has(userName));
@@ -2636,6 +2677,7 @@ function App() {
   }, [userOptions]);
 
   useEffect(() => {
+    if (segmentTypeOptions.length === 0) return; // Prevent wiping saved segments while loading source data
     const segmentSet = new Set(segmentTypeOptions.map((option) => option.value));
     setSelectedSegmentTypes((prev) => {
       const next = prev.filter((segmentType) => segmentSet.has(segmentType));
@@ -2644,6 +2686,7 @@ function App() {
   }, [segmentTypeOptions]);
 
   useEffect(() => {
+    if (systemStageOptions.length === 0) return; // Prevent wiping saved stages while loading source data
     const stageSet = new Set(systemStageOptions.map((option) => option.value));
     setSelectedSystemStages((prev) => {
       const next = prev.filter((stage) => stageSet.has(stage));
@@ -3363,10 +3406,49 @@ function App() {
     setExpandedVisualizationId('');
   }, [activeView]);
 
+
+
+  // Watchers to persist all filters
+  useEffect(() => { saveState('filter_ganttSingleLaneMode', ganttSingleLaneMode); }, [ganttSingleLaneMode]);
+  useEffect(() => { saveState('filter_showSystemLane', showSystemLane); }, [showSystemLane]);
+  useEffect(() => { saveState('filter_showIdleLane', showIdleLane); }, [showIdleLane]);
+  useEffect(() => { saveState('filter_showStarMarkers', showStarMarkers); }, [showStarMarkers]);
+  useEffect(() => { saveState('filter_showWorkloadIdle', showWorkloadIdle); }, [showWorkloadIdle]);
+  useEffect(() => { saveState('filter_showWorkloadSystem', showWorkloadSystem); }, [showWorkloadSystem]);
+  useEffect(() => { saveState('filter_showIdle', showIdle); }, [showIdle]);
+  useEffect(() => { saveState('filter_datePreset', datePreset); }, [datePreset]);
+  useEffect(() => { saveState('filter_dateStart', dateStart); }, [dateStart]);
+  useEffect(() => { saveState('filter_dateEnd', dateEnd); }, [dateEnd]);
+  useEffect(() => { saveState('filter_selectedFiles', selectedFiles); }, [selectedFiles]);
+  useEffect(() => { saveState('filter_selectedSheets', selectedSheets); }, [selectedSheets]);
+  useEffect(() => { saveState('filter_activeDocumentFile', activeDocumentFile); }, [activeDocumentFile]);
+  useEffect(() => { saveState('filter_selectedUsers', selectedUsers); }, [selectedUsers]);
+  useEffect(() => { saveState('filter_selectedSegmentTypes', selectedSegmentTypes); }, [selectedSegmentTypes]);
+  useEffect(() => { saveState('filter_selectedSystemStages', selectedSystemStages); }, [selectedSystemStages]);
+
   useEffect(() => {
-    // Ensure donut idle toggle starts disabled on initial load.
-    setShowWorkloadIdle(false);
-  }, []);
+    if (!showTimelineFilterMenu) return undefined;
+    const close = (e) => {
+      if (e.type === 'keydown' && e.key === 'Escape') { setShowTimelineFilterMenu(false); return; }
+      if (timelineFilterRef.current && timelineFilterRef.current.contains(e.target)) return;
+      setShowTimelineFilterMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [showTimelineFilterMenu]);
+
+  useEffect(() => {
+    if (!showWorkloadFilterMenu) return undefined;
+    const close = (e) => {
+      if (e.type === 'keydown' && e.key === 'Escape') { setShowWorkloadFilterMenu(false); return; }
+      if (workloadFilterRef.current && workloadFilterRef.current.contains(e.target)) return;
+      setShowWorkloadFilterMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close); };
+  }, [showWorkloadFilterMenu]);
 
   const workloadContributors = useMemo(() => {
     const laneDurationMap = new Map();
@@ -3505,6 +3587,9 @@ function App() {
           onSelectSegment={setSelectedGanttSegment}
           expanded
           singleLane={ganttSingleLaneMode}
+          showSystemLane={showSystemLane}
+          showIdleLane={showIdleLane}
+          showStarMarkers={showStarMarkers}
         />
       );
     }
@@ -4176,25 +4261,52 @@ function App() {
               <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 overflow-hidden" style={{ animationDelay: '220ms' }}>
                 <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
                   <button
-                    onClick={exportTimelineExcel}
+                    onClick={() => setShowExportConfirm(true)}
                     disabled={ganttVisibleSegments.length === 0}
                     className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-400 disabled:hover:border-slate-200"
                     title="Export timeline to Excel"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 mx-auto" />
                   </button>
-                  <button
-                    onClick={() => setGanttSingleLaneMode((prev) => !prev)}
-                    className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
-                      ganttSingleLaneMode
-                        ? 'border-blue-200 bg-blue-50/90 text-blue-600'
-                        : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                    }`}
-                    title="Toggle single-lane timeline (All user)"
-                    aria-pressed={ganttSingleLaneMode}
-                  >
-                    <Users className="w-3.5 h-3.5 mx-auto" />
-                  </button>
+                  <div className="relative" ref={timelineFilterRef}>
+                    <button
+                      onClick={() => setShowTimelineFilterMenu((prev) => !prev)}
+                      className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
+                        (!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
+                          ? 'border-blue-200 bg-blue-50/90 text-blue-600'
+                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
+                      }`}
+                      title="Timeline display filters"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5 mx-auto" />
+                    </button>
+                    {showTimelineFilterMenu && (
+                      <div
+                        className="dropdown-slide-enter absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18)] py-1.5 z-30"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Display Options</div>
+                        {[
+                          { label: 'Single Lane', active: ganttSingleLaneMode, toggle: () => setGanttSingleLaneMode((p) => !p), icon: Users },
+                          { label: 'System Lane', active: showSystemLane, toggle: () => setShowSystemLane((p) => !p), icon: Server },
+                          { label: 'Idle Lane', active: showIdleLane, toggle: () => setShowIdleLane((p) => !p), icon: Clock },
+                          { label: 'Star Status', active: showStarMarkers, toggle: () => setShowStarMarkers((p) => !p), icon: AlertTriangle },
+                        ].map((opt) => (
+                          <button
+                            key={opt.label}
+                            onClick={opt.toggle}
+                            className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                          >
+                            <div className={`w-8 h-[18px] rounded-full relative transition-colors duration-200 ${opt.active ? 'bg-blue-500' : 'bg-slate-200'}`}>
+                              <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${opt.active ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                            </div>
+                            <opt.icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="text-slate-700 font-medium">{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => setExpandedVisualizationId('gantt')}
                     className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
@@ -4220,6 +4332,9 @@ function App() {
                         segments={ganttVisibleSegments}
                         onSelectSegment={setSelectedGanttSegment}
                         singleLane={ganttSingleLaneMode}
+                        showSystemLane={showSystemLane}
+                        showIdleLane={showIdleLane}
+                        showStarMarkers={showStarMarkers}
                       />
                     )}
                   </div>
@@ -4228,30 +4343,43 @@ function App() {
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
                 <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 flex flex-col lg:h-[430px] lg:col-span-2" style={{ animationDelay: '260ms' }}>
                   <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
-                    <button
-                      onClick={() => setShowWorkloadIdle((prev) => !prev)}
-                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
-                        showWorkloadIdle
-                          ? 'border-blue-200 bg-blue-50/90 text-blue-600'
-                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                      }`}
-                      title="Toggle idle time in donut"
-                      aria-pressed={showWorkloadIdle}
-                    >
-                      Idle Time
-                    </button>
-                    <button
-                      onClick={() => setShowWorkloadSystem((prev) => !prev)}
-                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
-                        showWorkloadSystem
-                          ? 'border-blue-200 bg-blue-50/90 text-blue-600'
-                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                      }`}
-                      title="Toggle system time in donut"
-                      aria-pressed={showWorkloadSystem}
-                    >
-                      System Time
-                    </button>
+                    <div className="relative" ref={workloadFilterRef}>
+                      <button
+                        onClick={() => setShowWorkloadFilterMenu((prev) => !prev)}
+                        className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
+                          (showWorkloadIdle || showWorkloadSystem)
+                            ? 'border-blue-200 bg-blue-50/90 text-blue-600'
+                            : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
+                        }`}
+                        title="Workload display filters"
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5 mx-auto" />
+                      </button>
+                      {showWorkloadFilterMenu && (
+                        <div
+                          className="dropdown-slide-enter absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18)] py-1.5 z-30"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Display Options</div>
+                          {[
+                            { label: 'Idle Time', active: showWorkloadIdle, toggle: () => setShowWorkloadIdle((p) => !p), icon: Clock },
+                            { label: 'System Time', active: showWorkloadSystem, toggle: () => setShowWorkloadSystem((p) => !p), icon: Server },
+                          ].map((opt) => (
+                            <button
+                              key={opt.label}
+                              onClick={opt.toggle}
+                              className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                            >
+                              <div className={`w-8 h-[18px] rounded-full relative transition-colors duration-200 ${opt.active ? 'bg-blue-500' : 'bg-slate-200'}`}>
+                                <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${opt.active ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                              </div>
+                              <opt.icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="text-slate-700 font-medium">{opt.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => setExpandedVisualizationId('donut')}
                       className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
@@ -4391,7 +4519,7 @@ function App() {
                   <div className="flex items-center gap-2">
                     {expandedVisualizationId === 'gantt' ? (
                       <button
-                        onClick={exportTimelineExcel}
+                        onClick={() => setShowExportConfirm(true)}
                         disabled={ganttVisibleSegments.length === 0}
                         className="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                         title="Export timeline to Excel"
@@ -4400,46 +4528,84 @@ function App() {
                       </button>
                     ) : null}
                     {expandedVisualizationId === 'gantt' ? (
-                      <button
-                        onClick={() => setGanttSingleLaneMode((prev) => !prev)}
-                        className={`h-9 w-9 rounded-lg border transition-colors ${
-                          ganttSingleLaneMode
-                            ? 'border-blue-200 bg-blue-50 text-blue-600'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
-                        title="Toggle single-lane timeline (All user)"
-                        aria-pressed={ganttSingleLaneMode}
-                      >
-                        <Users className="w-4 h-4 mx-auto" />
-                      </button>
+                      <div className="relative" ref={timelineFilterRef}>
+                        <button
+                          onClick={() => setShowTimelineFilterMenu((prev) => !prev)}
+                          className={`h-9 w-9 rounded-lg border transition-colors ${
+                            (!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
+                              ? 'border-blue-200 bg-blue-50 text-blue-600'
+                              : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                          }`}
+                          title="Timeline display filters"
+                        >
+                          <SlidersHorizontal className="w-4 h-4 mx-auto" />
+                        </button>
+                        {showTimelineFilterMenu && (
+                          <div
+                            className="dropdown-slide-enter absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18)] py-1.5 z-30"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Display Options</div>
+                            {[
+                              { label: 'Single Lane', active: ganttSingleLaneMode, toggle: () => setGanttSingleLaneMode((p) => !p), icon: Users },
+                              { label: 'System Lane', active: showSystemLane, toggle: () => setShowSystemLane((p) => !p), icon: Server },
+                              { label: 'Idle Lane', active: showIdleLane, toggle: () => setShowIdleLane((p) => !p), icon: Clock },
+                              { label: 'Star Status', active: showStarMarkers, toggle: () => setShowStarMarkers((p) => !p), icon: AlertTriangle },
+                            ].map((opt) => (
+                              <button
+                                key={opt.label}
+                                onClick={opt.toggle}
+                                className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                              >
+                                <div className={`w-8 h-[18px] rounded-full relative transition-colors duration-200 ${opt.active ? 'bg-blue-500' : 'bg-slate-200'}`}>
+                                  <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${opt.active ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                                </div>
+                                <opt.icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="text-slate-700 font-medium">{opt.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : null}
                     {expandedVisualizationId === 'donut' ? (
-                      <button
-                        onClick={() => setShowWorkloadIdle((prev) => !prev)}
-                        className={`h-9 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                          showWorkloadIdle
-                            ? 'border-blue-200 bg-blue-50 text-blue-600'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
-                        title="Toggle idle time in donut"
-                        aria-pressed={showWorkloadIdle}
-                      >
-                        Idle Time
-                      </button>
-                    ) : null}
-                    {expandedVisualizationId === 'donut' ? (
-                      <button
-                        onClick={() => setShowWorkloadSystem((prev) => !prev)}
-                        className={`h-9 rounded-lg border px-3 text-xs font-semibold transition-colors ${
-                          showWorkloadSystem
-                            ? 'border-blue-200 bg-blue-50 text-blue-600'
-                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
-                        title="Toggle system time in donut"
-                        aria-pressed={showWorkloadSystem}
-                      >
-                        System Time
-                      </button>
+                      <div className="relative" ref={workloadFilterRef}>
+                        <button
+                          onClick={() => setShowWorkloadFilterMenu((prev) => !prev)}
+                          className={`h-9 w-9 rounded-lg border transition-colors ${
+                            (showWorkloadIdle || showWorkloadSystem)
+                              ? 'border-blue-200 bg-blue-50 text-blue-600'
+                              : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                          }`}
+                          title="Workload display filters"
+                        >
+                          <SlidersHorizontal className="w-4 h-4 mx-auto" />
+                        </button>
+                        {showWorkloadFilterMenu && (
+                          <div
+                            className="dropdown-slide-enter absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18)] py-1.5 z-30"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Display Options</div>
+                            {[
+                              { label: 'Idle Time', active: showWorkloadIdle, toggle: () => setShowWorkloadIdle((p) => !p), icon: Clock },
+                              { label: 'System Time', active: showWorkloadSystem, toggle: () => setShowWorkloadSystem((p) => !p), icon: Server },
+                            ].map((opt) => (
+                              <button
+                                key={opt.label}
+                                onClick={opt.toggle}
+                                className="flex items-center gap-2.5 w-full px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
+                              >
+                                <div className={`w-8 h-[18px] rounded-full relative transition-colors duration-200 ${opt.active ? 'bg-blue-500' : 'bg-slate-200'}`}>
+                                  <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-200 ${opt.active ? 'translate-x-[16px]' : 'translate-x-[2px]'}`} />
+                                </div>
+                                <opt.icon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="text-slate-700 font-medium">{opt.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : null}
                     <button
                       onClick={() => setExpandedVisualizationId('')}
@@ -4456,6 +4622,42 @@ function App() {
               </div>
             </div>
           ) : null}
+
+          {showExportConfirm && (
+            <div
+              className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px] confirm-overlay-enter"
+              onClick={() => setShowExportConfirm(false)}
+            >
+              <div
+                className="confirm-panel-enter w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex flex-col items-center pt-8 pb-4 px-6">
+                  <div className="confirm-check-enter w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-200/50 mb-4">
+                    <FileSpreadsheet className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Export to Excel</h3>
+                  <p className="text-sm text-slate-500 text-center">
+                    Export {ganttVisibleSegments.length.toLocaleString()} segments to Excel file?
+                  </p>
+                </div>
+                <div className="flex gap-3 px-6 pb-6 pt-2">
+                  <button
+                    onClick={() => setShowExportConfirm(false)}
+                    className="flex-1 h-11 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { setShowExportConfirm(false); exportTimelineExcel(); }}
+                    className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold text-sm hover:from-emerald-600 hover:to-emerald-700 shadow-md shadow-emerald-200/40 transition-all hover:shadow-lg"
+                  >
+                    Export Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {selectedGanttSegment && (
             <div

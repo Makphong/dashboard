@@ -119,6 +119,22 @@ This file must be read before making any code change.
   - Star status visibility
 - Export timeline action can require confirmation popup with clear confirm/cancel controls.
 
+## Click-Outside Handler Rule (2026-05-25)
+- When adding click-outside-to-close for a dropdown/popover:
+  - `mousedown` fires BEFORE `click`. If you listen on `document.mousedown` to close the menu,
+    it will close the menu before any `onClick` handler inside the dropdown can execute.
+  - ALWAYS use a `ref` on the dropdown container and check `ref.current.contains(e.target)` 
+    before closing. If the click is inside the dropdown, do NOT close.
+  - Wrong pattern: `document.addEventListener('mousedown', () => setOpen(false))`
+  - Correct pattern:
+    ```js
+    document.addEventListener('mousedown', (e) => {
+      if (dropdownRef.current && dropdownRef.current.contains(e.target)) return;
+      setOpen(false);
+    });
+    ```
+  - This applies to ALL interactive dropdown menus, not just timeline filters.
+
 ## Response Discipline
 - If uncertain between 2 interpretations, ask one short clarification.
 - Otherwise assume literal interpretation and execute directly.

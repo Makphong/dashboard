@@ -26,47 +26,53 @@
         display: none;
       }
       @keyframes vizOverlayEnter {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
       @keyframes vizPanelEnter {
-        from {
-          opacity: 0;
-          transform: translateY(12px) scale(0.985);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-        }
+        from { opacity: 0; transform: translateY(12px) scale(0.985); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
-      .viz-overlay-enter {
-        animation: vizOverlayEnter 180ms ease-out;
-      }
-      .viz-panel-enter {
-        animation: vizPanelEnter 220ms ease-out;
-      }
+      .viz-overlay-enter { animation: vizOverlayEnter 180ms ease-out; }
+      .viz-panel-enter { animation: vizPanelEnter 220ms ease-out; }
       @keyframes cardRiseIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
       .card-rise-in {
         opacity: 0;
         animation: cardRiseIn 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
       }
+      @keyframes confirmOverlayIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes confirmPanelIn {
+        0% { opacity: 0; transform: scale(0.85) translateY(20px); }
+        60% { opacity: 1; transform: scale(1.03) translateY(-2px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      @keyframes confirmCheckIn {
+        0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+        60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      .confirm-overlay-enter { animation: confirmOverlayIn 200ms ease-out; }
+      .confirm-panel-enter { animation: confirmPanelIn 380ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+      .confirm-check-enter { animation: confirmCheckIn 400ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms both; }
+      @keyframes dropdownSlideIn {
+        from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .dropdown-slide-enter { animation: dropdownSlideIn 180ms ease-out; }
       @media (prefers-reduced-motion: reduce) {
         .viz-overlay-enter,
         .viz-panel-enter,
-        .card-rise-in {
+        .card-rise-in,
+        .confirm-overlay-enter,
+        .confirm-panel-enter,
+        .confirm-check-enter,
+        .dropdown-slide-enter {
           animation: none !important;
           opacity: 1 !important;
           transform: none !important;
@@ -91,6 +97,6 @@
     <div id="root"></div>
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="text/babel" data-type="module" data-presets="react" src="./frontend/src/app.jsx?v=20260525-system-professional-18"></script>
+    <script type="text/babel" data-type="module" data-presets="react" src="./frontend/src/app.jsx?v=20260525-system-professional-19"></script>
   </body>
 </html>
