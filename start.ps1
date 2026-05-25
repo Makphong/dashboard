@@ -16,22 +16,22 @@ function Stop-ExistingPythonOnPort {
   }
 
   $listener = $listeners | Select-Object -First 1
-  $pid = $listener.OwningProcess
-  if (-not $pid) {
+  $processId = $listener.OwningProcess
+  if (-not $processId) {
     return
   }
 
-  $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+  $proc = Get-Process -Id $processId -ErrorAction SilentlyContinue
   if (-not $proc) {
     return
   }
 
   if ($proc.ProcessName -like "python*") {
-    Write-Host "Stopping old Python server on port $TargetPort (PID: $pid)..." -ForegroundColor Yellow
-    Stop-Process -Id $pid -Force
+    Write-Host "Stopping old Python server on port $TargetPort (PID: $processId)..." -ForegroundColor Yellow
+    Stop-Process -Id $processId -Force
     Start-Sleep -Milliseconds 400
   } else {
-    Write-Host "Port $TargetPort is already used by process '$($proc.ProcessName)' (PID: $pid)." -ForegroundColor Red
+    Write-Host "Port $TargetPort is already used by process '$($proc.ProcessName)' (PID: $processId)." -ForegroundColor Red
     Write-Host "Please free the port or run: ./start.ps1 -Port 8001" -ForegroundColor Red
     exit 1
   }

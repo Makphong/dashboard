@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-24-hotfix-text-07';
+const FRONTEND_BUILD_VERSION = '2026-05-25-system-time-toggle-01';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -1728,6 +1728,7 @@ function App() {
   const [expandedVisualizationId, setExpandedVisualizationId] = useState('');
   const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(false);
   const [showWorkloadIdle, setShowWorkloadIdle] = useState(false);
+  const [showWorkloadSystem, setShowWorkloadSystem] = useState(false);
 
   const [isMobileOpen, setMobileOpen] = useState(false);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -2354,6 +2355,7 @@ function App() {
       // Keep donut idle aligned with "Idle Waiting for User" KPI (explicit IDLE_* only).
       if (lane === 'Idle' && !isIdleContextSegment(segmentType)) return;
       if (!showWorkloadIdle && lane === 'Idle') return;
+      if (!showWorkloadSystem && lane === 'System') return;
 
       laneDurationMap.set(lane, (laneDurationMap.get(lane) || 0) + durationSeconds);
     });
@@ -2377,7 +2379,7 @@ function App() {
       ...row,
       share: row.totalSeconds / total,
     }));
-  }, [ganttVisibleSegments, showWorkloadIdle, visibleKpis]);
+  }, [ganttVisibleSegments, showWorkloadIdle, showWorkloadSystem, visibleKpis]);
 
   const suspiciousZeroState = useMemo(() => {
     const summaryRows = Number(performance?.summary?.rows || 0);
@@ -3142,6 +3144,18 @@ function App() {
                       Idle Time
                     </button>
                     <button
+                      onClick={() => setShowWorkloadSystem((prev) => !prev)}
+                      className={`h-7 rounded-md border px-2 text-[11px] font-semibold transition-all ${
+                        showWorkloadSystem
+                          ? 'border-blue-200 bg-blue-50/90 text-blue-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                          : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+                      }`}
+                      title="Toggle system time in donut"
+                      aria-pressed={showWorkloadSystem}
+                    >
+                      System Time
+                    </button>
+                    <button
                       onClick={() => setExpandedVisualizationId('donut')}
                       className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
                       title="Expand visualization"
@@ -3300,6 +3314,20 @@ function App() {
                         aria-pressed={showWorkloadIdle}
                       >
                         Idle Time
+                      </button>
+                    ) : null}
+                    {expandedVisualizationId === 'donut' ? (
+                      <button
+                        onClick={() => setShowWorkloadSystem((prev) => !prev)}
+                        className={`h-9 rounded-lg border px-3 text-xs font-semibold transition-colors ${
+                          showWorkloadSystem
+                            ? 'border-blue-200 bg-blue-50 text-blue-600'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                        title="Toggle system time in donut"
+                        aria-pressed={showWorkloadSystem}
+                      >
+                        System Time
                       </button>
                     ) : null}
                     <button
