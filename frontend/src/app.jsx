@@ -398,11 +398,6 @@ function toTimelineLane(segmentType, userNameRaw) {
   return userName || 'Unknown User';
 }
 
-function isSystemContextSegment(segmentType) {
-  const type = String(segmentType || '');
-  return type.startsWith('SYSTEM_');
-}
-
 function isIdleContextSegment(segmentType) {
   const type = String(segmentType || '');
   return type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE';
@@ -1937,9 +1932,42 @@ function App() {
 
   const userOptions = useMemo(
     () => {
+      let minTs = Number.NEGATIVE_INFINITY;
+      let maxTs = Number.POSITIVE_INFINITY;
+      if (parsedSegments.length > 0) {
+        if (datePreset === 'custom') {
+          const startTs = dateStart ? Date.parse(`${dateStart}T00:00:00`) : Number.NEGATIVE_INFINITY;
+          const endTs = dateEnd ? Date.parse(`${dateEnd}T23:59:59.999`) : Number.POSITIVE_INFINITY;
+          if (Number.isFinite(startTs) && Number.isFinite(endTs) && startTs > endTs) {
+            minTs = endTs;
+            maxTs = startTs;
+          } else {
+            minTs = startTs;
+            maxTs = endTs;
+          }
+        } else if (datePreset !== 'all') {
+          const latestEndTs = parsedSegments.reduce((maxValue, segment) => Math.max(maxValue, segment.endTs), parsedSegments[0].endTs);
+          const dayWindowMap = { '7d': 7, '30d': 30, '90d': 90 };
+          const windowDays = dayWindowMap[datePreset] || 30;
+          minTs = latestEndTs - (windowDays * 24 * 60 * 60 * 1000);
+          maxTs = latestEndTs;
+        }
+      }
+
+      const selectedSheetKeys = new Set(selectedSheets);
+      const selectedFileNames = new Set(selectedFiles);
+      const useSheetFilter = selectedSheetKeys.size > 0;
       const names = new Set();
       let hasSystemSegment = false;
+
       for (const seg of parsedSegments) {
+        if (seg.endTs < minTs || seg.startTs > maxTs) continue;
+        if (useSheetFilter) {
+          if (!selectedSheetKeys.has(seg.sheetKey)) continue;
+        } else if (!selectedFileNames.has(seg.fileName)) {
+          continue;
+        }
+
         const st = String(seg.segmentType || '');
         if (st.startsWith('USER_') && seg.userName) {
           names.add(seg.userName);
@@ -1950,7 +1978,7 @@ function App() {
       if (hasSystemSegment) names.add('System');
       return Array.from(names).sort((a, b) => a.localeCompare(b));
     },
-    [parsedSegments]
+    [parsedSegments, selectedSheets, selectedFiles, datePreset, dateStart, dateEnd]
   );
 
   const segmentTypeOptions = useMemo(
@@ -2117,7 +2145,7 @@ function App() {
       const segmentType = String(segment.segmentType || '');
       if (!showIdle && isIdleContextSegment(segmentType)) return false;
       if (selectedSegmentTypeSet.size > 0 && !selectedSegmentTypeSet.has(segmentType)) {
-        return isSystemContextSegment(segmentType);
+        return false;
       }
       return true;
     })
@@ -3153,17 +3181,14 @@ function App() {
                     <div className="text-xs text-slate-400 px-1 py-2">No segment types found</div>
                   ) : (
                     filteredSegmentTypeOptions.map((option) => (
-                      <label key={option.value} className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
+                      <label key={option.value} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={selectedSegmentTypeSet.has(option.value)}
                           onChange={() => toggleSegmentTypeSelection(option.value)}
-                          className="mt-0.5 h-4 w-4 accent-blue-600 rounded"
+                          className="h-4 w-4 accent-blue-600 rounded"
                         />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-slate-700 truncate">{option.label}</div>
-                          <div className="text-[11px] text-slate-400 truncate">{option.value}</div>
-                        </div>
+                        <div className="min-w-0 text-sm font-medium text-slate-700 truncate">{option.label}</div>
                       </label>
                     ))
                   )}
@@ -3485,7 +3510,7 @@ function App() {
 
           {expandedVisualizationId ? (
             <div
-              className="fixed inset-0 z-[45] flex items-center justify-center p-3 md:p-6 bg-slate-900/35 backdrop-blur-[1px] viz-overlay-enter"
+              className="fixed inset-0 z-[130] flex items-center justify-center p-3 md:p-6 bg-slate-900/35 backdrop-blur-[1px] viz-overlay-enter"
               onClick={() => setExpandedVisualizationId('')}
             >
               <div
