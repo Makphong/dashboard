@@ -9,10 +9,8 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-25-timeline-export-01';
+const FRONTEND_BUILD_VERSION = '2026-05-25-system-professional-09';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
-const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
-const FLOW_MIN_OCCURRENCES = 2;
 const SEGMENT_COLORS = {
   USER_REVIEW_COMMENT_CHECK: '#06B6D4',
   USER_EDITING_CORRECTION: '#F59E0B',
@@ -127,6 +125,28 @@ const WORKFLOW_FLOW_SEGMENT_TYPES = new Set([
   'IDLE_AFTER_SYSTEM_REPROCESS',
   'POST_COMPLETED_ELAPSED',
 ]);
+const SYSTEM_STAGE_FILTER_GROUPS = [
+  {
+    value: 'initial-processing',
+    label: 'Initial Processing',
+    segmentTypes: ['SYSTEM_INITIAL_PROCESSING'],
+  },
+  {
+    value: 'repeat-processing',
+    label: 'Repeat Processing',
+    segmentTypes: ['SYSTEM_SCHEDULED_REPROCESSING', 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'],
+  },
+  {
+    value: 'system-handoff',
+    label: 'System Handoff',
+    segmentTypes: ['SYSTEM_INTERNAL_TRANSITION'],
+  },
+  {
+    value: 'waiting',
+    label: 'Waiting',
+    segmentTypes: ['IDLE_WAITING_FOR_REVIEW', 'IDLE_WAITING_FOR_REREVIEW', 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS', 'IDLE_AFTER_SYSTEM_REPROCESS'],
+  },
+];
 
 const FLOW_INSIGHT_GROUPS = [
   {
@@ -202,6 +222,22 @@ const initialKpiData = [
   { id: 5, label: 'Edit Rate', value: '-', subtext: 'No data', icon: RefreshCw, color: 'text-slate-400', bg: 'bg-slate-50' },
   { id: 6, label: 'Auto Closed Actions', value: '-', subtext: 'No data', icon: AlertTriangle, color: 'text-slate-400', bg: 'bg-slate-50' },
 ];
+
+const KpiSubtext = ({ text }) => {
+  const content = String(text || '').trim();
+  if (!content) return null;
+  const parts = content.split('|').map((item) => item.trim()).filter(Boolean);
+  if (parts.length <= 1) {
+    return <div className="text-xs text-slate-400 mt-2 font-medium leading-snug">{content}</div>;
+  }
+  return (
+    <div className="text-xs text-slate-400 mt-2 font-medium leading-snug space-y-0.5">
+      {parts.map((part, idx) => (
+        <div key={`${part}-${idx}`} className="truncate" title={part}>{part}</div>
+      ))}
+    </div>
+  );
+};
 
 async function requestJson(path, options = {}) {
   const headers = { ...(options.headers || {}) };
@@ -326,6 +362,17 @@ function safeNumber(value) {
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
+}
+
+function percentile(values, ratio) {
+  const prepared = (Array.isArray(values) ? values : [])
+    .map((value) => safeNumber(value))
+    .filter((value) => value > 0)
+    .sort((a, b) => a - b);
+  if (prepared.length === 0) return 0;
+  const boundedRatio = Math.max(0, Math.min(1, safeNumber(ratio)));
+  const index = Math.ceil(boundedRatio * prepared.length) - 1;
+  return prepared[Math.max(0, Math.min(prepared.length - 1, index))];
 }
 
 function formatTimeTick(value) {
@@ -605,8 +652,13 @@ const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, act
           <Users className={`w-5 h-5 flex-shrink-0 ${activeView === 'user-performance' ? 'text-blue-600' : ''}`} />
           {!isCollapsed && <span>User Performance</span>}
         </a>
-        <a href="#" className={`flex items-center gap-3 py-2.5 text-slate-600 hover:bg-slate-50 border border-transparent rounded-xl font-medium transition-colors
-          ${isCollapsed ? 'justify-center px-0' : 'px-3'}`} title="System Performance">
+        <a
+          href="#"
+          onClick={(event) => event.preventDefault()}
+          className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors text-slate-600 hover:bg-slate-50 border border-transparent
+          ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
+          title="System Performance"
+        >
           <Server className="w-5 h-5 flex-shrink-0" />
           {!isCollapsed && <span>System Performance</span>}
         </a>
@@ -1262,6 +1314,213 @@ const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
   );
 };
 
+const SystemProcessingTrendChart = ({ rows }) => {
+  if (!rows || rows.length === 0) return null;
+
+  const width = 760;
+  const height = 280;
+  const margin = { top: 20, right: 20, bottom: 52, left: 56 };
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+  const maxSeriesSeconds = rows.reduce((max, row) => Math.max(max, safeNumber(row.p90Seconds), safeNumber(row.avgSeconds)), 0) || 1;
+  const maxSeconds = Math.max(maxSeriesSeconds, 1);
+  const xStep = rows.length > 1 ? innerWidth / (rows.length - 1) : innerWidth / 2;
+  const y = (seconds) => margin.top + (1 - (safeNumber(seconds) / maxSeconds)) * innerHeight;
+  const x = (idx) => margin.left + (rows.length > 1 ? idx * xStep : innerWidth / 2);
+  const avgPoints = rows.map((row, idx) => `${x(idx)},${y(row.avgSeconds)}`).join(' ');
+  const p90Points = rows.map((row, idx) => `${x(idx)},${y(row.p90Seconds)}`).join(' ');
+  const xLabelStep = rows.length > 10 ? Math.ceil(rows.length / 6) : 1;
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div className="mt-1">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto rounded-xl border border-slate-100 bg-white block">
+        {yTicks.map((tick) => {
+          const lineY = margin.top + (1 - tick) * innerHeight;
+          return (
+            <g key={`tick-${tick}`}>
+              <line x1={margin.left} x2={width - margin.right} y1={lineY} y2={lineY} stroke="#E2E8F0" strokeDasharray={tick === 0 ? '0' : '3 3'} />
+              <text x={margin.left - 8} y={lineY + 4} textAnchor="end" className="fill-slate-500 text-[10px]">
+                {formatDuration(maxSeconds * tick)}
+              </text>
+            </g>
+          );
+        })}
+
+        <polyline points={p90Points} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={avgPoints} fill="none" stroke="#06B6D4" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+        {rows.map((row, idx) => (
+          <g key={row.id || row.dateLabel}>
+            <circle cx={x(idx)} cy={y(row.p90Seconds)} r="3.2" fill="#2563EB">
+              <title>{`${row.dateLabel} | Slow-case ${formatDuration(row.p90Seconds)} | Average ${formatDuration(row.avgSeconds)} | ${row.docCount} docs`}</title>
+            </circle>
+            <circle cx={x(idx)} cy={y(row.avgSeconds)} r="3.2" fill="#06B6D4">
+              <title>{`${row.dateLabel} | Slow-case ${formatDuration(row.p90Seconds)} | Average ${formatDuration(row.avgSeconds)} | ${row.docCount} docs`}</title>
+            </circle>
+            {idx % xLabelStep === 0 || idx === rows.length - 1 ? (
+              <text x={x(idx)} y={height - 16} textAnchor="middle" className="fill-slate-500 text-[10px]">
+                {row.dateLabel}
+              </text>
+            ) : null}
+          </g>
+        ))}
+
+        <text x={width / 2} y={height - 2} textAnchor="middle" className="fill-slate-500 text-[11px]">Date</text>
+      </svg>
+      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>Average Time</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>Slow-Case Time (Worst 10%)</span>
+      </div>
+    </div>
+  );
+};
+
+const SystemParetoChart = ({ rows, maxBars = 8 }) => {
+  if (!rows || rows.length === 0) return null;
+
+  const bars = rows.slice(0, Math.max(1, maxBars));
+  const totalSeconds = bars.reduce((sum, row) => sum + safeNumber(row.totalSeconds), 0) || 1;
+  const maxSeconds = bars.reduce((max, row) => Math.max(max, safeNumber(row.totalSeconds)), 0) || 1;
+  const width = 760;
+  const height = 320;
+  const margin = { top: 20, right: 52, bottom: 78, left: 56 };
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+  const step = innerWidth / bars.length;
+  const barWidth = Math.min(58, step * 0.62);
+  const yLeft = (seconds) => margin.top + (1 - (safeNumber(seconds) / maxSeconds)) * innerHeight;
+  const yRight = (ratio) => margin.top + (1 - Math.max(0, Math.min(1, safeNumber(ratio)))) * innerHeight;
+
+  let cumulative = 0;
+  const prepared = bars.map((row, idx) => {
+    const seconds = safeNumber(row.totalSeconds);
+    cumulative += seconds;
+    return {
+      ...row,
+      idx,
+      seconds,
+      cumulativeShare: cumulative / totalSeconds,
+      x: margin.left + idx * step + (step / 2),
+      barX: margin.left + idx * step + (step - barWidth) / 2,
+    };
+  });
+  const linePoints = prepared.map((row) => `${row.x},${yRight(row.cumulativeShare)}`).join(' ');
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div className="mt-1">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto rounded-xl border border-slate-100 bg-white block">
+        {yTicks.map((tick) => {
+          const lineY = margin.top + (1 - tick) * innerHeight;
+          return (
+            <g key={`pareto-tick-${tick}`}>
+              <line
+                x1={margin.left}
+                x2={width - margin.right}
+                y1={lineY}
+                y2={lineY}
+                stroke="#E2E8F0"
+                strokeDasharray={tick === 0 ? '0' : '3 3'}
+              />
+              <text x={margin.left - 8} y={lineY + 4} textAnchor="end" className="fill-slate-500 text-[10px]">
+                {formatDuration(maxSeconds * tick)}
+              </text>
+              <text x={width - margin.right + 8} y={lineY + 4} textAnchor="start" className="fill-slate-500 text-[10px]">
+                {`${Math.round(tick * 100)}%`}
+              </text>
+            </g>
+          );
+        })}
+
+        <line
+          x1={margin.left}
+          x2={width - margin.right}
+          y1={yRight(0.8)}
+          y2={yRight(0.8)}
+          stroke="#F59E0B"
+          strokeWidth="1.4"
+          strokeDasharray="4 4"
+        />
+        <text x={width - margin.right} y={yRight(0.8) - 6} textAnchor="end" className="fill-amber-600 text-[10px] font-semibold">
+          80% Focus Line
+        </text>
+
+        {prepared.map((row) => (
+          <rect
+            key={`${row.id || row.documentLabel}-bar`}
+            x={row.barX}
+            y={yLeft(row.seconds)}
+            width={barWidth}
+            height={Math.max(2, margin.top + innerHeight - yLeft(row.seconds))}
+            rx="4"
+            fill="#3B82F6"
+          >
+            <title>{`${row.documentLabel} | ${formatDuration(row.seconds)} (${formatPercent(row.seconds / totalSeconds)})`}</title>
+          </rect>
+        ))}
+
+        <polyline points={linePoints} fill="none" stroke="#0EA5E9" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+        {prepared.map((row) => (
+          <g key={`${row.id || row.documentLabel}-point`}>
+            <circle cx={row.x} cy={yRight(row.cumulativeShare)} r="3.2" fill="#0EA5E9">
+              <title>{`${row.documentLabel} | Cumulative ${formatPercent(row.cumulativeShare)}`}</title>
+            </circle>
+            <text x={row.x} y={height - 20} textAnchor="middle" className="fill-slate-500 text-[10px]">
+              {`#${row.idx + 1}`}
+            </text>
+          </g>
+        ))}
+      </svg>
+
+      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm bg-blue-500"></span>
+          Document Delay
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+          Cumulative Share
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const SystemBottleneckTable = ({ rows, maxVisibleRows = 6 }) => {
+  if (!rows || rows.length === 0) return null;
+  const slotHeight = 70;
+  const useScroll = maxVisibleRows > 0 && rows.length > maxVisibleRows;
+  const wrapperStyle = useScroll ? { maxHeight: `${maxVisibleRows * slotHeight}px` } : undefined;
+  const maxTotal = rows.reduce((max, row) => Math.max(max, safeNumber(row.totalSeconds)), 0) || 1;
+
+  return (
+    <div className={`${useScroll ? 'overflow-y-auto no-scrollbar pr-1' : ''}`} style={wrapperStyle}>
+      <div className="space-y-2">
+        {rows.map((row, idx) => {
+          const share = clampPercent((safeNumber(row.totalSeconds) / maxTotal) * 100);
+          return (
+            <div key={row.id || row.documentLabel} className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-800 truncate">{idx + 1}. {row.documentLabel}</div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
+                    Processing {formatDuration(row.processingSeconds)} | Repeat {formatDuration(row.reprocessSeconds)} | Waiting {formatDuration(row.waitingSeconds)}
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-slate-600 whitespace-nowrap">{formatDuration(row.totalSeconds)}</div>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(4, share)}%` }}></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const FlowDelayComparisonTable = ({ rows, maxVisibleRows = 0 }) => {
   const maxAvgSeconds = rows.reduce((max, row) => Math.max(max, safeNumber(row.avgSeconds)), 0) || 1;
   const rowSlotHeight = 78;
@@ -1856,6 +2115,8 @@ function App() {
   const [userSearchText, setUserSearchText] = useState('');
   const [selectedSegmentTypes, setSelectedSegmentTypes] = useState([]);
   const [segmentTypeSearchText, setSegmentTypeSearchText] = useState('');
+  const [selectedSystemStages, setSelectedSystemStages] = useState([]);
+  const [systemStageSearchText, setSystemStageSearchText] = useState('');
   const [showDebugPanel, setShowDebugPanel] = useState(
     new URLSearchParams(window.location.search).get('debug') === '1'
   );
@@ -1990,6 +2251,50 @@ function App() {
     [parsedSegments]
   );
 
+  const systemStageOptions = useMemo(
+    () => {
+      let minTs = Number.NEGATIVE_INFINITY;
+      let maxTs = Number.POSITIVE_INFINITY;
+      if (parsedSegments.length > 0) {
+        if (datePreset === 'custom') {
+          const startTs = dateStart ? Date.parse(`${dateStart}T00:00:00`) : Number.NEGATIVE_INFINITY;
+          const endTs = dateEnd ? Date.parse(`${dateEnd}T23:59:59.999`) : Number.POSITIVE_INFINITY;
+          if (Number.isFinite(startTs) && Number.isFinite(endTs) && startTs > endTs) {
+            minTs = endTs;
+            maxTs = startTs;
+          } else {
+            minTs = startTs;
+            maxTs = endTs;
+          }
+        } else if (datePreset !== 'all') {
+          const latestEndTs = parsedSegments.reduce((maxValue, segment) => Math.max(maxValue, segment.endTs), parsedSegments[0].endTs);
+          const dayWindowMap = { '7d': 7, '30d': 30, '90d': 90 };
+          const windowDays = dayWindowMap[datePreset] || 30;
+          minTs = latestEndTs - (windowDays * 24 * 60 * 60 * 1000);
+          maxTs = latestEndTs;
+        }
+      }
+
+      const selectedSheetKeys = new Set(selectedSheets);
+      const selectedFileNames = new Set(selectedFiles);
+      const useSheetFilter = selectedSheetKeys.size > 0;
+      const availableTypes = new Set();
+
+      for (const seg of parsedSegments) {
+        if (seg.endTs < minTs || seg.startTs > maxTs) continue;
+        if (useSheetFilter) {
+          if (!selectedSheetKeys.has(seg.sheetKey)) continue;
+        } else if (!selectedFileNames.has(seg.fileName)) {
+          continue;
+        }
+        availableTypes.add(String(seg.segmentType || ''));
+      }
+
+      return SYSTEM_STAGE_FILTER_GROUPS.filter((group) => group.segmentTypes.some((type) => availableTypes.has(type)));
+    },
+    [parsedSegments, selectedSheets, selectedFiles, datePreset, dateStart, dateEnd]
+  );
+
   const filteredDocumentFiles = useMemo(
     () => documentTree.filter((item) => item.fileName.toLowerCase().includes(documentFileSearch.trim().toLowerCase())),
     [documentTree, documentFileSearch]
@@ -2014,6 +2319,11 @@ function App() {
   const filteredSegmentTypeOptions = useMemo(
     () => segmentTypeOptions.filter((option) => option.label.toLowerCase().includes(segmentTypeSearchText.trim().toLowerCase()) || option.value.toLowerCase().includes(segmentTypeSearchText.trim().toLowerCase())),
     [segmentTypeOptions, segmentTypeSearchText]
+  );
+
+  const filteredSystemStageOptions = useMemo(
+    () => systemStageOptions.filter((option) => option.label.toLowerCase().includes(systemStageSearchText.trim().toLowerCase())),
+    [systemStageOptions, systemStageSearchText]
   );
 
   useEffect(() => {
@@ -2074,6 +2384,14 @@ function App() {
     });
   }, [segmentTypeOptions]);
 
+  useEffect(() => {
+    const stageSet = new Set(systemStageOptions.map((option) => option.value));
+    setSelectedSystemStages((prev) => {
+      const next = prev.filter((stage) => stageSet.has(stage));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [systemStageOptions]);
+
   const explicitSelectedFileSet = useMemo(() => new Set(selectedFiles), [selectedFiles]);
   const selectedSheetSet = useMemo(() => new Set(selectedSheets), [selectedSheets]);
   const sheetSelectedFileSet = useMemo(
@@ -2087,6 +2405,17 @@ function App() {
   }, [selectedFiles, sheetSelectedFileSet]);
   const selectedUserSet = useMemo(() => new Set(selectedUsers), [selectedUsers]);
   const selectedSegmentTypeSet = useMemo(() => new Set(selectedSegmentTypes), [selectedSegmentTypes]);
+  const selectedSystemStageSet = useMemo(() => new Set(selectedSystemStages), [selectedSystemStages]);
+  const selectedSystemSegmentTypeSet = useMemo(() => {
+    if (selectedSystemStageSet.size === 0) return new Set();
+    const segmentTypes = [];
+    SYSTEM_STAGE_FILTER_GROUPS.forEach((group) => {
+      if (selectedSystemStageSet.has(group.value)) {
+        segmentTypes.push(...group.segmentTypes);
+      }
+    });
+    return new Set(segmentTypes);
+  }, [selectedSystemStageSet]);
 
   const dateRangeBounds = useMemo(() => {
     if (parsedSegments.length === 0) {
@@ -2140,6 +2469,21 @@ function App() {
     });
   }, [parsedSegments, dateRangeBounds, explicitSelectedFileSet, selectedSheetSet, selectedUserSet]);
 
+  const systemBaseSegments = useMemo(() => {
+    if (parsedSegments.length === 0) return [];
+    if (explicitSelectedFileSet.size === 0 && selectedSheetSet.size === 0) return [];
+
+    return parsedSegments.filter((segment) => {
+      if (segment.endTs < dateRangeBounds.minTs || segment.startTs > dateRangeBounds.maxTs) return false;
+      if (selectedSheetSet.size > 0) {
+        if (!selectedSheetSet.has(segment.sheetKey)) return false;
+      } else if (!explicitSelectedFileSet.has(segment.fileName)) {
+        return false;
+      }
+      return true;
+    });
+  }, [parsedSegments, dateRangeBounds, explicitSelectedFileSet, selectedSheetSet]);
+
   const ganttVisibleSegments = useMemo(() => (
     filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
@@ -2169,6 +2513,253 @@ function App() {
     [ganttVisibleSegments]
   );
 
+  const systemVisibleSegments = useMemo(() => (
+    systemBaseSegments.filter((segment) => {
+      const segmentType = String(segment.segmentType || '');
+      const isSystemSegment = segmentType.startsWith('SYSTEM_');
+      const isSystemIdle = segmentType === 'IDLE_WAITING_FOR_REVIEW'
+        || segmentType === 'IDLE_WAITING_FOR_REREVIEW'
+        || segmentType === 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS'
+        || segmentType === 'IDLE_AFTER_SYSTEM_REPROCESS';
+      if (!isSystemSegment && !isSystemIdle) return false;
+      if (!showIdle && isIdleContextSegment(segmentType)) return false;
+      if (selectedSegmentTypeSet.size > 0 && !selectedSegmentTypeSet.has(segmentType)) {
+        return false;
+      }
+      return true;
+    })
+  ), [systemBaseSegments, showIdle, selectedSegmentTypeSet]);
+
+  const systemInsightData = useMemo(() => {
+    const systemOnly = systemVisibleSegments.filter((segment) => String(segment.segmentType || '').startsWith('SYSTEM_'));
+    const processingSegments = systemOnly.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INITIAL_PROCESSING');
+    const reprocessSegments = systemOnly.filter((segment) => (
+      String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING'
+      || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+    ));
+    const waitingSegments = systemVisibleSegments.filter((segment) => isIdleContextSegment(segment.segmentType));
+    const transitionSegments = systemOnly.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INTERNAL_TRANSITION');
+
+    const totalSystemSeconds = systemOnly.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalVisibleSeconds = systemVisibleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalProcessingSeconds = processingSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalReprocessSeconds = reprocessSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalTransitionSeconds = transitionSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalWaitingSeconds = waitingSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+
+    const processingValues = processingSegments.map((segment) => safeNumber(segment.durationSeconds));
+    const avgProcessingSeconds = processingValues.length > 0
+      ? processingValues.reduce((sum, value) => sum + value, 0) / processingValues.length
+      : 0;
+    const p50ProcessingSeconds = percentile(processingValues, 0.5);
+    const p75ProcessingSeconds = percentile(processingValues, 0.75);
+    const p90ProcessingSeconds = percentile(processingValues, 0.9);
+
+    const processingDocs = new Set(
+      processingSegments.map((segment) => String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`))
+    );
+    const reprocessDocs = new Set(
+      reprocessSegments.map((segment) => String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`))
+    );
+    const systemDocs = new Set(
+      systemVisibleSegments.map((segment) => String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`))
+    );
+
+    const reprocessRate = processingDocs.size > 0 ? reprocessDocs.size / processingDocs.size : 0;
+    const waitingShare = totalVisibleSeconds > 0 ? totalWaitingSeconds / totalVisibleSeconds : 0;
+
+    const handoffGaps = [];
+    const handoffByDoc = new Map();
+    const byDocument = new Map();
+    systemBaseSegments.forEach((segment) => {
+      const key = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
+      if (!byDocument.has(key)) byDocument.set(key, []);
+      byDocument.get(key).push(segment);
+    });
+    byDocument.forEach((segmentsByDoc) => {
+      const sorted = [...segmentsByDoc].sort((a, b) => safeNumber(a.startTs) - safeNumber(b.startTs));
+      sorted.forEach((segment, idx) => {
+        const segmentType = String(segment.segmentType || '');
+        if (!segmentType.startsWith('SYSTEM_')) return;
+        const nextUser = sorted.find((candidate, candidateIdx) => (
+          candidateIdx > idx && isUserContextSegment(candidate.segmentType, candidate.userName)
+        ));
+        if (!nextUser) return;
+        const gapSeconds = (safeNumber(nextUser.startTs) - safeNumber(segment.endTs)) / 1000;
+        if (gapSeconds >= 0) {
+          handoffGaps.push(gapSeconds);
+          const docKey = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
+          if (!handoffByDoc.has(docKey)) {
+            handoffByDoc.set(docKey, {
+              id: docKey,
+              documentLabel: String(segment.documentLabel || segment.documentId || segment.sheetKey || docKey),
+              values: [],
+            });
+          }
+          handoffByDoc.get(docKey).values.push(gapSeconds);
+        }
+      });
+    });
+    const p90HandoffSeconds = percentile(handoffGaps, 0.9);
+    const handoffRows = Array.from(handoffByDoc.values())
+      .map((row) => {
+        const values = row.values || [];
+        const total = values.reduce((sum, value) => sum + safeNumber(value), 0);
+        return {
+          id: row.id,
+          documentLabel: row.documentLabel,
+          handoffCount: values.length,
+          avgGapSeconds: values.length > 0 ? total / values.length : 0,
+          p90GapSeconds: percentile(values, 0.9),
+        };
+      })
+      .filter((row) => row.handoffCount > 0)
+      .sort((a, b) => b.p90GapSeconds - a.p90GapSeconds)
+      .slice(0, 8);
+
+    const stageRowsRaw = [
+      { id: 'processing', label: 'Initial Processing', seconds: totalProcessingSeconds },
+      { id: 'reprocessing', label: 'Repeat Processing', seconds: totalReprocessSeconds },
+      { id: 'transition', label: 'System Handoff', seconds: totalTransitionSeconds },
+      { id: 'waiting', label: 'Waiting in Queue', seconds: totalWaitingSeconds },
+      { id: 'other', label: 'Other System Work', seconds: Math.max(0, totalSystemSeconds - totalProcessingSeconds - totalReprocessSeconds - totalTransitionSeconds) },
+    ].filter((row) => row.seconds > 0);
+    const stageRows = stageRowsRaw
+      .map((row) => ({
+        id: row.id,
+        label: row.label,
+        value: row.seconds,
+        valueLabel: formatDuration(row.seconds),
+        meta: totalVisibleSeconds > 0 ? `${formatPercent(row.seconds / totalVisibleSeconds)} of visible system flow` : '',
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    const daily = new Map();
+    processingSegments.forEach((segment) => {
+      const start = new Date(segment.start || segment.startTs || 0);
+      if (Number.isNaN(start.getTime())) return;
+      const dateKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+      if (!daily.has(dateKey)) {
+        daily.set(dateKey, { dateKey, dateLabel: start.toLocaleDateString([], { month: 'short', day: 'numeric' }), values: [] });
+      }
+      daily.get(dateKey).values.push(safeNumber(segment.durationSeconds));
+    });
+    const trendRows = Array.from(daily.values())
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+      .map((row) => {
+        const total = row.values.reduce((sum, value) => sum + value, 0);
+        return {
+          id: row.dateKey,
+          dateLabel: row.dateLabel,
+          docCount: row.values.length,
+          avgSeconds: row.values.length > 0 ? total / row.values.length : 0,
+          p90Seconds: percentile(row.values, 0.9),
+        };
+      });
+
+    const bottleneckByDoc = new Map();
+    systemVisibleSegments.forEach((segment) => {
+      const key = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
+      if (!bottleneckByDoc.has(key)) {
+        bottleneckByDoc.set(key, {
+          id: key,
+          documentLabel: String(segment.documentLabel || segment.documentId || segment.sheetKey || key),
+          processingSeconds: 0,
+          reprocessSeconds: 0,
+          waitingSeconds: 0,
+          totalSeconds: 0,
+        });
+      }
+      const row = bottleneckByDoc.get(key);
+      const segmentType = String(segment.segmentType || '');
+      const seconds = safeNumber(segment.durationSeconds);
+      if (segmentType === 'SYSTEM_INITIAL_PROCESSING') row.processingSeconds += seconds;
+      else if (
+        segmentType === 'SYSTEM_SCHEDULED_REPROCESSING'
+        || segmentType === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+      ) row.reprocessSeconds += seconds;
+      else if (isIdleContextSegment(segmentType)) row.waitingSeconds += seconds;
+      row.totalSeconds += seconds;
+    });
+    const rawBottleneckRows = Array.from(bottleneckByDoc.values())
+      .filter((row) => row.totalSeconds > 0)
+      .sort((a, b) => b.totalSeconds - a.totalSeconds)
+      .slice(0, 10);
+    const totalBottleneckSeconds = rawBottleneckRows.reduce((sum, row) => sum + safeNumber(row.totalSeconds), 0);
+    const bottleneckRows = rawBottleneckRows.map((row) => ({
+      ...row,
+      share: totalBottleneckSeconds > 0 ? row.totalSeconds / totalBottleneckSeconds : 0,
+    }));
+    const topThreeShare = bottleneckRows.slice(0, 3).reduce((sum, row) => sum + safeNumber(row.share), 0);
+
+    const kpis = [
+      {
+        id: 'docs-processed',
+        label: 'Documents in Scope',
+        value: `${systemDocs.size}`,
+        subtext: `${processingDocs.size} docs have processing activity`,
+        icon: FileText,
+        color: 'text-indigo-600',
+        bg: 'bg-indigo-50',
+      },
+      {
+        id: 'processing-events',
+        label: 'Processing Events',
+        value: `${processingSegments.length}`,
+        subtext: `${reprocessSegments.length} repeat-processing events`,
+        icon: Server,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50',
+      },
+      {
+        id: 'repeat-rate',
+        label: 'Repeat Processing Rate',
+        value: formatPercent(reprocessRate),
+        subtext: `${reprocessDocs.size}/${processingDocs.size || 0} documents repeated`,
+        icon: RefreshCw,
+        color: 'text-cyan-600',
+        bg: 'bg-cyan-50',
+      },
+      {
+        id: 'waiting-share',
+        label: 'Waiting Share',
+        value: formatPercent(waitingShare),
+        subtext: `Waiting time ${formatDuration(totalWaitingSeconds)}`,
+        icon: AlertTriangle,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-50',
+      },
+      {
+        id: 'total-system-time',
+        label: 'Total System Time',
+        value: formatDuration(totalSystemSeconds),
+        subtext: `Slowest handoff: ${formatDuration(p90HandoffSeconds)}`,
+        icon: Clock,
+        color: 'text-amber-600',
+        bg: 'bg-amber-50',
+      },
+    ];
+
+    return {
+      kpis,
+      stageRows,
+      trendRows,
+      bottleneckRows,
+      handoffRows,
+      systemTimeline: systemVisibleSegments,
+      totalSystemSeconds,
+      waitingShare,
+      processingCount: processingSegments.length,
+      topThreeShare,
+      distribution: {
+        average: avgProcessingSeconds,
+        median: p50ProcessingSeconds,
+        p75: p75ProcessingSeconds,
+        p90: p90ProcessingSeconds,
+      },
+    };
+  }, [systemBaseSegments, systemVisibleSegments]);
+
   const dateFilterSummary = useMemo(() => {
     if (datePreset !== 'custom') return datePresetLabelMap[datePreset] || 'All Time';
     if (!dateStart && !dateEnd) return 'ยังไม่ได้ตั้ง';
@@ -2190,6 +2781,11 @@ function App() {
   const segmentTypeFilterSummary = useMemo(
     () => (selectedSegmentTypes.length === 0 ? 'Segment Type' : `${selectedSegmentTypes.length} Types`),
     [selectedSegmentTypes]
+  );
+
+  const systemStageFilterSummary = useMemo(
+    () => (selectedSystemStages.length === 0 ? 'All Stages' : `${selectedSystemStages.length} Stages`),
+    [selectedSystemStages]
   );
 
   const toggleSelectedValue = (setter, value) => {
@@ -2326,13 +2922,9 @@ function App() {
       groupedByDocument.get(documentKey).push(segment);
     });
 
-    const REVIEW_OR_EDIT_TYPES = new Set([
+    const USER_ACTION_TYPES = new Set([
       'USER_REVIEW_COMMENT_CHECK',
-      'USER_EDITING_CORRECTION',
-      'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
-    ]);
-    const REVIEW_EDIT_OR_COMPLETE_TYPES = new Set([
-      'USER_REVIEW_COMMENT_CHECK',
+      'USER_REVIEW_AUTO_TIMEOUT',
       'USER_EDITING_CORRECTION',
       'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
       'USER_COMPLETION_APPROVAL',
@@ -2346,7 +2938,7 @@ function App() {
       FLOW_INSIGHT_GROUPS.map((group) => [group.id, { totalSeconds: 0, count: 0, minSeconds: null, maxSeconds: null }])
     );
 
-    const addMetric = (metricId, seconds, { capSeconds = FLOW_SESSION_GAP_MAX_SECONDS } = {}) => {
+    const addMetric = (metricId, seconds, { capSeconds = 0 } = {}) => {
       const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
       if (!Number.isFinite(safeSeconds)) return;
       if (capSeconds > 0 && safeSeconds > capSeconds) return;
@@ -2377,10 +2969,10 @@ function App() {
           reprocessIndices.push(idx);
         }
 
-        // 1) Processing round 1 -> first user review/edit
+        // 1) Processing round 1 -> first user action
         if (currentType === 'SYSTEM_INITIAL_PROCESSING') {
           const nextUserIdx = sorted.findIndex((candidate, candidateIdx) => (
-            candidateIdx > idx && REVIEW_OR_EDIT_TYPES.has(String(candidate.segmentType || ''))
+            candidateIdx > idx && USER_ACTION_TYPES.has(String(candidate.segmentType || ''))
           ));
           if (nextUserIdx > idx) {
             const next = sorted[nextUserIdx];
@@ -2391,10 +2983,10 @@ function App() {
           }
         }
 
-        // 2) User review/edit -> next user review/edit/complete
-        if (REVIEW_OR_EDIT_TYPES.has(currentType)) {
+        // 2) User action -> next user step
+        if (USER_ACTION_TYPES.has(currentType)) {
           const nextUserStepIdx = sorted.findIndex((candidate, candidateIdx) => (
-            candidateIdx > idx && REVIEW_EDIT_OR_COMPLETE_TYPES.has(String(candidate.segmentType || ''))
+            candidateIdx > idx && USER_ACTION_TYPES.has(String(candidate.segmentType || ''))
           ));
           if (nextUserStepIdx > idx) {
             const next = sorted[nextUserStepIdx];
@@ -2407,10 +2999,15 @@ function App() {
 
       }
 
-      // 4) Processing round 2 -> first user review/edit
-      // Backend emits SYSTEM_SCHEDULED_REPROCESSING for every cycle, so round-2 is the 2nd occurrence.
+      // 4) Processing round 2 -> first user action
+      // Prefer explicit round-2 marker first. If absent, fallback to "2nd reprocess occurrence".
       // Fallback: if round-2 marker is not explicit, use idle-after-reprocess style segments after a reprocess.
-      let round2AnchorIdx = reprocessIndices.length >= 2 ? reprocessIndices[1] : -1;
+      let round2AnchorIdx = sorted.findIndex(
+        (segment) => String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+      );
+      if (round2AnchorIdx < 0) {
+        round2AnchorIdx = reprocessIndices.length >= 2 ? reprocessIndices[1] : -1;
+      }
       if (round2AnchorIdx < 0) {
         round2AnchorIdx = sorted.findIndex((segment, idx) => {
           const type = String(segment.segmentType || '');
@@ -2427,7 +3024,7 @@ function App() {
 
       if (round2AnchorIdx >= 0) {
         const nextUserIdx = sorted.findIndex((candidate, candidateIdx) => (
-          candidateIdx > round2AnchorIdx && REVIEW_OR_EDIT_TYPES.has(String(candidate.segmentType || ''))
+          candidateIdx > round2AnchorIdx && USER_ACTION_TYPES.has(String(candidate.segmentType || ''))
         ));
         if (nextUserIdx > round2AnchorIdx) {
           const anchorSegment = sorted[round2AnchorIdx];
@@ -2491,7 +3088,7 @@ function App() {
 
   useEffect(() => {
     setSelectedGanttSegment(null);
-  }, [datePreset, dateStart, dateEnd, selectedFiles, selectedSheets, selectedUsers, selectedSegmentTypes, showIdle]);
+  }, [datePreset, dateStart, dateEnd, selectedFiles, selectedSheets, selectedUsers, selectedSegmentTypes, selectedSystemStages, showIdle, activeView]);
 
   useEffect(() => {
     setOpenDropdown('');
@@ -3088,113 +3685,115 @@ function App() {
               </div>
             </FilterPopover>
 
-            <FilterPopover
-              id="user"
-              title="User"
-              summary={userFilterSummary}
-              openDropdown={openDropdown}
-              setOpenDropdown={setOpenDropdown}
-              icon={Users}
-              active={selectedUsers.length > 0}
-              minWidthClass="min-w-[190px]"
-              panelClassName="w-[350px] max-w-[90vw]"
-            >
-              <div className="p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Users</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedUsers(Array.from(new Set([...selectedUsers, ...filteredUserOptions])))}
-                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      onClick={() => setSelectedUsers([])}
-                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
-                    >
-                      Clear
-                    </button>
+            <>
+              <FilterPopover
+                id="user"
+                title="User"
+                summary={userFilterSummary}
+                openDropdown={openDropdown}
+                setOpenDropdown={setOpenDropdown}
+                icon={Users}
+                active={selectedUsers.length > 0}
+                minWidthClass="min-w-[190px]"
+                panelClassName="w-[350px] max-w-[90vw]"
+              >
+                <div className="p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Users</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedUsers(Array.from(new Set([...selectedUsers, ...filteredUserOptions])))}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={() => setSelectedUsers([])}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <DropdownSearch
+                    value={userSearchText}
+                    onChange={setUserSearchText}
+                    placeholder="Search user..."
+                  />
+                  <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1 pr-1">
+                    {filteredUserOptions.length === 0 ? (
+                      <div className="text-xs text-slate-400 px-1 py-2">No users found</div>
+                    ) : (
+                      filteredUserOptions.map((userName) => (
+                        <label key={userName} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedUserSet.has(userName)}
+                            onChange={() => toggleUserSelection(userName)}
+                            className="h-4 w-4 accent-blue-600 rounded"
+                          />
+                          <span className="text-sm text-slate-700 truncate">{userName}</span>
+                        </label>
+                      ))
+                    )}
                   </div>
                 </div>
-                <DropdownSearch
-                  value={userSearchText}
-                  onChange={setUserSearchText}
-                  placeholder="Search user..."
-                />
-                <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1 pr-1">
-                  {filteredUserOptions.length === 0 ? (
-                    <div className="text-xs text-slate-400 px-1 py-2">No users found</div>
-                  ) : (
-                    filteredUserOptions.map((userName) => (
-                      <label key={userName} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedUserSet.has(userName)}
-                          onChange={() => toggleUserSelection(userName)}
-                          className="h-4 w-4 accent-blue-600 rounded"
-                        />
-                        <span className="text-sm text-slate-700 truncate">{userName}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            </FilterPopover>
+              </FilterPopover>
 
-            <FilterPopover
-              id="segment-type"
-              title="Segment"
-              summary={segmentTypeFilterSummary}
-              openDropdown={openDropdown}
-              setOpenDropdown={setOpenDropdown}
-              icon={LayoutDashboard}
-              active={selectedSegmentTypes.length > 0}
-              minWidthClass="min-w-[210px]"
-              panelClassName="w-[380px] max-w-[92vw]"
-            >
-              <div className="p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Segment Type</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedSegmentTypes(Array.from(new Set([...selectedSegmentTypes, ...filteredSegmentTypeOptions.map((item) => item.value)])))}
-                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      onClick={() => setSelectedSegmentTypes([])}
-                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
-                    >
-                      Clear
-                    </button>
+              <FilterPopover
+                id="segment-type"
+                title="Segment"
+                summary={segmentTypeFilterSummary}
+                openDropdown={openDropdown}
+                setOpenDropdown={setOpenDropdown}
+                icon={LayoutDashboard}
+                active={selectedSegmentTypes.length > 0}
+                minWidthClass="min-w-[210px]"
+                panelClassName="w-[380px] max-w-[92vw]"
+              >
+                <div className="p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Segment Type</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedSegmentTypes(Array.from(new Set([...selectedSegmentTypes, ...filteredSegmentTypeOptions.map((item) => item.value)])))}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={() => setSelectedSegmentTypes([])}
+                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <DropdownSearch
+                    value={segmentTypeSearchText}
+                    onChange={setSegmentTypeSearchText}
+                    placeholder="Search segment..."
+                  />
+                  <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1 pr-1">
+                    {filteredSegmentTypeOptions.length === 0 ? (
+                      <div className="text-xs text-slate-400 px-1 py-2">No segment types found</div>
+                    ) : (
+                      filteredSegmentTypeOptions.map((option) => (
+                        <label key={option.value} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedSegmentTypeSet.has(option.value)}
+                            onChange={() => toggleSegmentTypeSelection(option.value)}
+                            className="h-4 w-4 accent-blue-600 rounded"
+                          />
+                          <div className="min-w-0 text-sm font-medium text-slate-700 truncate">{option.label}</div>
+                        </label>
+                      ))
+                    )}
                   </div>
                 </div>
-                <DropdownSearch
-                  value={segmentTypeSearchText}
-                  onChange={setSegmentTypeSearchText}
-                  placeholder="Search segment..."
-                />
-                <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1 pr-1">
-                  {filteredSegmentTypeOptions.length === 0 ? (
-                    <div className="text-xs text-slate-400 px-1 py-2">No segment types found</div>
-                  ) : (
-                    filteredSegmentTypeOptions.map((option) => (
-                      <label key={option.value} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSegmentTypeSet.has(option.value)}
-                          onChange={() => toggleSegmentTypeSelection(option.value)}
-                          className="h-4 w-4 accent-blue-600 rounded"
-                        />
-                        <div className="min-w-0 text-sm font-medium text-slate-700 truncate">{option.label}</div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-            </FilterPopover>
+              </FilterPopover>
+            </>
 
             <div className="ml-auto flex items-center gap-4 pl-4 border-l border-slate-200">
               <button
@@ -3306,7 +3905,7 @@ function App() {
                     </div>
                     <div className="text-slate-500 text-sm font-semibold mb-1">{kpi.label}</div>
                     <div className="text-[2rem] sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">{kpi.value}</div>
-                    <div className="text-xs text-slate-400 mt-2 font-medium leading-snug break-words" title={kpi.subtext}>{kpi.subtext}</div>
+                    <KpiSubtext text={kpi.subtext} />
                   </div>
                 ))}
               </div>
