@@ -30,10 +30,17 @@ ROOT = PROJECT_ROOT
 DATA_DIR = PROJECT_ROOT / "data"
 LEGACY_DB_PATH = PROJECT_ROOT / "local_dashboard.db"
 DEFAULT_DB_PATH = DATA_DIR / "local_dashboard.db"
+SERVERLESS_DB_PATH = Path(os.getenv("TMPDIR", "/tmp")) / "local_dashboard.db"
+IS_SERVERLESS_RUNTIME = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+DEFAULT_RUNTIME_DB_PATH = (
+    SERVERLESS_DB_PATH
+    if IS_SERVERLESS_RUNTIME
+    else (DEFAULT_DB_PATH if DEFAULT_DB_PATH.exists() else LEGACY_DB_PATH)
+)
 DB_PATH = Path(
     os.getenv(
         "LOCAL_DB_PATH",
-        str(DEFAULT_DB_PATH if DEFAULT_DB_PATH.exists() else LEGACY_DB_PATH),
+        str(DEFAULT_RUNTIME_DB_PATH),
     )
 )
 DEFAULT_TIMEOUT_SECONDS = 30 * 60
@@ -2831,4 +2838,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

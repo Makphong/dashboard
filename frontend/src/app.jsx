@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-25-mobile-motion-01';
+const FRONTEND_BUILD_VERSION = '2026-05-25-timeline-export-01';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -228,6 +228,57 @@ function toDisplayDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleString();
+}
+
+function toExcelDateTime(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function downloadExcelTable(filename, sheetTitle, columns, rows) {
+  const headerHtml = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('');
+  const rowsHtml = rows.map((row) => (
+    `<tr>${columns.map((column) => `<td>${escapeHtml(row[column.key])}</td>`).join('')}</tr>`
+  )).join('');
+  const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+    th { background: #e2e8f0; font-weight: 700; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <h3>${escapeHtml(sheetTitle)}</h3>
+  <table>
+    <thead><tr>${headerHtml}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+</body>
+</html>`;
+  const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formatDuration(seconds) {
@@ -2465,6 +2516,57 @@ function App() {
     }));
   }, [ganttVisibleSegments, showWorkloadIdle, showWorkloadSystem, visibleKpis]);
 
+  const exportTimelineExcel = () => {
+    if (ganttVisibleSegments.length === 0) return;
+
+    const columns = [
+      { key: 'no', label: 'No.' },
+      { key: 'lane', label: 'Lane' },
+      { key: 'userName', label: 'User' },
+      { key: 'group', label: 'Timeline Group' },
+      { key: 'segmentLabel', label: 'Segment' },
+      { key: 'segmentType', label: 'Segment Type' },
+      { key: 'start', label: 'Start Time' },
+      { key: 'end', label: 'End Time' },
+      { key: 'duration', label: 'Duration' },
+      { key: 'durationSeconds', label: 'Duration Seconds' },
+      { key: 'documentId', label: 'Document ID' },
+      { key: 'fileName', label: 'File' },
+      { key: 'pageName', label: 'Page' },
+      { key: 'autoTimeout', label: 'Auto Timeout' },
+    ];
+    const rows = [...ganttVisibleSegments]
+      .sort((a, b) => safeNumber(a.startTs) - safeNumber(b.startTs))
+      .map((segment, idx) => {
+        const segmentType = String(segment.segmentType || 'UNKNOWN');
+        const drillGroup = toDrillGroup(segmentType);
+        return {
+          no: idx + 1,
+          lane: ganttSingleLaneMode ? 'All user' : toTimelineLane(segmentType, segment.userName),
+          userName: segment.userName || '',
+          group: GANTT_DRILL_GROUP_LABELS[drillGroup] || drillGroup,
+          segmentLabel: toGanttSegmentTypeLabel(segmentType),
+          segmentType,
+          start: toExcelDateTime(segment.start),
+          end: toExcelDateTime(segment.end),
+          duration: formatDuration(segment.durationSeconds),
+          durationSeconds: Math.round(safeNumber(segment.durationSeconds)),
+          documentId: segment.documentId || '',
+          fileName: segment.fileName || '',
+          pageName: segment.pageName || '',
+          autoTimeout: segment.autoTimeout ? 'Yes' : '',
+        };
+      });
+    const stamp = toExcelDateTime(new Date()).replace(/[: ]/g, '-');
+    const laneSuffix = ganttSingleLaneMode ? 'all-lane' : 'by-lane';
+    downloadExcelTable(
+      `timeline-${laneSuffix}-${stamp}.xls`,
+      ganttSingleLaneMode ? 'Timeline - All user lane' : 'Timeline by User',
+      columns,
+      rows
+    );
+  };
+
   const suspiciousZeroState = useMemo(() => {
     const summaryRows = Number(performance?.summary?.rows || 0);
     const activeSeconds = Number(performance?.kpis?.activeUserTimeSeconds || 0);
@@ -3186,6 +3288,14 @@ function App() {
               <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 overflow-hidden" style={{ animationDelay: '220ms' }}>
                 <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
                   <button
+                    onClick={exportTimelineExcel}
+                    disabled={ganttVisibleSegments.length === 0}
+                    className="h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-slate-400 disabled:hover:border-slate-200"
+                    title="Export timeline to Excel"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 mx-auto" />
+                  </button>
+                  <button
                     onClick={() => setGanttSingleLaneMode((prev) => !prev)}
                     className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
                       ganttSingleLaneMode
@@ -3391,6 +3501,16 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {expandedVisualizationId === 'gantt' ? (
+                      <button
+                        onClick={exportTimelineExcel}
+                        disabled={ganttVisibleSegments.length === 0}
+                        className="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        title="Export timeline to Excel"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 mx-auto" />
+                      </button>
+                    ) : null}
                     {expandedVisualizationId === 'gantt' ? (
                       <button
                         onClick={() => setGanttSingleLaneMode((prev) => !prev)}
