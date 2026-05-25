@@ -1047,7 +1047,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
   const boundsSegments = laneVisibleSegments.length > 0 ? laneVisibleSegments : mapped;
   const fullMinTs = boundsSegments.reduce((min, item) => Math.min(min, item.startTs), boundsSegments[0].startTs);
   const fullMaxTs = boundsSegments.reduce((max, item) => Math.max(max, item.endTs), boundsSegments[0].endTs);
-  
+
   // Tighten range padding to minimum 1 minute and maximum 10 minutes (instead of 2 hours) to avoid empty spaces
   const rangePadMs = Math.min(10 * 60 * 1000, Math.max(1 * 60 * 1000, (fullMaxTs - fullMinTs) * 0.005));
 
@@ -1262,7 +1262,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
     GANTT_MAX_TIMELINE_WIDTH_PX,
     Math.max(minTimelinePx, Math.round(baseTimelineWidth * zoomScale))
   );
-  
+
   // Dynamically expand timelineSvgWidth if shifted bars push past original boundaries
   const baseSvgWidth = timelinePadLeft + timelineWidth + timelinePadRight;
   const timelineSvgWidth = Math.max(baseSvgWidth, maxRightCoordinate + timelinePadRight + 45);
@@ -4524,11 +4524,10 @@ function App() {
                   <div className="relative" ref={timelineFilterRef}>
                     <button
                       onClick={() => setShowTimelineFilterMenu((prev) => !prev)}
-                      className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
-                        (!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
+                      className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${(!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
                           ? 'border-blue-200 bg-blue-50/90 text-blue-600'
                           : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                      }`}
+                        }`}
                       title="Timeline display filters"
                     >
                       <SlidersHorizontal className="w-3.5 h-3.5 mx-auto" />
@@ -4575,27 +4574,27 @@ function App() {
                     <h2 className="text-lg font-bold text-slate-900">Timeline by User</h2>
                   </div>
                 </div>
-                  <div className="space-y-2">
-                    {ganttVisibleSegments.length === 0 ? (
-                      <EmptyState
-                        icon={LayoutDashboard}
-                        title="No Segment Data"
-                        subtitle="Upload an Audit Log file to generate Gantt segments"
-                      />
-                    ) : (
-                      <GanttTimelineChart
-                        segments={ganttVisibleSegments}
-                        onSelectSegment={setSelectedGanttSegment}
-                        singleLane={ganttSingleLaneMode}
-                        showSystemLane={showSystemLane}
-                        showIdleLane={showIdleLane}
-                        showStarMarkers={showStarMarkers}
-                        collapseGaps={ganttCollapseGaps}
-                        showGanttLegend={showGanttLegend}
-                      />
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  {ganttVisibleSegments.length === 0 ? (
+                    <EmptyState
+                      icon={LayoutDashboard}
+                      title="No Segment Data"
+                      subtitle="Upload an Audit Log file to generate Gantt segments"
+                    />
+                  ) : (
+                    <GanttTimelineChart
+                      segments={ganttVisibleSegments}
+                      onSelectSegment={setSelectedGanttSegment}
+                      singleLane={ganttSingleLaneMode}
+                      showSystemLane={showSystemLane}
+                      showIdleLane={showIdleLane}
+                      showStarMarkers={showStarMarkers}
+                      collapseGaps={ganttCollapseGaps}
+                      showGanttLegend={showGanttLegend}
+                    />
+                  )}
                 </div>
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
                 <div className="group relative card-rise-in bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-4 sm:p-6 flex flex-col lg:h-[430px] lg:col-span-2" style={{ animationDelay: '260ms' }}>
@@ -4603,11 +4602,10 @@ function App() {
                     <div className="relative" ref={workloadFilterRef}>
                       <button
                         onClick={() => setShowWorkloadFilterMenu((prev) => !prev)}
-                        className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${
-                          (showWorkloadIdle || showWorkloadSystem)
+                        className={`h-7 w-7 rounded-md border transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 ${(showWorkloadIdle || showWorkloadSystem)
                             ? 'border-blue-200 bg-blue-50/90 text-blue-600'
                             : 'border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                        }`}
+                          }`}
                         title="Workload display filters"
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5 mx-auto" />
@@ -4709,20 +4707,20 @@ function App() {
                         subtitle="No valid transition delays found from current filters"
                       />
                     ) : (
-                        <DurationBarChart
-                          rows={flowTopRows.map((row) => ({
-                            id: row.transitionKey,
-                            label: row.transitionLabel,
-                            value: row.avgSeconds,
-                            minValue: row.minSeconds,
-                            maxValue: row.maxSeconds,
-                            valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
-                            meta: row.count > 0
-                              ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
-                              : 'Min - | Max -',
-                          }))}
-                          maxVisibleRows={4}
-                        />
+                      <DurationBarChart
+                        rows={flowTopRows.map((row) => ({
+                          id: row.transitionKey,
+                          label: row.transitionLabel,
+                          value: row.avgSeconds,
+                          minValue: row.minSeconds,
+                          maxValue: row.maxSeconds,
+                          valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
+                          meta: row.count > 0
+                            ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
+                            : 'Min - | Max -',
+                        }))}
+                        maxVisibleRows={4}
+                      />
                     )}
                   </div>
                 </div>
@@ -4788,11 +4786,10 @@ function App() {
                       <div className="relative" ref={timelineFilterRef}>
                         <button
                           onClick={() => setShowTimelineFilterMenu((prev) => !prev)}
-                          className={`h-9 w-9 rounded-lg border transition-colors ${
-                            (!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
+                          className={`h-9 w-9 rounded-lg border transition-colors ${(!showSystemLane || !showIdleLane || !showStarMarkers || ganttSingleLaneMode)
                               ? 'border-blue-200 bg-blue-50 text-blue-600'
                               : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                          }`}
+                            }`}
                           title="Timeline display filters"
                         >
                           <SlidersHorizontal className="w-4 h-4 mx-auto" />
@@ -4831,11 +4828,10 @@ function App() {
                       <div className="relative" ref={workloadFilterRef}>
                         <button
                           onClick={() => setShowWorkloadFilterMenu((prev) => !prev)}
-                          className={`h-9 w-9 rounded-lg border transition-colors ${
-                            (showWorkloadIdle || showWorkloadSystem)
+                          className={`h-9 w-9 rounded-lg border transition-colors ${(showWorkloadIdle || showWorkloadSystem)
                               ? 'border-blue-200 bg-blue-50 text-blue-600'
                               : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                          }`}
+                            }`}
                           title="Workload display filters"
                         >
                           <SlidersHorizontal className="w-4 h-4 mx-auto" />
