@@ -455,6 +455,7 @@ function toCompleteMarkerType(segmentOrType) {
   if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') return 'COMPLETE_BY_EDIT_MARKER';
   if (segment && segment.hasReprocessRound2CompleteMarker) return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
   if (type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2') return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
+  if (type === 'SYSTEM_SCHEDULED_REPROCESSING') return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
   return '';
 }
 
@@ -467,7 +468,8 @@ function mergeContinuousReprocessingSegments(sortedSegments) {
       ...segment,
       reopenMarkerList: Array.isArray(segment.reopenMarkerList) ? [...segment.reopenMarkerList] : [],
       hasReprocessRound2CompleteMarker: Boolean(segment.hasReprocessRound2CompleteMarker)
-        || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2',
+        || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+        || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING',
     };
 
     const previous = merged[merged.length - 1];
@@ -1058,9 +1060,9 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
 
   const lanes = Object.keys(laneDurationMap).sort((a, b) => {
     const lanePriority = (laneName) => {
-      if (laneName === 'System') return 2;
-      if (laneName === 'Idle') return 3;
-      return 1;
+      if (laneName === 'System') return 1;
+      if (laneName === 'Idle') return 2;
+      return 3;
     };
     const priorityDiff = lanePriority(a) - lanePriority(b);
     if (priorityDiff !== 0) return priorityDiff;
