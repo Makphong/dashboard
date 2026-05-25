@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import {
@@ -9,7 +9,14 @@ import {
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-25-system-professional-09';
+const FRONTEND_BUILD_VERSION = '2026-05-25-system-professional-18';
+const REOPEN_MARKER_TYPES = new Set(['REOPEN_MARKER', 'REOPEN_TO_REVIEW_HANDOFF_MARKER']);
+const PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES = new Set(['IDLE_WAITING_FOR_SCHEDULED_REPROCESS']);
+const COMPLETE_MARKER_COLOR = '#16A34A';
+const REPROCESSING_SEGMENT_MERGE_GAP_MS = 1000;
+const MARKER_STAR_OUTER_RADIUS = 7.4;
+const MARKER_STAR_INNER_RADIUS = 3.3;
+const MARKER_STAR_MIN_GAP_PX = 12;
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const SEGMENT_COLORS = {
   USER_REVIEW_COMMENT_CHECK: '#06B6D4',
@@ -23,7 +30,7 @@ const SEGMENT_COLORS = {
   SYSTEM_INTERNAL_TRANSITION: '#334155',
   IDLE_WAITING_FOR_REVIEW: '#94A3B8',
   IDLE_WAITING_FOR_REREVIEW: '#94A3B8',
-  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: '#94A3B8',
+  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: '#334155',
   IDLE_AFTER_SYSTEM_REPROCESS: '#94A3B8',
   AUTO_TIMEOUT_MARKER: '#DC2626',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: '#475569',
@@ -33,7 +40,7 @@ const SEGMENT_TYPE_SHORT_LABELS = {
   USER_REVIEW_COMMENT_CHECK: 'Review',
   USER_REVIEW_AUTO_TIMEOUT: 'Auto Closed',
   USER_EDITING_CORRECTION: 'Edit',
-  USER_COMPLETION_APPROVAL: 'Complete',
+  USER_COMPLETION_APPROVAL: 'Review & Complete',
   USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL: 'Edit & Complete',
   USER_UPLOADING: 'Upload',
   SYSTEM_INITIAL_PROCESSING: 'Processing',
@@ -41,16 +48,20 @@ const SEGMENT_TYPE_SHORT_LABELS = {
   SYSTEM_INTERNAL_TRANSITION: 'System Transition',
   IDLE_WAITING_FOR_REVIEW: 'Waiting Review',
   IDLE_WAITING_FOR_REREVIEW: 'Waiting Re-Review',
-  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Waiting Reprocess',
+  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Reprocessing',
   IDLE_AFTER_SYSTEM_REPROCESS: 'Waiting Reprocess',
   AUTO_TIMEOUT_MARKER: 'Auto Timeout Marker',
+  COMPLETE_BY_REVIEW_MARKER: 'Review Complete Marker',
+  COMPLETE_BY_EDIT_MARKER: 'Edit Complete Marker',
+  COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER: 'System Complete Marker',
+  REOPEN_TO_REVIEW_HANDOFF_MARKER: 'Reopen Handoff Marker',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: 'System Reprocess',
   REOPEN_MARKER: 'Reopen',
 };
 const GANTT_SEGMENT_DISPLAY_LABELS = {
   USER_REVIEW_COMMENT_CHECK: 'Review',
   USER_EDITING_CORRECTION: 'Edit',
-  USER_COMPLETION_APPROVAL: 'Complete',
+  USER_COMPLETION_APPROVAL: 'Review & Complete',
   USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL: 'Edit & Complete',
   USER_UPLOADING: 'Upload',
   USER_REVIEW_AUTO_TIMEOUT: 'Auto Closed (Timeout)',
@@ -58,9 +69,13 @@ const GANTT_SEGMENT_DISPLAY_LABELS = {
   SYSTEM_SCHEDULED_REPROCESSING: 'Reprocessing',
   SYSTEM_INTERNAL_TRANSITION: 'System Transition',
   AUTO_TIMEOUT_MARKER: 'Auto Timeout Marker',
+  COMPLETE_BY_REVIEW_MARKER: 'Review Complete Marker',
+  COMPLETE_BY_EDIT_MARKER: 'Edit Complete Marker',
+  COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER: 'System Complete Marker',
+  REOPEN_TO_REVIEW_HANDOFF_MARKER: 'Reopen Handoff Marker',
   IDLE_WAITING_FOR_REVIEW: 'Waiting Review',
   IDLE_WAITING_FOR_REREVIEW: 'Waiting Re-Review',
-  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Waiting Reprocess',
+  IDLE_WAITING_FOR_SCHEDULED_REPROCESS: 'Reprocessing',
   IDLE_AFTER_SYSTEM_REPROCESS: 'Waiting Reprocess',
   SYSTEM_SCHEDULED_REPROCESSING_ROUND_2: 'System Reprocess Round 2',
   REOPEN_MARKER: 'Reopen Marker',
@@ -134,7 +149,7 @@ const SYSTEM_STAGE_FILTER_GROUPS = [
   {
     value: 'repeat-processing',
     label: 'Repeat Processing',
-    segmentTypes: ['SYSTEM_SCHEDULED_REPROCESSING', 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'],
+    segmentTypes: ['SYSTEM_SCHEDULED_REPROCESSING', 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2', 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS'],
   },
   {
     value: 'system-handoff',
@@ -144,7 +159,7 @@ const SYSTEM_STAGE_FILTER_GROUPS = [
   {
     value: 'waiting',
     label: 'Waiting',
-    segmentTypes: ['IDLE_WAITING_FOR_REVIEW', 'IDLE_WAITING_FOR_REREVIEW', 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS', 'IDLE_AFTER_SYSTEM_REPROCESS'],
+    segmentTypes: ['IDLE_WAITING_FOR_REVIEW', 'IDLE_WAITING_FOR_REREVIEW', 'IDLE_AFTER_SYSTEM_REPROCESS'],
   },
 ];
 
@@ -172,49 +187,40 @@ const FLOW_INSIGHT_GROUPS = [
 ];
 
 const TRANSITION_FRIENDLY_LABELS = {
-  // อัปโหลด → ขั้นต่อไป
-  'USER_UPLOADING=>SYSTEM_INITIAL_PROCESSING': 'อัปโหลดเสร็จ → ระบบเริ่มประมวลผล',
-  'USER_UPLOADING=>IDLE_WAITING_FOR_REVIEW': 'อัปโหลดเสร็จ → รอผู้ตรวจ',
-  'USER_UPLOADING=>USER_REVIEW_COMMENT_CHECK': 'อัปโหลดเสร็จ → เริ่ม Review ทันที',
-  'USER_UPLOADING=>USER_REVIEW_AUTO_TIMEOUT': 'อัปโหลดเสร็จ → ไม่มีคนตรวจ (หมดเวลา)',
-  // ระบบประมวลผล → ขั้นต่อไป
-  'SYSTEM_INITIAL_PROCESSING=>IDLE_WAITING_FOR_REVIEW': 'ประมวลผลเสร็จ → รอผู้ตรวจ',
-  'SYSTEM_INITIAL_PROCESSING=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลเสร็จ → เริ่ม Review ทันที',
-  'SYSTEM_INITIAL_PROCESSING=>USER_EDITING_CORRECTION': 'ประมวลผลเสร็จ → เริ่มแก้ไขทันที',
-  // รอตรวจ → ผู้ใช้มาทำงาน
-  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_COMMENT_CHECK': 'รอผู้ตรวจ → เริ่ม Review',
-  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_AUTO_TIMEOUT': 'รอผู้ตรวจนานเกิน → หมดเวลา',
-  'IDLE_WAITING_FOR_REREVIEW=>USER_REVIEW_COMMENT_CHECK': 'รอตรวจซ้ำ → เริ่ม Review',
-  'IDLE_WAITING_FOR_REREVIEW=>USER_EDITING_CORRECTION': 'รอตรวจซ้ำ → เริ่มแก้ไข',
-  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลซ้ำเสร็จ → เริ่ม Review',
-  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_EDITING_CORRECTION': 'ประมวลผลซ้ำเสร็จ → เริ่มแก้ไข',
-  'IDLE_WAITING_FOR_SCHEDULED_REPROCESS=>SYSTEM_SCHEDULED_REPROCESSING': 'รอคิว → ระบบประมวลผลซ้ำ',
-  // Review → ขั้นต่อไป
-  'USER_REVIEW_COMMENT_CHECK=>USER_COMPLETION_APPROVAL': 'Review ผ่าน → อนุมัติ',
-  'USER_REVIEW_COMMENT_CHECK=>USER_EDITING_CORRECTION': 'Review ไม่ผ่าน → ส่งแก้ไข',
-  'USER_REVIEW_COMMENT_CHECK=>IDLE_WAITING_FOR_REREVIEW': 'Review เสร็จ → รอตรวจซ้ำ',
-  'USER_REVIEW_COMMENT_CHECK=>SYSTEM_SCHEDULED_REPROCESSING': 'Review เสร็จ → ส่งระบบประมวลผลซ้ำ',
-  // แก้ไข → ขั้นต่อไป
-  'USER_EDITING_CORRECTION=>USER_COMPLETION_APPROVAL': 'แก้ไขเสร็จ → อนุมัติ',
-  'USER_EDITING_CORRECTION=>IDLE_WAITING_FOR_REREVIEW': 'แก้ไขเสร็จ → รอตรวจซ้ำ',
-  'USER_EDITING_CORRECTION=>SYSTEM_SCHEDULED_REPROCESSING': 'แก้ไขเสร็จ → ส่งระบบประมวลผลซ้ำ',
-  'USER_EDITING_CORRECTION=>USER_REVIEW_COMMENT_CHECK': 'แก้ไขเสร็จ → กลับมา Review',
-  // หมดเวลา → กลับมาทำงาน
-  'USER_REVIEW_AUTO_TIMEOUT=>USER_EDITING_CORRECTION': 'หมดเวลา Review → กลับมาแก้ไข',
-  'USER_REVIEW_AUTO_TIMEOUT=>USER_REVIEW_COMMENT_CHECK': 'หมดเวลา Review → กลับมา Review',
-  'USER_REVIEW_AUTO_TIMEOUT=>IDLE_WAITING_FOR_REREVIEW': 'หมดเวลา Review → รอตรวจซ้ำ',
-  // อนุมัติ → ขั้นต่อไป
-  'USER_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'อนุมัติแล้ว → รอตรวจซ้ำ',
-  'USER_COMPLETION_APPROVAL=>SYSTEM_SCHEDULED_REPROCESSING': 'อนุมัติแล้ว → ส่งระบบประมวลผลซ้ำ',
-  'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'แก้ไข+อนุมัติ → รอตรวจซ้ำ',
-  // ระบบประมวลผลซ้ำ
-  'SYSTEM_SCHEDULED_REPROCESSING=>IDLE_AFTER_SYSTEM_REPROCESS': 'ระบบประมวลผลซ้ำเสร็จ → รอผู้ตรวจ',
-  'SYSTEM_SCHEDULED_REPROCESSING=>USER_REVIEW_COMMENT_CHECK': 'ระบบประมวลผลซ้ำเสร็จ → เริ่ม Review',
-  'SYSTEM_SCHEDULED_REPROCESSING=>USER_EDITING_CORRECTION': 'ระบบประมวลผลซ้ำเสร็จ → เริ่มแก้ไข',
-  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>IDLE_AFTER_SYSTEM_REPROCESS': 'ประมวลผลซ้ำรอบ 2 เสร็จ → รอผู้ตรวจ',
-  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>USER_REVIEW_COMMENT_CHECK': 'ประมวลผลซ้ำรอบ 2 เสร็จ → เริ่ม Review',
+  'USER_UPLOADING=>SYSTEM_INITIAL_PROCESSING': 'Upload complete -> System starts processing',
+  'USER_UPLOADING=>IDLE_WAITING_FOR_REVIEW': 'Upload complete -> Waiting for review',
+  'USER_UPLOADING=>USER_REVIEW_COMMENT_CHECK': 'Upload complete -> Review starts immediately',
+  'USER_UPLOADING=>USER_REVIEW_AUTO_TIMEOUT': 'Upload complete -> No reviewer (timeout)',
+  'SYSTEM_INITIAL_PROCESSING=>IDLE_WAITING_FOR_REVIEW': 'Processing complete -> Waiting for review',
+  'SYSTEM_INITIAL_PROCESSING=>USER_REVIEW_COMMENT_CHECK': 'Processing complete -> Review starts immediately',
+  'SYSTEM_INITIAL_PROCESSING=>USER_EDITING_CORRECTION': 'Processing complete -> Edit starts immediately',
+  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_COMMENT_CHECK': 'Waiting for review -> Review starts',
+  'IDLE_WAITING_FOR_REVIEW=>USER_REVIEW_AUTO_TIMEOUT': 'Waiting too long for review -> Timeout',
+  'IDLE_WAITING_FOR_REREVIEW=>USER_REVIEW_COMMENT_CHECK': 'Waiting for re-review -> Review starts',
+  'IDLE_WAITING_FOR_REREVIEW=>USER_EDITING_CORRECTION': 'Waiting for re-review -> Edit starts',
+  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_REVIEW_COMMENT_CHECK': 'Reprocess complete -> Review starts',
+  'IDLE_AFTER_SYSTEM_REPROCESS=>USER_EDITING_CORRECTION': 'Reprocess complete -> Edit starts',
+  'IDLE_WAITING_FOR_SCHEDULED_REPROCESS=>SYSTEM_SCHEDULED_REPROCESSING': 'Queued -> System reprocessing',
+  'USER_REVIEW_COMMENT_CHECK=>USER_COMPLETION_APPROVAL': 'Review passed -> Complete approval',
+  'USER_REVIEW_COMMENT_CHECK=>USER_EDITING_CORRECTION': 'Review failed -> Send to edit',
+  'USER_REVIEW_COMMENT_CHECK=>IDLE_WAITING_FOR_REREVIEW': 'Review done -> Waiting re-review',
+  'USER_REVIEW_COMMENT_CHECK=>SYSTEM_SCHEDULED_REPROCESSING': 'Review done -> Send to system reprocess',
+  'USER_EDITING_CORRECTION=>USER_COMPLETION_APPROVAL': 'Edit done -> Complete approval',
+  'USER_EDITING_CORRECTION=>IDLE_WAITING_FOR_REREVIEW': 'Edit done -> Waiting re-review',
+  'USER_EDITING_CORRECTION=>SYSTEM_SCHEDULED_REPROCESSING': 'Edit done -> Send to system reprocess',
+  'USER_EDITING_CORRECTION=>USER_REVIEW_COMMENT_CHECK': 'Edit done -> Back to review',
+  'USER_REVIEW_AUTO_TIMEOUT=>USER_EDITING_CORRECTION': 'Review timeout -> Back to edit',
+  'USER_REVIEW_AUTO_TIMEOUT=>USER_REVIEW_COMMENT_CHECK': 'Review timeout -> Back to review',
+  'USER_REVIEW_AUTO_TIMEOUT=>IDLE_WAITING_FOR_REREVIEW': 'Review timeout -> Waiting re-review',
+  'USER_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'Approval complete -> Waiting re-review',
+  'USER_COMPLETION_APPROVAL=>SYSTEM_SCHEDULED_REPROCESSING': 'Approval complete -> Send to system reprocess',
+  'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL=>IDLE_WAITING_FOR_REREVIEW': 'Edit + approval -> Waiting re-review',
+  'SYSTEM_SCHEDULED_REPROCESSING=>IDLE_AFTER_SYSTEM_REPROCESS': 'System reprocess complete -> Waiting reviewer',
+  'SYSTEM_SCHEDULED_REPROCESSING=>USER_REVIEW_COMMENT_CHECK': 'System reprocess complete -> Review starts',
+  'SYSTEM_SCHEDULED_REPROCESSING=>USER_EDITING_CORRECTION': 'System reprocess complete -> Edit starts',
+  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>IDLE_AFTER_SYSTEM_REPROCESS': 'Round 2 reprocess complete -> Waiting reviewer',
+  'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2=>USER_REVIEW_COMMENT_CHECK': 'Round 2 reprocess complete -> Review starts',
 };
-
 const initialKpiData = [
   { id: 1, label: 'Active User Time', value: '-', subtext: 'No data', icon: Clock, color: 'text-slate-400', bg: 'bg-slate-50' },
   { id: 2, label: 'Contributing Users', value: '-', subtext: 'No data', icon: Users, color: 'text-slate-400', bg: 'bg-slate-50' },
@@ -420,9 +426,89 @@ function toGanttSegmentTypeLabel(segmentType) {
   return toSegmentTypeLabel(key);
 }
 
+function isProcessingEquivalentIdleSegment(segmentType) {
+  const type = String(segmentType || '');
+  return PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES.has(type);
+}
+
+function isReprocessingSegmentType(segmentType) {
+  const type = String(segmentType || '');
+  return type === 'SYSTEM_SCHEDULED_REPROCESSING'
+    || type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+    || isProcessingEquivalentIdleSegment(type);
+}
+
+function toDisplaySegmentTypeCode(segmentType) {
+  const type = String(segmentType || '');
+  if (type === 'COMPLETE_BY_REVIEW_MARKER') return 'USER_COMPLETION_APPROVAL';
+  if (type === 'COMPLETE_BY_EDIT_MARKER') return 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+  if (type === 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER') return 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2';
+  if (isReprocessingSegmentType(type)) return 'SYSTEM_SCHEDULED_REPROCESSING';
+  return type;
+}
+
+function toCompleteMarkerType(segmentOrType) {
+  const segment = segmentOrType && typeof segmentOrType === 'object' ? segmentOrType : null;
+  const type = String(segment ? segment.segmentType : segmentOrType || '');
+  if (type === 'USER_COMPLETION_APPROVAL') return 'COMPLETE_BY_REVIEW_MARKER';
+  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') return 'COMPLETE_BY_EDIT_MARKER';
+  if (segment && segment.hasReprocessRound2CompleteMarker) return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
+  if (type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2') return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
+  return '';
+}
+
+function mergeContinuousReprocessingSegments(sortedSegments) {
+  if (!Array.isArray(sortedSegments) || sortedSegments.length <= 1) return sortedSegments;
+
+  const merged = [];
+  sortedSegments.forEach((segment) => {
+    const segmentCopy = {
+      ...segment,
+      reopenMarkerList: Array.isArray(segment.reopenMarkerList) ? [...segment.reopenMarkerList] : [],
+      hasReprocessRound2CompleteMarker: Boolean(segment.hasReprocessRound2CompleteMarker)
+        || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2',
+    };
+
+    const previous = merged[merged.length - 1];
+    if (!previous) {
+      merged.push(segmentCopy);
+      return;
+    }
+
+    const sameContext = String(previous.contextKey || '') === String(segmentCopy.contextKey || '');
+    const shouldMerge = sameContext
+      && isReprocessingSegmentType(previous.segmentType)
+      && isReprocessingSegmentType(segmentCopy.segmentType)
+      && segmentCopy.startTs <= previous.endTs + REPROCESSING_SEGMENT_MERGE_GAP_MS;
+
+    if (!shouldMerge) {
+      merged.push(segmentCopy);
+      return;
+    }
+
+    previous.endTs = Math.max(previous.endTs, segmentCopy.endTs);
+    if (segmentCopy.endTs >= previous.endTs) previous.end = segmentCopy.end;
+    previous.durationSeconds = Math.max(0, Math.round((previous.endTs - previous.startTs) / 1000));
+    previous.segmentType = 'SYSTEM_SCHEDULED_REPROCESSING';
+    previous.drillGroup = 'Reprocessing';
+    previous.hasReprocessRound2CompleteMarker = Boolean(previous.hasReprocessRound2CompleteMarker)
+      || Boolean(segmentCopy.hasReprocessRound2CompleteMarker);
+    previous.reopenMarkerList = [
+      ...(Array.isArray(previous.reopenMarkerList) ? previous.reopenMarkerList : []),
+      ...(Array.isArray(segmentCopy.reopenMarkerList) ? segmentCopy.reopenMarkerList : []),
+    ];
+  });
+
+  return merged;
+}
+
 function toDrillGroup(segmentType) {
   const type = String(segmentType || '');
   if (type === 'USER_UPLOADING') return 'Uploading';
+  if (type === 'COMPLETE_BY_REVIEW_MARKER') return 'Review';
+  if (type === 'COMPLETE_BY_EDIT_MARKER') return 'Edit';
+  if (type === 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER') return 'Reprocessing';
+  if (isProcessingEquivalentIdleSegment(type)) return 'Reprocessing';
   if (type === 'SYSTEM_INITIAL_PROCESSING' || type === 'SYSTEM_INTERNAL_TRANSITION') return 'Processing';
   if (type === 'USER_REVIEW_COMMENT_CHECK') return 'Review';
   if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
@@ -432,12 +518,14 @@ function toDrillGroup(segmentType) {
     || type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
   ) return 'Reprocessing';
   if (type === 'USER_EDITING_CORRECTION') return 'Edit';
-  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL' || type === 'USER_COMPLETION_APPROVAL') return 'EditAndComplete';
+  if (type === 'USER_COMPLETION_APPROVAL') return 'Review';
+  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') return 'Edit';
   return 'Processing';
 }
 
 function toTimelineLane(segmentType, userNameRaw) {
   const type = String(segmentType || '');
+  if (isProcessingEquivalentIdleSegment(type)) return 'System';
   if (type.startsWith('SYSTEM_')) return 'System';
   if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
   const userName = String(userNameRaw || '').trim();
@@ -447,7 +535,8 @@ function toTimelineLane(segmentType, userNameRaw) {
 
 function isIdleContextSegment(segmentType) {
   const type = String(segmentType || '');
-  return type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE';
+  return (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE')
+    && !isProcessingEquivalentIdleSegment(type);
 }
 
 function isUserContextSegment(segmentType, userNameRaw) {
@@ -469,6 +558,41 @@ function buildAsteriskPoints(cx, cy, outerRadius = 6, innerRadius = 2.6, spikes 
     points.push(`${cx + Math.cos(angle) * radius},${cy + Math.sin(angle) * radius}`);
   }
   return points.join(' ');
+}
+
+function spreadMarkerPositions(markerItems, minGapPx = MARKER_STAR_MIN_GAP_PX) {
+  if (!Array.isArray(markerItems) || markerItems.length === 0) return [];
+  if (markerItems.length === 1) {
+    return markerItems.map((item) => ({ ...item, x: item.rawX }));
+  }
+  const sorted = markerItems
+    .map((item, idx) => ({ ...item, orderIdx: idx }))
+    .sort((a, b) => (a.rawX - b.rawX) || (a.orderIdx - b.orderIdx));
+
+  let startIdx = 0;
+  while (startIdx < sorted.length) {
+    let endIdx = startIdx + 1;
+    while (endIdx < sorted.length && (sorted[endIdx].rawX - sorted[endIdx - 1].rawX) < minGapPx) {
+      endIdx += 1;
+    }
+
+    const cluster = sorted.slice(startIdx, endIdx);
+    if (cluster.length === 1) {
+      cluster[0].x = cluster[0].rawX;
+    } else {
+      const centerX = cluster.reduce((sum, item) => sum + item.rawX, 0) / cluster.length;
+      const firstX = centerX - ((cluster.length - 1) * minGapPx) / 2;
+      cluster.forEach((item, idx) => {
+        item.x = firstX + (idx * minGapPx);
+      });
+    }
+
+    startIdx = endIdx;
+  }
+
+  return sorted
+    .sort((a, b) => a.orderIdx - b.orderIdx)
+    .map(({ orderIdx, ...item }) => item);
 }
 
 function buildSheetKey(fileName, pageName) {
@@ -511,7 +635,7 @@ function buildKpiData(kpis) {
       id: 3,
       label: 'Avg User Action',
       value: kpis.avgUserSessionDisplay || '-',
-      subtext: `Med ${kpis.medianSessionDisplay || '-'} · ${kpis.minSessionDisplay || '-'} – ${kpis.maxSessionDisplay || '-'}`,
+      subtext: `Med ${kpis.medianSessionDisplay || '-'} · ${kpis.minSessionDisplay || '-'} - ${kpis.maxSessionDisplay || '-'}`,
       icon: Timer,
       color: 'text-sky-600',
       bg: 'bg-sky-50',
@@ -542,6 +666,7 @@ function buildKpisFromSegments(segments) {
   const userSegments = safeSegments.filter((segment) => String(segment.segmentType || '').startsWith('USER_'));
   const coreUserSegments = userSegments.filter((segment) => CORE_WORK_SESSION_TYPES.has(String(segment.segmentType || '')));
   const idleSegments = safeSegments.filter((segment) => isIdleContextSegment(segment.segmentType));
+  const processingEquivalentIdleSegments = safeSegments.filter((segment) => isProcessingEquivalentIdleSegment(segment.segmentType));
 
   // Use full segment time for KPI calculations.
   const effectiveDuration = (segment) => safeNumber(segment?.durationSeconds);
@@ -562,7 +687,9 @@ function buildKpisFromSegments(segments) {
   const reworkRate = coreUserSegments.length > 0 ? (reworkSessions / coreUserSegments.length) : 0;
 
   // --- Additional insight metrics ---
+  const processingEquivalentSystemSeconds = processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
   const totalCycleSeconds = activeUserTimeSeconds + idleWaitingSeconds +
+    processingEquivalentSystemSeconds +
     safeSegments.filter((s) => String(s.segmentType || '').startsWith('SYSTEM_')).reduce((sum, s) => sum + safeNumber(s.durationSeconds), 0);
   const idlePercentOfCycle = totalCycleSeconds > 0 ? (idleWaitingSeconds / totalCycleSeconds) * 100 : 0;
   const avgTimePerUser = contributingUsers > 0 ? activeUserTimeSeconds / contributingUsers : 0;
@@ -826,35 +953,73 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
     timelineSvgWidth: 2232,
   });
 
-  const mapped = useMemo(() => (
-    (segments || [])
-      .map((segment, idx) => {
-        const startTs = Date.parse(segment.start || '');
-        const endTsRaw = Date.parse(segment.end || '');
-        if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) return null;
+  const mapped = useMemo(() => {
+    const parsedRows = [];
+    const reopenMarkers = [];
 
-        const segmentType = String(segment.segmentType || 'UNKNOWN');
-        const lane = singleLane ? 'All user' : toTimelineLane(segmentType, segment.userName);
+    (segments || []).forEach((segment, idx) => {
+      const startTs = Date.parse(segment.start || '');
+      const endTsRaw = Date.parse(segment.end || '');
+      if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) return;
 
-        return {
-          id: `${segmentType}-${idx}`,
-          segmentType,
-          lane,
-          startTs,
-          endTs: Math.max(endTsRaw, startTs + 1000),
-          durationSeconds: safeNumber(segment.durationSeconds),
-          start: segment.start,
-          end: segment.end,
-          timeGroup: String(segment.timeGroup || ''),
-          drillGroup: toDrillGroup(segmentType),
-          documentId: segment.documentId || '',
-          fileName: segment.fileName || '',
-          pageName: segment.pageName || '',
-          autoTimeout: Boolean(segment.autoTimeout),
-        };
-      })
-      .filter(Boolean)
-  ), [segments, singleLane]);
+      const segmentType = String(segment.segmentType || 'UNKNOWN');
+      const contextKey = String(segment.documentId || `${segment.fileName || ''}::${segment.pageName || ''}`);
+
+      // Render timeout/reopen markers directly on related action bars, not as stand-alone segments.
+      if (segmentType === 'AUTO_TIMEOUT_MARKER') return;
+      if (REOPEN_MARKER_TYPES.has(segmentType)) {
+        reopenMarkers.push({ contextKey, ts: startTs, markerType: segmentType });
+        return;
+      }
+
+      const lane = singleLane ? 'All user' : toTimelineLane(segmentType, segment.userName);
+
+      parsedRows.push({
+        id: `${segmentType}-${idx}`,
+        segmentType,
+        lane,
+        startTs,
+        endTs: Math.max(endTsRaw, startTs + 1000),
+        durationSeconds: safeNumber(segment.durationSeconds),
+        start: segment.start,
+        end: segment.end,
+        timeGroup: String(segment.timeGroup || ''),
+        drillGroup: toDrillGroup(segmentType),
+        documentId: segment.documentId || '',
+        fileName: segment.fileName || '',
+        pageName: segment.pageName || '',
+        autoTimeout: Boolean(segment.autoTimeout),
+        contextKey,
+        reopenMarkerList: [],
+        hasReprocessRound2CompleteMarker: segmentType === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2',
+      });
+    });
+
+    if (reopenMarkers.length === 0 || parsedRows.length === 0) return parsedRows;
+
+    const userBarsByContext = new Map();
+    parsedRows.forEach((row) => {
+      if (!String(row.segmentType || '').startsWith('USER_')) return;
+      if (!userBarsByContext.has(row.contextKey)) userBarsByContext.set(row.contextKey, []);
+      userBarsByContext.get(row.contextKey).push(row);
+    });
+    userBarsByContext.forEach((rows) => rows.sort((a, b) => a.startTs - b.startTs));
+
+    reopenMarkers.forEach((marker) => {
+      const candidateBars = userBarsByContext.get(marker.contextKey);
+      if (!candidateBars || candidateBars.length === 0) return;
+
+      let targetBar = candidateBars.find((bar) => marker.ts >= bar.startTs && marker.ts <= bar.endTs);
+      if (!targetBar) targetBar = candidateBars.find((bar) => bar.startTs >= marker.ts);
+      if (!targetBar) targetBar = candidateBars[candidateBars.length - 1];
+      targetBar.reopenMarkerList.push({
+        ts: marker.ts,
+        markerType: marker.markerType || 'REOPEN_MARKER',
+      });
+    });
+
+    return parsedRows;
+  }, [segments, singleLane]);
 
   useEffect(() => {
     const bodyViewport = bodyScrollRef.current;
@@ -891,10 +1056,13 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
   });
 
   const lanes = Object.keys(laneDurationMap).sort((a, b) => {
-    if (a === 'System' && b !== 'System') return -1;
-    if (b === 'System' && a !== 'System') return 1;
-    if (a === 'Idle' && b !== 'Idle') return -1;
-    if (b === 'Idle' && a !== 'Idle') return 1;
+    const lanePriority = (laneName) => {
+      if (laneName === 'System') return 2;
+      if (laneName === 'Idle') return 3;
+      return 1;
+    };
+    const priorityDiff = lanePriority(a) - lanePriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
     const durationDiff = laneDurationMap[b] - laneDurationMap[a];
     if (durationDiff !== 0) return durationDiff;
     return a.localeCompare(b);
@@ -902,9 +1070,10 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
 
   const laneToSegments = {};
   lanes.forEach((lane) => {
-    laneToSegments[lane] = visibleSegments
+    const laneSegments = visibleSegments
       .filter((item) => item.lane === lane)
       .sort((a, b) => a.startTs - b.startTs);
+    laneToSegments[lane] = mergeContinuousReprocessingSegments(laneSegments);
   });
 
   const laneLabelWidth = expanded ? 210 : 132;
@@ -1192,58 +1361,148 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
                           : (GANTT_DRILL_GROUP_COLORS[segment.drillGroup] || SEGMENT_COLORS[segment.segmentType] || '#64748B');
                         const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
                         const typeLabel = toGanttSegmentTypeLabel(segment.segmentType);
-                        const label = `${groupLabel} | ${typeLabel} (${segment.segmentType}) | ${lane} | ${formatTimeTick(segment.start)} → ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
-                        const isReopenMarker = segment.segmentType === 'REOPEN_MARKER';
-                        const isAutoTimeoutMarker = segment.segmentType === 'AUTO_TIMEOUT_MARKER';
-                        const isMarker = isReopenMarker || isAutoTimeoutMarker;
-                        const isUpload = segment.drillGroup === 'Uploading';
+                        const label = `${groupLabel} | ${typeLabel} (${toDisplaySegmentTypeCode(segment.segmentType)}) | ${lane} | ${formatTimeTick(segment.start)} -> ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
                         const barOpacity = '0.94';
 
-                        if (isMarker) {
-                          const cx = x1 + 6;
-                          const cy = y + rowHeight / 2;
-                          return (
-                            <g
-                              key={segment.id}
-                              onClick={() => pickSegment(segment, lane)}
-                              onMouseEnter={(event) => showHoverTooltip(event, segment, lane)}
-                              onMouseMove={(event) => showHoverTooltip(event, segment, lane)}
-                              onMouseLeave={hideHoverTooltip}
-                              style={{ cursor: 'pointer' }}
-                            >
-                              {isAutoTimeoutMarker ? (
-                                <polygon points={buildAsteriskPoints(cx, cy)} fill={color}>
-                                  <title>{label}</title>
-                                </polygon>
-                              ) : (
-                                <rect x={cx - 5} y={cy - 5} width="10" height="10" transform={`rotate(45 ${cx} ${cy})`} fill={color}>
-                                  <title>{label}</title>
-                                </rect>
-                              )}
-                            </g>
-                          );
-                        }
-
                         return (
-                          <rect
+                          <g
                             key={segment.id}
-                            x={x1}
-                            y={y + 4}
-                            width={barWidth}
-                            height={rowHeight - 8}
-                            rx="6"
-                            fill={color}
-                            stroke={isUpload ? '#4C1D95' : 'none'}
-                            strokeWidth={isUpload ? '1' : '0'}
-                            opacity={barOpacity}
                             onClick={() => pickSegment(segment, lane)}
                             onMouseEnter={(event) => showHoverTooltip(event, segment, lane)}
                             onMouseMove={(event) => showHoverTooltip(event, segment, lane)}
                             onMouseLeave={hideHoverTooltip}
                             style={{ cursor: 'pointer' }}
                           >
-                            <title>{label}</title>
-                          </rect>
+                            <rect
+                              x={x1}
+                              y={y + 4}
+                              width={barWidth}
+                              height={rowHeight - 8}
+                              rx="6"
+                              fill={color}
+                              stroke="none"
+                              strokeWidth="0"
+                              opacity={barOpacity}
+                            >
+                              <title>{label}</title>
+                            </rect>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+
+                {lanes.map((lane, laneIdx) => {
+                  const y = rowTopPadding + laneIdx * rowSlotHeight;
+                  const bars = laneToSegments[lane] || [];
+                  return (
+                    <g key={`markers-${lane}`}>
+                      {bars.map((segment) => {
+                        const clippedStart = Math.max(segment.startTs, displayMinTs);
+                        const clippedEnd = Math.min(segment.endTs, displayMaxTs);
+                        const x1 = getX(clippedStart);
+                        const x2 = getX(clippedEnd);
+                        const minBarWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
+                        const barWidth = Math.max(minBarWidth, x2 - x1);
+                        const timeoutStarX = x1 + Math.max(6, barWidth - 7);
+                        const timeoutStarY = y + rowHeight / 2;
+                        const isTimeoutAction = segment.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || segment.autoTimeout;
+                        const completeMarkerType = toCompleteMarkerType(segment);
+                        const hasCompleteMarker = completeMarkerType.length > 0;
+                        const completeMarkerTs = safeNumber(segment.endTs);
+                        const completeMarkerX = getX(completeMarkerTs);
+                        const reopenMarkerList = Array.isArray(segment.reopenMarkerList) ? segment.reopenMarkerList : [];
+                        const visibleReopenMarkers = reopenMarkerList.filter((marker) => marker.ts >= displayMinTs && marker.ts <= displayMaxTs);
+                        const primaryReopenMarker = visibleReopenMarkers
+                          .slice()
+                          .sort((a, b) => {
+                            const aType = String(a.markerType || 'REOPEN_MARKER');
+                            const bType = String(b.markerType || 'REOPEN_MARKER');
+                            // Prefer explicit REOPEN marker, then earliest timestamp.
+                            if (aType === 'REOPEN_MARKER' && bType !== 'REOPEN_MARKER') return -1;
+                            if (bType === 'REOPEN_MARKER' && aType !== 'REOPEN_MARKER') return 1;
+                            return safeNumber(a.ts) - safeNumber(b.ts);
+                          })[0] || null;
+                        const reopenMarkerColor = GANTT_DRILL_GROUP_COLORS[toDrillGroup('REOPEN_MARKER')]
+                          || SEGMENT_COLORS.REOPEN_MARKER
+                          || '#64748B';
+
+                        const markerItems = [];
+
+                        if (isTimeoutAction) {
+                          markerItems.push({
+                            key: `timeout-marker-${segment.id}`,
+                            rawX: timeoutStarX,
+                            fill: '#DC2626',
+                            markerSegment: {
+                              ...segment,
+                              segmentType: 'AUTO_TIMEOUT_MARKER',
+                              start: segment.end,
+                              end: segment.end,
+                              durationSeconds: 0,
+                            },
+                          });
+                        }
+
+                        if (hasCompleteMarker && completeMarkerTs >= displayMinTs && completeMarkerTs <= displayMaxTs) {
+                          markerItems.push({
+                            key: `complete-marker-${segment.id}`,
+                            rawX: completeMarkerX,
+                            fill: COMPLETE_MARKER_COLOR,
+                            markerSegment: {
+                              ...segment,
+                              segmentType: completeMarkerType,
+                              start: segment.end,
+                              end: segment.end,
+                              durationSeconds: 0,
+                            },
+                          });
+                        }
+
+                        if (primaryReopenMarker) {
+                          const markerTs = primaryReopenMarker.ts;
+                          const markerType = String(primaryReopenMarker.markerType || 'REOPEN_MARKER');
+                          const markerTimestamp = new Date(markerTs).toISOString();
+                          markerItems.push({
+                            key: `reopen-marker-${segment.id}`,
+                            rawX: getX(markerTs),
+                            fill: reopenMarkerColor,
+                            markerSegment: {
+                              ...segment,
+                              segmentType: markerType,
+                              start: markerTimestamp,
+                              end: markerTimestamp,
+                              durationSeconds: 0,
+                            },
+                          });
+                        }
+
+                        const positionedMarkers = spreadMarkerPositions(markerItems, MARKER_STAR_MIN_GAP_PX);
+
+                        return (
+                          <g key={`marker-layer-${segment.id}`}>
+                            {positionedMarkers.map((markerItem) => (
+                              <polygon
+                                key={markerItem.key}
+                                points={buildAsteriskPoints(
+                                  markerItem.x,
+                                  timeoutStarY,
+                                  MARKER_STAR_OUTER_RADIUS,
+                                  MARKER_STAR_INNER_RADIUS
+                                )}
+                                fill={markerItem.fill}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  pickSegment(markerItem.markerSegment, lane);
+                                }}
+                                onMouseEnter={(event) => showHoverTooltip(event, markerItem.markerSegment, lane)}
+                                onMouseMove={(event) => showHoverTooltip(event, markerItem.markerSegment, lane)}
+                                onMouseLeave={hideHoverTooltip}
+                                style={{ cursor: 'pointer' }}
+                              />
+                            ))}
+                          </g>
                         );
                       })}
                     </g>
@@ -1260,7 +1519,7 @@ const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false, singl
           style={{ left: `${hoveredSegment.x}px`, top: `${hoveredSegment.y}px` }}
         >
           <div className="text-[11px] font-semibold text-slate-800">
-            {toGanttSegmentTypeLabel(hoveredSegment.segmentType)} ({hoveredSegment.segmentType})
+            {toGanttSegmentTypeLabel(hoveredSegment.segmentType)} ({toDisplaySegmentTypeCode(hoveredSegment.segmentType)})
           </div>
           <div className="mt-0.5 text-[11px] text-slate-600">Group: {hoveredSegment.groupLabel || '-'}</div>
           <div className="mt-1 text-[11px] text-slate-600">Lane: {hoveredSegment.lane || '-'}</div>
@@ -1862,7 +2121,7 @@ const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectG
     setGsheetSuccess('');
     try {
       await onConnectGSheet(gsheetUrl.trim());
-      setGsheetSuccess('เชื่อมต่อสำเร็จ! ข้อมูลจะ sync อัตโนมัติทุกครั้งที่เปิดหน้าเว็บ');
+      setGsheetSuccess('Connected successfully! Data will sync automatically each time the page opens.');
       setGsheetUrl('');
       setTimeout(() => setGsheetSuccess(''), 5000);
     } catch (err) {
@@ -1896,7 +2155,7 @@ const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectG
       <div className="flex justify-between items-end mb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Data Management</h1>
-          <p className="text-slate-500 mt-1">Upload Excel/CSV แล้วรวมข้อมูลลงตารางกลางเดียวใน SQLite พร้อมเก็บชื่อไฟล์และชื่อหน้า (Page)</p>
+          <p className="text-slate-500 mt-1">Upload Excel/CSV and consolidate all data into one central SQLite table with file and page names.</p>
         </div>
       </div>
 
@@ -2461,7 +2720,7 @@ function App() {
         if (isUserSegment) {
           if (!selectedUserSet.has(segment.userName)) return false;
         } else {
-          // SYSTEM_, IDLE_, REOPEN_MARKER, AUTO_TIMEOUT_MARKER, etc. → treat as "System"
+          // SYSTEM_, IDLE_, REOPEN_MARKER, AUTO_TIMEOUT_MARKER, etc. -> treat as "System"
           if (!selectedUserSet.has('System')) return false;
         }
       }
@@ -2532,15 +2791,20 @@ function App() {
 
   const systemInsightData = useMemo(() => {
     const systemOnly = systemVisibleSegments.filter((segment) => String(segment.segmentType || '').startsWith('SYSTEM_'));
-    const processingSegments = systemOnly.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INITIAL_PROCESSING');
-    const reprocessSegments = systemOnly.filter((segment) => (
+    const processingEquivalentIdleSegments = systemVisibleSegments.filter((segment) => (
+      isProcessingEquivalentIdleSegment(segment.segmentType)
+    ));
+    const processingSegments = systemVisibleSegments.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INITIAL_PROCESSING');
+    const reprocessSegments = systemVisibleSegments.filter((segment) => (
       String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING'
       || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
+      || isProcessingEquivalentIdleSegment(segment.segmentType)
     ));
     const waitingSegments = systemVisibleSegments.filter((segment) => isIdleContextSegment(segment.segmentType));
     const transitionSegments = systemOnly.filter((segment) => String(segment.segmentType || '') === 'SYSTEM_INTERNAL_TRANSITION');
 
-    const totalSystemSeconds = systemOnly.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+    const totalSystemSeconds = systemOnly.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0)
+      + processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
     const totalVisibleSeconds = systemVisibleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
     const totalProcessingSeconds = processingSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
     const totalReprocessSeconds = reprocessSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
@@ -2678,6 +2942,7 @@ function App() {
         segmentType === 'SYSTEM_SCHEDULED_REPROCESSING'
         || segmentType === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
       ) row.reprocessSeconds += seconds;
+      else if (isProcessingEquivalentIdleSegment(segmentType)) row.reprocessSeconds += seconds;
       else if (isIdleContextSegment(segmentType)) row.waitingSeconds += seconds;
       row.totalSeconds += seconds;
     });
@@ -2762,7 +3027,7 @@ function App() {
 
   const dateFilterSummary = useMemo(() => {
     if (datePreset !== 'custom') return datePresetLabelMap[datePreset] || 'All Time';
-    if (!dateStart && !dateEnd) return 'ยังไม่ได้ตั้ง';
+    if (!dateStart && !dateEnd) return 'Not set';
     return `${dateStart || '...'} - ${dateEnd || '...'}`;
   }, [datePreset, dateStart, dateEnd, datePresetLabelMap]);
 
@@ -3229,8 +3494,8 @@ function App() {
         return (
           <EmptyState
             icon={LayoutDashboard}
-            title="ยังไม่มี Segment Data"
-            subtitle="อัปโหลดไฟล์ Audit Log เพื่อคำนวณ Gantt segment"
+            title="No Segment Data"
+            subtitle="Upload an Audit Log file to generate Gantt segments"
           />
         );
       }
@@ -3249,8 +3514,8 @@ function App() {
         return (
           <EmptyState
             icon={Users}
-            title="ยังไม่มี Contribution Data"
-            subtitle="ยังไม่มี Active Time จากข้อมูลที่อัปโหลด"
+            title="No Contribution Data"
+            subtitle="No active time was found in the uploaded data"
           />
         );
       }
@@ -3262,8 +3527,8 @@ function App() {
         return (
           <EmptyState
             icon={Users}
-            title="ยังไม่มี Ranking Data"
-            subtitle="ระบบยังไม่พบ session ผู้ใช้ที่คำนวณได้"
+            title="No Ranking Data"
+            subtitle="No user sessions are available for ranking"
           />
         );
       }
@@ -3303,8 +3568,8 @@ function App() {
         return (
           <EmptyState
             icon={Search}
-            title="ยังไม่มี Matrix Data"
-            subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Edit Matrix"
+            title="No Matrix Data"
+            subtitle="No data is available to compute the Edit Matrix"
           />
         );
       }
@@ -3350,9 +3615,7 @@ function App() {
       } else {
         setHealthInfo(healthRes || null);
         if (!healthRes?.version) {
-          setBackendWarning(
-            'Backend ที่รันอยู่ไม่มี version metadata (น่าจะเป็น process เก่า). ให้ปิด server ทั้งหมดแล้วรัน ./start.ps1 ใหม่'
-          );
+          setBackendWarning('Backend is missing version metadata (likely old process). Stop all servers and run ./start.ps1 again.');
         }
       }
 
@@ -3494,7 +3757,7 @@ function App() {
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                   <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Custom Range</div>
-                  <div className="text-[11px] font-medium text-slate-500">{datePreset === 'custom' && hasCustomDateInput ? 'ตั้งค่าแล้ว (Custom)' : 'ยังไม่ได้ตั้ง'}</div>
+                  <div className="text-[11px] font-medium text-slate-500">{datePreset === 'custom' && hasCustomDateInput ? 'Configured (Custom)' : 'Not set'}</div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="space-y-1">
                       <div className="text-[11px] text-slate-500">Start</div>
@@ -3669,7 +3932,7 @@ function App() {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-slate-100 pt-2">
-                  <div className="text-xs text-slate-500">Tip: เลือกได้หลายไฟล์และหลายชีตพร้อมกัน</div>
+                  <div className="text-xs text-slate-500">Tip: You can select multiple files and multiple sheets at once</div>
                   <button
                     onClick={() => {
                       setSelectedFiles([]);
@@ -3825,7 +4088,7 @@ function App() {
             <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${suspiciousZeroState ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-200 bg-white text-slate-700'}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="font-semibold">
-                  {suspiciousZeroState ? 'Debug Warning: มีข้อมูลใน DB แต่ KPI ยังเป็น 0' : 'Debug Panel'}
+                  {suspiciousZeroState ? 'Debug Warning: DB has data but KPI is still 0' : 'Debug Panel'}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -3949,8 +4212,8 @@ function App() {
                     {ganttVisibleSegments.length === 0 ? (
                       <EmptyState
                         icon={LayoutDashboard}
-                        title="ยังไม่มี Segment Data"
-                        subtitle="อัปโหลดไฟล์ Audit Log เพื่อคำนวณ Gantt segment"
+                        title="No Segment Data"
+                        subtitle="Upload an Audit Log file to generate Gantt segments"
                       />
                     ) : (
                       <GanttTimelineChart
@@ -4005,8 +4268,8 @@ function App() {
                     {workloadContributors.length === 0 ? (
                       <EmptyState
                         icon={Users}
-                        title="ยังไม่มี Contribution Data"
-                        subtitle="ยังไม่มี Active Time จากข้อมูลที่อัปโหลด"
+                        title="No Contribution Data"
+                        subtitle="No active time was found in the uploaded data"
                       />
                     ) : (
                       <DonutWorkloadChart rows={workloadContributors} />
@@ -4030,8 +4293,8 @@ function App() {
                     {contributionRows.length === 0 ? (
                       <EmptyState
                         icon={Users}
-                        title="ยังไม่มี Ranking Data"
-                        subtitle="ระบบยังไม่พบ session ผู้ใช้ที่คำนวณได้"
+                        title="No Ranking Data"
+                        subtitle="No user sessions are available for ranking"
                       />
                     ) : (
                       <UserContributionStackChart rows={contributionRows} maxVisibleRows={3} />
@@ -4095,8 +4358,8 @@ function App() {
                     {matrixRows.length === 0 ? (
                       <EmptyState
                         icon={Search}
-                        title="ยังไม่มี Matrix Data"
-                        subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Edit Matrix"
+                        title="No Matrix Data"
+                        subtitle="No data is available to compute the Edit Matrix"
                       />
                     ) : (
                       <ReworkMatrixScatterChart rows={matrixRows} />
@@ -4215,7 +4478,7 @@ function App() {
                 <div className="p-6 space-y-3 text-sm">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">Lane:</span> <span className="font-medium text-slate-800">{selectedGanttSegment.lane || '-'}</span></div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">Segment Type:</span> <span className="font-medium text-slate-800">{toGanttSegmentTypeLabel(selectedGanttSegment.segmentType)} ({selectedGanttSegment.segmentType || '-'})</span></div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">Segment Type:</span> <span className="font-medium text-slate-800">{toGanttSegmentTypeLabel(selectedGanttSegment.segmentType)} ({toDisplaySegmentTypeCode(selectedGanttSegment.segmentType) || '-'})</span></div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">Start:</span> <span className="font-medium text-slate-800">{toDisplayDate(selectedGanttSegment.start)}</span></div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">End:</span> <span className="font-medium text-slate-800">{toDisplayDate(selectedGanttSegment.end)}</span></div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><span className="text-slate-500">Duration:</span> <span className="font-medium text-slate-800">{formatDuration(selectedGanttSegment.durationSeconds)}</span></div>
@@ -4244,3 +4507,8 @@ if (!rootNode) {
 }
 
 createRoot(rootNode).render(<App />);
+
+
+
+
+
