@@ -2,14 +2,14 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createRoot } from 'react-dom/client';
 import { createPortal } from 'react-dom';
 import {
-  Users, Server, Clock, Timer, Hourglass, RefreshCw, AlertTriangle,
+  Users, Server, Clock, Timer, RefreshCw, AlertTriangle,
   Search, Calendar, ChevronDown, User, LayoutDashboard,
   Menu, X, ChevronLeft, ChevronRight, Database, UploadCloud, Link2,
   FileText, FileSpreadsheet, Trash2, CheckCircle2, Plus, Maximize2
 } from 'lucide-react';
 
 const API_BASE = '';
-const FRONTEND_BUILD_VERSION = '2026-05-25-system-time-toggle-01';
+const FRONTEND_BUILD_VERSION = '2026-05-25-duration-scale-01';
 const CHART_PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#22C55E', '#EAB308', '#F97316', '#EF4444', '#8B5CF6', '#EC4899', '#64748B'];
 const FLOW_SESSION_GAP_MAX_SECONDS = 2 * 60 * 60;
 const FLOW_MIN_OCCURRENCES = 2;
@@ -198,10 +198,9 @@ const TRANSITION_FRIENDLY_LABELS = {
 const initialKpiData = [
   { id: 1, label: 'Active User Time', value: '-', subtext: 'No data', icon: Clock, color: 'text-slate-400', bg: 'bg-slate-50' },
   { id: 2, label: 'Contributing Users', value: '-', subtext: 'No data', icon: Users, color: 'text-slate-400', bg: 'bg-slate-50' },
-  { id: 3, label: 'Avg User Session', value: '-', subtext: 'No data', icon: Timer, color: 'text-slate-400', bg: 'bg-slate-50' },
-  { id: 4, label: 'Idle Waiting for User', value: '-', subtext: 'No data', icon: Hourglass, color: 'text-slate-400', bg: 'bg-slate-50' },
-  { id: 5, label: 'Rework Rate', value: '-', subtext: 'No data', icon: RefreshCw, color: 'text-slate-400', bg: 'bg-slate-50' },
-  { id: 6, label: 'Auto Closed Sessions', value: '-', subtext: 'No data', icon: AlertTriangle, color: 'text-slate-400', bg: 'bg-slate-50' },
+  { id: 3, label: 'Avg User Action', value: '-', subtext: 'No data', icon: Timer, color: 'text-slate-400', bg: 'bg-slate-50' },
+  { id: 5, label: 'Edit Rate', value: '-', subtext: 'No data', icon: RefreshCw, color: 'text-slate-400', bg: 'bg-slate-50' },
+  { id: 6, label: 'Auto Closed Actions', value: '-', subtext: 'No data', icon: AlertTriangle, color: 'text-slate-400', bg: 'bg-slate-50' },
 ];
 
 async function requestJson(path, options = {}) {
@@ -233,9 +232,33 @@ function toDisplayDate(value) {
 
 function formatDuration(seconds) {
   const safe = Math.max(0, Math.round(Number(seconds) || 0));
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
+  const MINUTE = 60;
+  const HOUR = 60 * MINUTE;
+  const DAY = 24 * HOUR;
+  const MONTH = 24 * DAY; // Requested threshold: over 24 days -> month
+  const YEAR = 12 * MONTH; // Requested threshold: over 12 months -> year
+
+  if (safe > YEAR) {
+    const years = Math.floor(safe / YEAR);
+    const months = Math.floor((safe % YEAR) / MONTH);
+    return `${years}y ${months}mo`;
+  }
+
+  if (safe > MONTH) {
+    const months = Math.floor(safe / MONTH);
+    const days = Math.floor((safe % MONTH) / DAY);
+    return `${months}mo ${days}d`;
+  }
+
+  if (safe > DAY) {
+    const days = Math.floor(safe / DAY);
+    const hours = Math.floor((safe % DAY) / HOUR);
+    return `${days}d ${hours}h`;
+  }
+
+  const h = Math.floor(safe / HOUR);
+  const m = Math.floor((safe % HOUR) / MINUTE);
+  const s = safe % MINUTE;
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
@@ -393,7 +416,7 @@ function buildKpiData(kpis) {
     },
     {
       id: 3,
-      label: 'Avg User Session',
+      label: 'Avg User Action',
       value: kpis.avgUserSessionDisplay || '-',
       subtext: `Med ${kpis.medianSessionDisplay || '-'} · ${kpis.minSessionDisplay || '-'} – ${kpis.maxSessionDisplay || '-'}`,
       icon: Timer,
@@ -401,28 +424,19 @@ function buildKpiData(kpis) {
       bg: 'bg-sky-50',
     },
     {
-      id: 4,
-      label: 'Idle Waiting for User',
-      value: kpis.idleWaitingDisplay || '-',
-      subtext: `${kpis.idlePercentOfCycle?.toFixed(1) || '0.0'}% of cycle time`,
-      icon: Hourglass,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
-    },
-    {
       id: 5,
-      label: 'Rework Rate',
+      label: 'Edit Rate',
       value: kpis.reworkRateDisplay || '0.0%',
-      subtext: `${kpis.reworkSessions || 0} / ${kpis.totalSessions || 0} sessions`,
+      subtext: `${kpis.reworkSessions || 0} edit / ${kpis.totalSessions || 0} actions`,
       icon: RefreshCw,
       color: 'text-violet-600',
       bg: 'bg-violet-50',
     },
     {
       id: 6,
-      label: 'Auto Closed Sessions',
+      label: 'Auto Closed Actions',
       value: String(kpis.autoClosedSessions || 0),
-      subtext: `${kpis.autoClosedRate?.toFixed(1) || '0.0'}% of all sessions`,
+      subtext: `${kpis.autoClosedRate?.toFixed(1) || '0.0'}% of all actions`,
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
@@ -1171,7 +1185,19 @@ const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
     <div className={`space-y-3 ${useScroll ? 'overflow-y-auto no-scrollbar pr-1' : ''}`} style={wrapperStyle}>
       {rows.map((row, idx) => {
         const rawValue = safeNumber(row.value);
-        const width = rawValue <= 0 ? 0 : clampPercent(Math.max((rawValue / maxValue) * 100, 2));
+        const rowMin = Number.isFinite(Number(row.minValue)) ? safeNumber(row.minValue) : null;
+        const rowMax = Number.isFinite(Number(row.maxValue)) ? safeNumber(row.maxValue) : null;
+        const hasRangeScale = rowMin !== null && rowMax !== null && rowMax >= rowMin;
+        let width = rawValue <= 0 ? 0 : clampPercent(Math.max((rawValue / maxValue) * 100, 2));
+        if (hasRangeScale) {
+          const range = Math.max(0, rowMax - rowMin);
+          if (range === 0) {
+            width = rawValue > 0 ? 100 : 0;
+          } else {
+            const ratio = (rawValue - rowMin) / range;
+            width = clampPercent(Math.max(2, ratio * 100));
+          }
+        }
         const color = CHART_PALETTE[idx % CHART_PALETTE.length];
         return (
           <div key={row.id || row.label} className="py-2">
@@ -1183,6 +1209,46 @@ const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
               <div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: color }}></div>
             </div>
             {row.meta ? <div className="mt-1 text-xs text-slate-500">{row.meta}</div> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const FlowDelayComparisonTable = ({ rows, maxVisibleRows = 0 }) => {
+  const maxAvgSeconds = rows.reduce((max, row) => Math.max(max, safeNumber(row.avgSeconds)), 0) || 1;
+  const rowSlotHeight = 78;
+  const useScroll = maxVisibleRows > 0 && rows.length > maxVisibleRows;
+  const wrapperStyle = useScroll ? { maxHeight: `${maxVisibleRows * rowSlotHeight}px` } : undefined;
+
+  return (
+    <div className={`space-y-2.5 ${useScroll ? 'overflow-y-auto no-scrollbar pr-1' : ''}`} style={wrapperStyle}>
+      {rows.map((row, idx) => {
+        const avgSeconds = safeNumber(row.avgSeconds);
+        const relative = avgSeconds <= 0 ? 0 : avgSeconds / maxAvgSeconds;
+        const barWidth = avgSeconds <= 0 ? 0 : Math.max(4, Math.min(100, relative * 100));
+        const color = CHART_PALETTE[idx % CHART_PALETTE.length];
+        return (
+          <div key={row.id || row.label} className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+            <div className="flex items-center justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
+                <div className="font-semibold text-slate-800 truncate">{row.label}</div>
+              </div>
+              <div className="text-sm font-semibold text-slate-900 whitespace-nowrap">
+                {formatDuration(avgSeconds)} avg
+              </div>
+            </div>
+            <div className="mt-2.5 px-1">
+              <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                <span>Min</span>
+                <span>Max</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${barWidth}%`, backgroundColor: color }}></div>
+              </div>
+            </div>
           </div>
         );
       })}
@@ -1361,7 +1427,7 @@ const UserContributionStackChart = ({ rows, maxVisibleRows = 0 }) => {
                 </div>
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                Review {formatDuration(row.review)} | Edit {formatDuration(row.edit)} | Complete {formatDuration(row.complete)} | Rework {formatPercent(row.reworkRate)}
+                Review {formatDuration(row.review)} | Edit {formatDuration(row.edit)} | Complete {formatDuration(row.complete)} | Edit Rate {formatPercent(row.reworkRate)}
               </div>
             </div>
           );
@@ -1450,16 +1516,13 @@ const ReworkMatrixScatterChart = ({ rows, expanded = false }) => {
           const pointRadius = bubbleRadius(row.totalActiveSeconds);
           const color = CHART_PALETTE[idx % CHART_PALETTE.length];
           const shortUserLabel = row.user.length > 14 ? `${row.user.slice(0, 14)}...` : row.user;
-          const placeLabelRight = (px + pointRadius + 86) <= (width - margin.right);
-          const labelX = placeLabelRight
-            ? Math.min(width - margin.right - 6, px + pointRadius + 8)
-            : Math.max(margin.left + 6, px - pointRadius - 8);
-          const labelAnchor = placeLabelRight ? 'start' : 'end';
-          const labelY = Math.max(margin.top + 10, py - pointRadius - 6);
+          const labelX = Math.max(margin.left + 8, Math.min(width - margin.right - 8, px));
+          const labelAnchor = 'middle';
+          const labelY = Math.max(margin.top + 12, py - pointRadius - 8);
           return (
             <g key={row.user}>
               <circle cx={px} cy={py} r={pointRadius} fill={color} opacity="0.8" stroke="#ffffff" strokeWidth="2">
-                <title>{`${row.user} | Avg/Doc ${formatDuration(row.avgTimePerDocSeconds)} | Rework ${formatPercent(row.reworkRate)} | Auto Closed ${formatPercent(row.autoClosedRate)}`}</title>
+                <title>{`${row.user} | Avg/Doc ${formatDuration(row.avgTimePerDocSeconds)} | Edit ${formatPercent(row.reworkRate)} | Auto Closed ${formatPercent(row.autoClosedRate)}`}</title>
               </circle>
               <text x={labelX} y={labelY} textAnchor={labelAnchor} className="fill-slate-700 text-[10px] font-medium">
                 {shortUserLabel}
@@ -1472,7 +1535,7 @@ const ReworkMatrixScatterChart = ({ rows, expanded = false }) => {
           Avg Time per Document
         </text>
         <text transform={`translate(14 ${height / 2}) rotate(-90)`} textAnchor="middle" className="fill-slate-500 text-[11px]">
-          Rework Rate
+          Edit Rate
         </text>
       </svg>
     </div>
@@ -1903,6 +1966,19 @@ function App() {
   }, [documentTree, selectedSheets.length]);
 
   useEffect(() => {
+    const validFiles = new Set(documentTree.map((item) => item.fileName));
+    if (validFiles.size === 0) return;
+    if (activeDocumentFile && validFiles.has(activeDocumentFile)) return;
+
+    const firstSelected = selectedFiles.find((fileName) => validFiles.has(fileName));
+    if (firstSelected) {
+      setActiveDocumentFile(firstSelected);
+      return;
+    }
+    setActiveDocumentFile(documentTree[0].fileName);
+  }, [documentTree, selectedFiles, activeDocumentFile]);
+
+  useEffect(() => {
     const userSet = new Set(userOptions);
     setSelectedUsers((prev) => {
       const next = prev.filter((userName) => userSet.has(userName));
@@ -2187,7 +2263,7 @@ function App() {
     ]);
 
     const statsById = Object.fromEntries(
-      FLOW_INSIGHT_GROUPS.map((group) => [group.id, { totalSeconds: 0, count: 0 }])
+      FLOW_INSIGHT_GROUPS.map((group) => [group.id, { totalSeconds: 0, count: 0, minSeconds: null, maxSeconds: null }])
     );
 
     const addMetric = (metricId, seconds, { capSeconds = FLOW_SESSION_GAP_MAX_SECONDS } = {}) => {
@@ -2196,6 +2272,12 @@ function App() {
       if (capSeconds > 0 && safeSeconds > capSeconds) return;
       statsById[metricId].totalSeconds += safeSeconds;
       statsById[metricId].count += 1;
+      statsById[metricId].minSeconds = statsById[metricId].minSeconds === null
+        ? safeSeconds
+        : Math.min(statsById[metricId].minSeconds, safeSeconds);
+      statsById[metricId].maxSeconds = statsById[metricId].maxSeconds === null
+        ? safeSeconds
+        : Math.max(statsById[metricId].maxSeconds, safeSeconds);
     };
 
     groupedByDocument.forEach((segmentsByDoc) => {
@@ -2309,7 +2391,7 @@ function App() {
 
     // --- Aggregate transitions into groups ---
     const groupStats = FLOW_INSIGHT_GROUPS.map((group) => {
-      const stats = statsById[group.id] || { totalSeconds: 0, count: 0 };
+      const stats = statsById[group.id] || { totalSeconds: 0, count: 0, minSeconds: null, maxSeconds: null };
       return {
         transitionKey: group.id,
         transitionLabel: group.label,
@@ -2317,6 +2399,8 @@ function App() {
         count: stats.count,
         totalSeconds: stats.totalSeconds,
         avgSeconds: stats.count > 0 ? stats.totalSeconds / stats.count : 0,
+        minSeconds: stats.count > 0 ? safeNumber(stats.minSeconds) : 0,
+        maxSeconds: stats.count > 0 ? safeNumber(stats.maxSeconds) : 0,
       };
     });
 
@@ -2406,8 +2490,8 @@ function App() {
       subtitle: '4 key workflow delays',
     },
     matrix: {
-      title: 'Quality vs Rework by User',
-      subtitle: 'Avg time per document versus rework rate',
+      title: 'Quality vs Edit by User',
+      subtitle: 'Avg time per document versus edit rate',
     },
   };
 
@@ -2474,8 +2558,12 @@ function App() {
             id: row.transitionKey,
             label: row.transitionLabel,
             value: row.avgSeconds,
+            minValue: row.minSeconds,
+            maxValue: row.maxSeconds,
             valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
-            meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
+            meta: row.count > 0
+              ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
+              : 'Min - | Max -',
           }))}
           maxVisibleRows={4}
         />
@@ -2488,7 +2576,7 @@ function App() {
           <EmptyState
             icon={Search}
             title="ยังไม่มี Matrix Data"
-            subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Rework Matrix"
+            subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Edit Matrix"
           />
         );
       }
@@ -3069,7 +3157,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {kpiData.map((kpi) => (
                   <div key={kpi.id} className={`bg-white rounded-2xl border border-slate-100 p-5 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] ${loading ? 'opacity-70' : ''}`}>
                     <div className="flex justify-between items-start mb-4">
@@ -3207,7 +3295,7 @@ function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[520px] overflow-hidden">
+                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:min-h-[420px] overflow-hidden">
                   <button
                     onClick={() => setExpandedVisualizationId('flow')}
                     className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -3232,8 +3320,12 @@ function App() {
                             id: row.transitionKey,
                             label: row.transitionLabel,
                             value: row.avgSeconds,
+                            minValue: row.minSeconds,
+                            maxValue: row.maxSeconds,
                             valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
-                            meta: `${row.count} occurrences | total ${formatDuration(row.totalSeconds)}`,
+                            meta: row.count > 0
+                              ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
+                              : 'Min - | Max -',
                           }))}
                           maxVisibleRows={4}
                         />
@@ -3241,7 +3333,7 @@ function App() {
                   </div>
                 </div>
 
-                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:h-[520px] overflow-hidden">
+                <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] p-6 flex flex-col lg:min-h-[420px] overflow-hidden">
                   <button
                     onClick={() => setExpandedVisualizationId('matrix')}
                     className="absolute right-4 top-4 z-10 h-7 w-7 rounded-md border border-slate-200 bg-white/85 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
@@ -3250,15 +3342,15 @@ function App() {
                     <Maximize2 className="w-3.5 h-3.5 mx-auto" />
                   </button>
                   <div className="mb-4 pr-8">
-                    <h2 className="text-lg font-bold text-slate-900">Quality vs Rework by User</h2>
-                    <p className="text-sm text-slate-500">Avg time per document versus rework rate</p>
+                    <h2 className="text-lg font-bold text-slate-900">Quality vs Edit by User</h2>
+                    <p className="text-sm text-slate-500">Avg time per document versus edit rate</p>
                   </div>
                   <div className="space-y-2 flex-1 min-h-0">
                     {matrixRows.length === 0 ? (
                       <EmptyState
                         icon={Search}
                         title="ยังไม่มี Matrix Data"
-                        subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Rework Matrix"
+                        subtitle="ยังไม่พบข้อมูลสำหรับคำนวณ Edit Matrix"
                       />
                     ) : (
                       <ReworkMatrixScatterChart rows={matrixRows} />
