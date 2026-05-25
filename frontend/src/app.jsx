@@ -1929,6 +1929,7 @@ function App() {
       }))
       .sort((a, b) => a.fileName.localeCompare(b.fileName));
   }, [sources, parsedSegments]);
+
   const allDocumentFiles = useMemo(
     () => documentTree.map((item) => item.fileName),
     [documentTree]

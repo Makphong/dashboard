@@ -48,9 +48,8 @@ When Firebase env vars are present:
 - App loads persisted data from Firestore into local SQLite cache on startup.
 - Data changes are synced back to Firestore after upload/sync/delete actions.
 
-Default local SQLite path is `local_dashboard.db` at project root.
-On Vercel/serverless, the SQLite cache defaults to `/tmp/local_dashboard.db` because the deployed project files are read-only.
-Set `LOCAL_DB_PATH` when you want to override the path.
+Default SQLite path is `local_dashboard.db` at project root.
+Set `LOCAL_DB_PATH` when you want to move it to `data/local_dashboard.db` or another path.
 
 ## Deploy on Vercel
 
@@ -60,5 +59,3 @@ Set `LOCAL_DB_PATH` when you want to override the path.
 4. Deploy.
 
 API endpoints stay under `/api/*`, and frontend is served from `/`.
-
-For persistent uploads and Google Sheet connections on Vercel, configure Firebase/Firestore env vars. Without Firestore, `/tmp` is writable but temporary and may reset when the serverless instance is recycled.
