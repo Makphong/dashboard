@@ -1,0 +1,5 @@
+File Name,Page Name,Row Number,Change Type,Changed Value,From Value,To Value,Event Time,Actor Type,Actor Name,Statement Type
+sample_small.xlsx,Sheet1,1,Spread Status,Status,Uploading,Processing,2026-05-20T09:00:00Z,System,System,Balance Sheet
+sample_small.xlsx,Sheet1,2,Spread Status,Status,Processing,Pending Review by Moodys,2026-05-20T09:05:00Z,System,System,Balance Sheet
+sample_small.xlsx,Sheet1,3,Spread Status,Status,Pending Review by Moodys,In Review by Moodys,2026-05-20T09:10:00Z,User,Reviewer A,Balance Sheet
+sample_small.xlsx,Sheet1,4,Spread Status,Status,In Review by Moodys,Completed,2026-05-20T09:20:00Z,User,Reviewer A,Balance Sheet

@@ -149,3 +149,27 @@ This file must be read before making any code change.
   - If full-file recovery is required, verify first 10 lines immediately after restore before any further edits.
   - When Git lock/permission errors occur, switch to read-only `git show HEAD:<file>` restoration workflow and re-validate encoding.
 
+- Incident: `ARCHITECTURE_REFACTOR_PLAN.md` was accidentally double-encoded while updating Phase checkboxes in shell.
+- Root cause:
+  - Used a shell rewrite flow that re-encoded UTF text in a non-UTF-safe path.
+  - Tried line-based rewrite first, which amplified mojibake in Thai sections.
+- Prevention rule:
+  - For multilingual markdown, do not use shell-wide rewrite for checklist updates; prefer `apply_patch` with minimal hunks.
+  - If encoding damage occurs, restore exact bytes from Git object (`git show HEAD:<file>`) before applying any new edits.
+  - Validate with both Thai-mojibake scan and a Unicode sanity check immediately after recovery.
+
+## Encoding Recurrence RCA (2026-05-26)
+- Why this happened again even after prior notes:
+  - Previous prevention was too narrow (focused on a specific file incident), but did not explicitly ban risky shell piping patterns.
+  - A nested shell pattern was used: `@' ... '@ | powershell -NoProfile -Command -`.
+  - Reproduction proves this pattern can destroy non-ASCII text (`Thai -> ?`) when script text crosses shell/stdin encoding boundaries.
+  - Terminal mojibake view from `Get-Content` can be a display/codepage issue; treating that rendered output as source text causes real corruption on rewrite.
+- Mandatory prevention (hard rules):
+  - Never use nested PowerShell stdin piping for multilingual content rewrites.
+  - For multilingual markdown (`*.md` with Thai/Unicode), use `apply_patch` only for targeted edits.
+  - If full restore is required, restore raw bytes from Git object first (`git show HEAD:<file>` -> bytes write), then patch minimal lines.
+  - After each markdown edit, run immediate Unicode sanity check (do not wait until task end):
+    - verify file still contains expected Thai range
+    - verify no mojibake markers (`Ã`, `à¸`, `à¹`)
+  - If sanity check fails, stop further edits and restore before continuing.
+

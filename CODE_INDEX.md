@@ -446,6 +446,10 @@ Flask app factory with routes:
 - 2026-05-26: Added `Feedback Log` entry in `CODER_BRAIN.md` for:
   - encoding corruption incident handling (`CODE_INDEX.md`)
   - Git lock/permission fallback workflow
+- 2026-05-26: Added recurrence RCA in `CODER_BRAIN.md` for encoding issue:
+  - root cause expanded to nested PowerShell stdin pipeline (`@'... '@ | powershell -Command -`)
+  - added hard rule to use `apply_patch` only for multilingual markdown edits
+  - added immediate post-edit Unicode sanity check gate
 
 ---
 
@@ -457,3 +461,34 @@ Flask app factory with routes:
   - dependency artifacts (`node_modules/`, lockfiles)
   - local data/binaries (`*.db`, `local_dashboard.db`, image/video/archive binaries)
   - VCS/editor/deploy metadata (`.git/`, `.vscode/`, `.vercel/`)
+
+---
+
+## Phase 0 Execution Log
+
+- `2026-05-26`: Started and executed Phase 0 baseline setup from `ARCHITECTURE_REFACTOR_PLAN.md`.
+- `2026-05-26`: Team confirmation received; Phase 0 marked complete in `ARCHITECTURE_REFACTOR_PLAN.md`.
+- Generated artifacts under `artifacts/phase0/`:
+  - `README.md`
+  - `baseline_api/` (`/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug` + manifest/hash)
+  - `metrics_lock.json`
+  - `sample_data/sample_small_replay.csv`
+  - `sample_data/sample_medium_replay.csv`
+  - `smoke_checklist.md`
+  - `assumptions.md`
+  - `regression_policy.md`
+  - `regression_log.md`
+
+---
+
+## Phase 1 Execution Log
+
+- `2026-05-26`: Executed Phase 1 from `ARCHITECTURE_REFACTOR_PLAN.md` and marked checklist + exit criteria complete.
+- Security/API changes:
+  - `backend/app/api.py`: static allowlist + traversal protection + API/static separation + write endpoint auth guard + upload size/shape limits
+  - `vercel.json`: route allowlist for static assets and explicit API routing before SPA fallback
+  - `README.md`: production auth setup (`DASHBOARD_WRITE_TOKEN`) and upload guard env vars
+- Validation summary:
+  - Flask test-client smoke checks passed for `/api/health`, `/api/sources`, `/api/user-performance`, `/frontend/src/app.jsx`, SPA fallback route
+  - Traversal/static block checks returned `404` as expected (`/README.md`, `/..%2FREADME.md`)
+  - With `DASHBOARD_WRITE_TOKEN` set: write endpoint without token returned `401`, with valid bearer token returned success

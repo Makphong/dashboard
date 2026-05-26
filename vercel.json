@@ -12,8 +12,16 @@
       "dest": "/api/index.py"
     },
     {
-      "src": "/frontend/src/app.jsx",
-      "dest": "/frontend/src/app.jsx"
+      "src": "/frontend/src/(.*\\.(?:js|jsx|mjs|css|json|map))",
+      "dest": "/frontend/src/$1"
+    },
+    {
+      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
     },
     {
       "src": "/(.*)",

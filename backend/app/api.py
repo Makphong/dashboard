@@ -1,20 +1,201 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
+import binascii
+import hmac
+import os
 from http import HTTPStatus
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from flask import Flask, jsonify, request, send_from_directory
 
 from . import core
 
 PROJECT_ROOT = core.PROJECT_ROOT
-FRONTEND_SRC_DIR = PROJECT_ROOT / "frontend" / "src"
+WRITE_TOKEN_ENV_NAME = "DASHBOARD_WRITE_TOKEN"
+MAX_UPLOAD_REQUEST_BODY_BYTES = 40 * 1024 * 1024
+MAX_UPLOAD_TOTAL_DECODED_BYTES = 25 * 1024 * 1024
+MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_FILES = 10
+UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
+ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest"}
+FRONTEND_STATIC_PREFIX = "frontend/src/"
+FRONTEND_STATIC_EXTENSIONS = {".js", ".jsx", ".mjs", ".css", ".json", ".map"}
+
+
+class RequestLimitError(ValueError):
+    """Raised when request size exceeds configured limits."""
+
+
+def _int_env(name: str, default_value: int) -> int:
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return default_value
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default_value
+    return parsed if parsed > 0 else default_value
+
+
+def _configured_write_token() -> str:
+    return os.getenv(WRITE_TOKEN_ENV_NAME, "").strip()
+
+
+def _extract_write_token_from_request() -> str:
+    authorization = request.headers.get("Authorization", "").strip()
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return (
+        request.headers.get("X-Write-Token", "").strip()
+        or request.headers.get("X-API-Key", "").strip()
+    )
+
+
+def _require_write_auth():
+    expected_token = _configured_write_token()
+    if not expected_token:
+        return None
+
+    provided_token = _extract_write_token_from_request()
+    if provided_token and hmac.compare_digest(provided_token, expected_token):
+        return None
+
+    return (
+        jsonify(
+            {
+                "error": (
+                    "Unauthorized write request. Provide Authorization: Bearer <token> "
+                    "or X-Write-Token header."
+                )
+            }
+        ),
+        HTTPStatus.UNAUTHORIZED,
+    )
+
+
+def _normalize_relative_url_path(url_path: str) -> str | None:
+    if not isinstance(url_path, str):
+        return None
+
+    normalized = PurePosixPath(url_path.strip().lstrip("/")).as_posix()
+    if not normalized:
+        return None
+
+    path_parts = PurePosixPath(normalized).parts
+    if any(part in ("", ".", "..") for part in path_parts):
+        return None
+    if "\\" in normalized or ":" in normalized:
+        return None
+
+    return normalized
+
+
+def _is_allowed_static_path(normalized_path: str) -> bool:
+    if normalized_path in ROOT_STATIC_ALLOWLIST:
+        return True
+    if normalized_path.startswith(FRONTEND_STATIC_PREFIX):
+        suffix = Path(normalized_path).suffix.lower()
+        return suffix in FRONTEND_STATIC_EXTENSIONS
+    return False
+
+
+def _resolve_static_file(url_path: str) -> Path | None:
+    normalized_path = _normalize_relative_url_path(url_path)
+    if not normalized_path or not _is_allowed_static_path(normalized_path):
+        return None
+
+    candidate = (PROJECT_ROOT / normalized_path).resolve()
+    try:
+        candidate.relative_to(PROJECT_ROOT)
+    except ValueError:
+        return None
+
+    return candidate if candidate.is_file() else None
+
+
+def _serve_static_file(url_path: str):
+    static_file = _resolve_static_file(url_path)
+    if static_file is None:
+        return None
+
+    mimetype = (
+        "application/javascript"
+        if static_file.suffix.lower() in {".js", ".jsx", ".mjs"}
+        else None
+    )
+    return send_from_directory(static_file.parent, static_file.name, mimetype=mimetype)
+
+
+def _validate_upload_payload(
+    payload: object,
+    *,
+    max_files: int,
+    max_file_bytes: int,
+    max_total_bytes: int,
+) -> list[tuple[str, bytes]]:
+    if not isinstance(payload, dict):
+        raise ValueError("Request body must be a JSON object.")
+
+    files = payload.get("files")
+    if not isinstance(files, list) or not files:
+        raise ValueError("Request must include files[].")
+    if len(files) > max_files:
+        raise RequestLimitError(f"Too many files. Maximum is {max_files}.")
+
+    decoded_files: list[tuple[str, bytes]] = []
+    total_decoded_bytes = 0
+    for index, item in enumerate(files):
+        if not isinstance(item, dict):
+            raise ValueError(f"files[{index}] must be an object.")
+
+        name = str(item.get("name", "")).strip()
+        content_base64 = item.get("contentBase64")
+        if not name or not isinstance(content_base64, str) or not content_base64.strip():
+            raise ValueError(f"files[{index}] must include 'name' and 'contentBase64'.")
+
+        suffix = Path(name).suffix.lower()
+        if suffix not in UPLOAD_ALLOWED_EXTENSIONS:
+            allowed_suffixes = ", ".join(sorted(UPLOAD_ALLOWED_EXTENSIONS))
+            raise ValueError(
+                f"files[{index}] has unsupported extension '{suffix}'. Allowed: {allowed_suffixes}."
+            )
+
+        try:
+            binary = base64.b64decode(content_base64, validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError(f"files[{index}] has invalid base64 content.") from None
+
+        if not binary:
+            raise ValueError(f"files[{index}] is empty after decode.")
+        if len(binary) > max_file_bytes:
+            raise RequestLimitError(
+                f"files[{index}] exceeds max file size ({max_file_bytes} bytes)."
+            )
+
+        total_decoded_bytes += len(binary)
+        if total_decoded_bytes > max_total_bytes:
+            raise RequestLimitError(
+                f"Decoded payload exceeds max total size ({max_total_bytes} bytes)."
+            )
+
+        decoded_files.append((name, binary))
+
+    return decoded_files
 
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
     core.init_db()
+
+    max_upload_request_body_bytes = _int_env(
+        "DASHBOARD_MAX_UPLOAD_REQUEST_BODY_BYTES", MAX_UPLOAD_REQUEST_BODY_BYTES
+    )
+    max_upload_total_decoded_bytes = _int_env(
+        "DASHBOARD_MAX_UPLOAD_TOTAL_DECODED_BYTES", MAX_UPLOAD_TOTAL_DECODED_BYTES
+    )
+    max_upload_file_bytes = _int_env("DASHBOARD_MAX_UPLOAD_FILE_BYTES", MAX_UPLOAD_FILE_BYTES)
+    max_upload_files = _int_env("DASHBOARD_MAX_UPLOAD_FILES", MAX_UPLOAD_FILES)
 
     @app.after_request
     def add_no_cache_headers(response):
@@ -45,29 +226,38 @@ def create_app() -> Flask:
 
     @app.post("/api/upload")
     def api_upload():
+        auth_error = _require_write_auth()
+        if auth_error is not None:
+            return auth_error
+
         try:
-            payload = request.get_json(silent=True) or {}
-            files = payload.get("files", [])
-            if not isinstance(files, list) or not files:
-                raise ValueError("Request must include files[]")
+            content_length = request.content_length or 0
+            if content_length > max_upload_request_body_bytes:
+                raise RequestLimitError(
+                    f"Request body exceeds limit ({max_upload_request_body_bytes} bytes)."
+                )
 
-            uploaded = []
-            for item in files:
-                if not isinstance(item, dict):
-                    continue
-                name = str(item.get("name", "")).strip()
-                content_b64 = item.get("contentBase64")
-                if not name or not content_b64:
-                    continue
-                binary = base64.b64decode(content_b64)
-                uploaded.append(core.ingest_file(name, binary))
+            payload = request.get_json(silent=True)
+            files = _validate_upload_payload(
+                payload,
+                max_files=max_upload_files,
+                max_file_bytes=max_upload_file_bytes,
+                max_total_bytes=max_upload_total_decoded_bytes,
+            )
 
+            uploaded = [core.ingest_file(name, binary) for name, binary in files]
             return jsonify({"uploaded": uploaded, "sources": core.list_sources()})
+        except RequestLimitError as exc:
+            return jsonify({"error": str(exc)}), HTTPStatus.REQUEST_ENTITY_TOO_LARGE
         except Exception as exc:  # pragma: no cover - runtime path
             return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
 
     @app.post("/api/gsheet/connect")
     def api_gsheet_connect():
+        auth_error = _require_write_auth()
+        if auth_error is not None:
+            return auth_error
+
         try:
             payload = request.get_json(silent=True) or {}
             url = str(payload.get("url", "")).strip()
@@ -88,6 +278,10 @@ def create_app() -> Flask:
 
     @app.post("/api/gsheet/sync")
     def api_gsheet_sync():
+        auth_error = _require_write_auth()
+        if auth_error is not None:
+            return auth_error
+
         try:
             results = core.sync_all_gsheets()
             return jsonify(
@@ -102,6 +296,10 @@ def create_app() -> Flask:
 
     @app.delete("/api/sources/<path:source_id>")
     def api_source_delete(source_id: str):
+        auth_error = _require_write_auth()
+        if auth_error is not None:
+            return auth_error
+
         source_id = source_id.strip()
         if not source_id:
             return jsonify({"error": "Missing source id"}), HTTPStatus.BAD_REQUEST
@@ -110,6 +308,10 @@ def create_app() -> Flask:
 
     @app.delete("/api/gsheet/<path:connection_id>")
     def api_gsheet_delete(connection_id: str):
+        auth_error = _require_write_auth()
+        if auth_error is not None:
+            return auth_error
+
         connection_id = connection_id.strip()
         if not connection_id:
             return jsonify({"error": "Missing connection id"}), HTTPStatus.BAD_REQUEST
@@ -128,19 +330,23 @@ def create_app() -> Flask:
 
     @app.get("/frontend/src/<path:filename>")
     def web_frontend_src(filename: str):
-        mimetype = "application/javascript" if filename.endswith(".jsx") else None
-        return send_from_directory(FRONTEND_SRC_DIR, filename, mimetype=mimetype)
+        static_response = _serve_static_file(f"frontend/src/{filename}")
+        if static_response is None:
+            return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
+        return static_response
 
     @app.get("/<path:filename>")
     def web_static(filename: str):
-        if filename.startswith("api/"):
+        head_segment = filename.split("/", 1)[0].lower()
+        if head_segment == "api":
             return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
 
-        target_path = PROJECT_ROOT / filename
-        if target_path.is_file():
-            parent_dir = target_path.parent
-            mimetype = "application/javascript" if target_path.suffix == ".jsx" else None
-            return send_from_directory(parent_dir, target_path.name, mimetype=mimetype)
+        static_response = _serve_static_file(filename)
+        if static_response is not None:
+            return static_response
+
+        if "." in Path(filename).name:
+            return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
 
         return send_from_directory(PROJECT_ROOT, "index.html")
 

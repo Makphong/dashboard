@@ -32,6 +32,31 @@
 3. Open:
    `http://localhost:8000/`
 
+## Write Endpoint Authentication (Production)
+
+The backend now supports token guard for write endpoints:
+- `POST /api/upload`
+- `POST /api/gsheet/connect`
+- `POST /api/gsheet/sync`
+- `DELETE /api/sources/<id>`
+- `DELETE /api/gsheet/<id>`
+
+Set `DASHBOARD_WRITE_TOKEN` in production to enforce authentication on these endpoints.
+
+Send either header format:
+- `Authorization: Bearer <token>`
+- `X-Write-Token: <token>` (or `X-API-Key`)
+
+If `DASHBOARD_WRITE_TOKEN` is not set, write endpoints remain open for local/dev compatibility.
+
+### Optional Upload Safety Limits
+
+You can tune upload guards with env vars:
+- `DASHBOARD_MAX_UPLOAD_REQUEST_BODY_BYTES` (default: `41943040`)
+- `DASHBOARD_MAX_UPLOAD_TOTAL_DECODED_BYTES` (default: `26214400`)
+- `DASHBOARD_MAX_UPLOAD_FILE_BYTES` (default: `10485760`)
+- `DASHBOARD_MAX_UPLOAD_FILES` (default: `10`)
+
 ## Firebase Firestore Setup
 
 Set environment variables (see `.env.example`):

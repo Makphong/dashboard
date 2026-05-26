@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-05-26T00:10:46.860544+00:00",
+  "tool": "flask_test_client",
+  "endpoints": {
+    "/api/health": {
+      "statusCode": 200,
+      "file": "artifacts/phase0/baseline_api/api_health.json",
+      "sha256": "fab41234948f866db66f31e15ecbf5983982e3727b81f9584ffdc671c648e003",
+      "canonicalSizeBytes": 281
+    },
+    "/api/sources": {
+      "statusCode": 200,
+      "file": "artifacts/phase0/baseline_api/api_sources.json",
+      "sha256": "05e72194753907bdd789599d9890e6dd7e4261eea042a8ce9fbd8c1d62053723",
+      "canonicalSizeBytes": 624
+    },
+    "/api/user-performance": {
+      "statusCode": 200,
+      "file": "artifacts/phase0/baseline_api/api_user_performance.json",
+      "sha256": "095942d29c70fc33a34c1e0bd6136e78d5de4b6afe533dcb7b07fe600e4a44a5",
+      "canonicalSizeBytes": 674523
+    },
+    "/api/debug": {
+      "statusCode": 200,
+      "file": "artifacts/phase0/baseline_api/api_debug.json",
+      "sha256": "b55d5705aac6d466ab36fdbbc2162d86cf4494892a74c0eabadf9fd9d2c86129",
+      "canonicalSizeBytes": 2154
+    }
+  }
+}

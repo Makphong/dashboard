@@ -11,8 +11,8 @@ Purpose: ใช้เป็นแผนลงมือแก้โครงส�
 
 ## Phase Progress
 
-- [ ] Phase 0 - Baseline and Safety Net
-- [ ] Phase 1 - Security Boundary and API Hardening
+- [x] Phase 0 - Baseline and Safety Net
+- [x] Phase 1 - Security Boundary and API Hardening
 - [ ] Phase 2 - Backend Modularization (No Behavior Change)
 - [ ] Phase 3 - Frontend Decomposition (No UI Behavior Change)
 - [ ] Phase 4 - Test and Quality Gates
@@ -22,7 +22,7 @@ Purpose: ใช้เป็นแผนลงมือแก้โครงส�
 
 ## Phase 0 - Baseline and Safety Net
 
-Goal: ล็อก baseline ก่อน refactor เพื่อเทียบผลได้ทุกครั้ง
+Goal: Lock baseline before refactor so every later phase can be compared precisely.
 
 Scope:
 - Backend API responses
@@ -30,16 +30,30 @@ Scope:
 - Performance payload shape
 
 Checklist:
-- [ ] เก็บ baseline ของ `/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug`
-- [ ] เก็บ sample data อย่างน้อย 2 ชุด (เล็ก/กลาง) สำหรับ replay
-- [ ] ทำ smoke checklist หน้า UI หลัก (filter, timeline, charts, upload/delete)
-- [ ] ระบุ metrics ที่ต้องคงเดิม (เช่น `kpis`, จำนวน `segments`, `sourceSummary`)
-- [ ] ตั้งกติกา regression log ไว้ในงานทุกเฟส
-- [ ] บันทึก assumptions ที่มีผลต่อการ refactor
+- [x] Captured baseline for `/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug`
+- [x] Prepared at least 2 replay sample datasets (small/medium)
+- [x] Created UI smoke checklist for key flows (filter, timeline, charts, upload/delete)
+- [x] Locked metrics that must stay stable (`kpis`, `segments`, `sourceSummary`, parse stats)
+- [x] Defined regression log policy for all next phases
+- [x] Documented assumptions that affect refactor interpretation
 
 Exit Criteria:
-- [ ] มี baseline artifacts พร้อมเทียบก่อน-หลัง
-- [ ] ทีมเห็นตรงกันว่า baseline ใช้ตรวจ regression ได้จริง
+- [x] Baseline artifacts exist and are ready for before/after comparisons
+- [x] Team confirms the baseline is sufficient for regression validation
+
+Artifacts:
+- `artifacts/phase0/baseline_api/baseline_manifest.json`
+- `artifacts/phase0/baseline_api/api_health.json`
+- `artifacts/phase0/baseline_api/api_sources.json`
+- `artifacts/phase0/baseline_api/api_user_performance.json`
+- `artifacts/phase0/baseline_api/api_debug.json`
+- `artifacts/phase0/metrics_lock.json`
+- `artifacts/phase0/sample_data/sample_small_replay.csv`
+- `artifacts/phase0/sample_data/sample_medium_replay.csv`
+- `artifacts/phase0/smoke_checklist.md`
+- `artifacts/phase0/assumptions.md`
+- `artifacts/phase0/regression_policy.md`
+- `artifacts/phase0/regression_log.md`
 
 ---
 
@@ -53,18 +67,18 @@ Scope Files:
 - `README.md` (เฉพาะส่วน deployment/security notes)
 
 Checklist:
-- [ ] ปรับ static serving ให้ไม่สามารถ path traversal ได้
-- [ ] จำกัดไฟล์ static ที่อนุญาตให้เสิร์ฟ (allowlist)
-- [ ] แยก route API ออกจาก fallback static ให้ชัดเจน
-- [ ] เพิ่ม auth guard สำหรับ endpoint ที่แก้ข้อมูล (`upload`, `sync`, `delete`, `connect`)
-- [ ] เพิ่ม request size/shape guard ขั้นพื้นฐานใน endpoint upload
-- [ ] ทดสอบว่า dev/local flow ยังใช้ได้ตามเดิม
-- [ ] อัปเดตเอกสารวิธีตั้งค่า auth สำหรับ production
+- [x] ปรับ static serving ให้ไม่สามารถ path traversal ได้
+- [x] จำกัดไฟล์ static ที่อนุญาตให้เสิร์ฟ (allowlist)
+- [x] แยก route API ออกจาก fallback static ให้ชัดเจน
+- [x] เพิ่ม auth guard สำหรับ endpoint ที่แก้ข้อมูล (`upload`, `sync`, `delete`, `connect`)
+- [x] เพิ่ม request size/shape guard ขั้นพื้นฐานใน endpoint upload
+- [x] ทดสอบว่า dev/local flow ยังใช้ได้ตามเดิม
+- [x] อัปเดตเอกสารวิธีตั้งค่า auth สำหรับ production
 
 Exit Criteria:
-- [ ] ช่องเสี่ยง file traversal ถูกปิด
-- [ ] write endpoints มีชั้นป้องกันขั้นต่ำ
-- [ ] smoke test เดิมผ่านครบ
+- [x] ช่องเสี่ยง file traversal ถูกปิด
+- [x] write endpoints มีชั้นป้องกันขั้นต่ำ
+- [x] smoke test เดิมผ่านครบ
 
 ---
 
