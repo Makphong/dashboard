@@ -13,7 +13,7 @@ Purpose: ใช้เป็นแผนลงมือแก้โครงส�
 
 - [x] Phase 0 - Baseline and Safety Net
 - [x] Phase 1 - Security Boundary and API Hardening
-- [ ] Phase 2 - Backend Modularization (No Behavior Change)
+- [x] Phase 2 - Backend Modularization (No Behavior Change)
 - [ ] Phase 3 - Frontend Decomposition (No UI Behavior Change)
 - [ ] Phase 4 - Test and Quality Gates
 - [ ] Phase 5 - Data and Configuration Hygiene + Final Cleanup
@@ -94,20 +94,30 @@ Scope Target Structure (proposed):
 - `backend/app/services/sync/`
 - `backend/app/contracts/` (constants/types)
 
+Completion Status (2026-05-26):
+- [x] Split DB access and schema init from `core.py`
+- [x] Split parser (`xlsx/csv`) into `backend/app/parsers/`
+- [x] Split segmentation + event normalization engine into `backend/app/services/segmentation/`
+- [x] Split response aggregation (`compute_user_performance`) into `backend/app/services/analytics/`
+- [x] Reduced duplicate API payload assembly between Flask routes and standalone handler
+- [x] Preserved API contract for `/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug`
+- [x] Baseline/metrics lock checks matched Phase 0 artifacts
+- Note: this completion block is the canonical Phase 2 status.
+
 Checklist:
 - [x] แยก DB access และ schema init ออกจาก core monolith
-- [ ] แยก parser (`xlsx/csv`) ออกจาก analytics logic
-- [ ] แยก segmentation engine เป็นโมดูลเฉพาะ
-- [ ] แยก response aggregation (`compute_user_performance`) เป็น service layer
+- [x] แยก parser (`xlsx/csv`) ออกจาก analytics logic
+- [x] แยก segmentation engine เป็นโมดูลเฉพาะ
+- [x] แยก response aggregation (`compute_user_performance`) เป็น service layer
 - [x] รวมแหล่ง schema definition ให้เหลือ single source-of-truth
-- [ ] ลด logic ซ้ำระหว่าง Flask routes กับ standalone HTTP handler
-- [ ] คง API contract เดิม (keys, field names, data types)
-- [ ] เทียบ baseline จาก Phase 0 แล้วต้องตรง
+- [x] ลด logic ซ้ำระหว่าง Flask routes กับ standalone HTTP handler
+- [x] คง API contract เดิม (keys, field names, data types)
+- [x] เทียบ baseline จาก Phase 0 แล้วต้องตรง
 
 Exit Criteria:
-- [ ] โมดูล backend แยกตาม responsibility ชัดเจน
-- [ ] API output เทียบ baseline ผ่าน
-- [ ] ไม่มี behavior drift ใน KPI/segments
+- [x] โมดูล backend แยกตาม responsibility ชัดเจน
+- [x] API output เทียบ baseline ผ่าน
+- [x] ไม่มี behavior drift ใน KPI/segments
 
 ---
 

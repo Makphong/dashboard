@@ -210,7 +210,7 @@ def create_app() -> Flask:
 
     @app.get("/api/sources")
     def api_sources():
-        return jsonify({"sources": core.list_sources()})
+        return jsonify(core.api_sources_payload())
 
     @app.get("/api/debug")
     def api_debug():
@@ -222,7 +222,7 @@ def create_app() -> Flask:
 
     @app.get("/api/gsheet/connections")
     def api_gsheet_connections():
-        return jsonify({"connections": core.list_gsheet_connections()})
+        return jsonify(core.api_gsheet_connections_payload())
 
     @app.post("/api/upload")
     def api_upload():
@@ -245,8 +245,7 @@ def create_app() -> Flask:
                 max_total_bytes=max_upload_total_decoded_bytes,
             )
 
-            uploaded = [core.ingest_file(name, binary) for name, binary in files]
-            return jsonify({"uploaded": uploaded, "sources": core.list_sources()})
+            return jsonify(core.api_upload_payload(files))
         except RequestLimitError as exc:
             return jsonify({"error": str(exc)}), HTTPStatus.REQUEST_ENTITY_TOO_LARGE
         except Exception as exc:  # pragma: no cover - runtime path
@@ -265,14 +264,7 @@ def create_app() -> Flask:
                 raise ValueError(
                     "Request must include a 'url' field with the Google Sheet URL."
                 )
-            result = core.connect_gsheet(url)
-            return jsonify(
-                {
-                    "connected": result,
-                    "connections": core.list_gsheet_connections(),
-                    "sources": core.list_sources(),
-                }
-            )
+            return jsonify(core.api_connect_gsheet_payload(url))
         except Exception as exc:  # pragma: no cover - runtime path
             return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
 
@@ -283,14 +275,7 @@ def create_app() -> Flask:
             return auth_error
 
         try:
-            results = core.sync_all_gsheets()
-            return jsonify(
-                {
-                    "synced": results,
-                    "sources": core.list_sources(),
-                    "connections": core.list_gsheet_connections(),
-                }
-            )
+            return jsonify(core.api_sync_gsheet_payload())
         except Exception as exc:  # pragma: no cover - runtime path
             return jsonify({"error": str(exc)}), HTTPStatus.BAD_REQUEST
 
@@ -303,8 +288,7 @@ def create_app() -> Flask:
         source_id = source_id.strip()
         if not source_id:
             return jsonify({"error": "Missing source id"}), HTTPStatus.BAD_REQUEST
-        core.delete_source(source_id)
-        return jsonify({"ok": True, "sources": core.list_sources()})
+        return jsonify(core.api_delete_source_payload(source_id))
 
     @app.delete("/api/gsheet/<path:connection_id>")
     def api_gsheet_delete(connection_id: str):
@@ -315,14 +299,7 @@ def create_app() -> Flask:
         connection_id = connection_id.strip()
         if not connection_id:
             return jsonify({"error": "Missing connection id"}), HTTPStatus.BAD_REQUEST
-        core.disconnect_gsheet(connection_id)
-        return jsonify(
-            {
-                "ok": True,
-                "connections": core.list_gsheet_connections(),
-                "sources": core.list_sources(),
-            }
-        )
+        return jsonify(core.api_delete_gsheet_payload(connection_id))
 
     @app.get("/")
     def web_index():

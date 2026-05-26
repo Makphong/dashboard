@@ -49,11 +49,11 @@ This file must be read before making any code change.
   - Never report completion while any requested rollback residue remains.
 
 - Mojibake miss root cause:
-  - Detection pattern was too narrow and missed Thai mojibake signatures (`à¸`, `à¹`).
+  - Detection pattern was too narrow and missed Thai mojibake signatures (`\\u00e0\\u00b8`, `\\u00e0\\u00b9`).
   - Replacement approach mixed encodings during repeated patching.
 - Mojibake prevention rule:
   - Always scan with Thai-focused patterns first:
-    - `rg -n "à¸|à¹|Ã|Â|â" --glob "*.js" --glob "*.jsx" --glob "*.ts" --glob "*.tsx" --glob "*.py" --glob "*.md" --glob "*.html" --glob "*.css" .`
+    - `rg -n "\\u00e0\\u00b8|\\u00e0\\u00b9|\\u00c3|\\u00c2|\\u00e2" --glob "*.js" --glob "*.jsx" --glob "*.ts" --glob "*.tsx" --glob "*.py" --glob "*.md" --glob "*.html" --glob "*.css" .`
   - Then run general extended-latin scan:
     - `rg -n --pcre2 "[\\x{00C0}-\\x{017F}]" --glob "*.js" --glob "*.jsx" --glob "*.ts" --glob "*.tsx" --glob "*.py" --glob "*.md" --glob "*.html" --glob "*.css" .`
   - If any match remains, task is not complete.
@@ -166,6 +166,30 @@ This file must be read before making any code change.
   - Before Git-dependent checks, run `Get-Command git -ErrorAction SilentlyContinue` and choose non-git fallback if missing.
   - On Windows, always use `rg --glob` for wildcard filtering and keep positional targets to valid paths.
 
+- Incident: standalone server smoke command failed due malformed `python -c` argument quoting in `Start-Process`.
+- Root cause:
+  - `-ArgumentList` split the inline Python command unexpectedly, producing `SyntaxError: invalid syntax`.
+  - Process cleanup assumed PID always alive, causing noisy stop errors in earlier attempt.
+- Prevention rule:
+  - For `Start-Process python -c ...`, pass each argument explicitly and validate command string with a quick dry-run (`python -c \"print('ok')\"`) before health checks.
+  - Always guard cleanup with `Get-Process -Id <pid> -ErrorAction SilentlyContinue` before `Stop-Process`.
+
+- Incident: attempted to open `test_core_logic.py` from repo root where file path did not exist.
+- Root cause:
+  - Assumed IDE tab path matched repository filesystem path.
+- Prevention rule:
+  - Run a quick file discovery (`rg --files --glob \"*test_core_logic.py\"` or recursive `Get-ChildItem`) before direct reads when path certainty is low.
+
+- Incident: Phase was reported complete but original checklist/exit checkboxes in `ARCHITECTURE_REFACTOR_PLAN.md` remained partially unchecked.
+- Root cause:
+  - Updated completion summary block first, but did not reconcile the legacy checklist/exit criteria lines in the same section.
+- Prevention rule:
+  - When closing a phase, verify all three layers before reporting done:
+    1) phase progress row,
+    2) checklist items,
+    3) exit criteria items.
+  - Run a final checkbox audit with line-targeted read of that phase section before final response.
+
 ## Encoding Recurrence RCA (2026-05-26)
 - Why this happened again even after prior notes:
   - Previous prevention was too narrow (focused on a specific file incident), but did not explicitly ban risky shell piping patterns.
@@ -178,5 +202,5 @@ This file must be read before making any code change.
   - If full restore is required, restore raw bytes from Git object first (`git show HEAD:<file>` -> bytes write), then patch minimal lines.
   - After each markdown edit, run immediate Unicode sanity check (do not wait until task end):
     - verify file still contains expected Thai range
-    - verify no mojibake markers (`Ã`, `à¸`, `à¹`)
+    - verify no mojibake markers (`\\u00c3`, `\\u00e0\\u00b8`, `\\u00e0\\u00b9`)
   - If sanity check fails, stop further edits and restore before continuing.

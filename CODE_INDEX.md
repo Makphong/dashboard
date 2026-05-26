@@ -495,7 +495,7 @@ Flask app factory with routes:
 
 ---
 
-## Phase 2 Execution Log (In Progress)
+## Phase 2 Execution Log (Completed)
 
 - `2026-05-26`: Continued Phase 2 backend modularization with no intended behavior changes.
 - Structural changes completed in this pass:
@@ -506,3 +506,20 @@ Flask app factory with routes:
   - `python -m compileall backend/app` passed.
   - Flask test-client smoke checks passed for `/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug`.
   - Baseline top-level response key set matched Phase 0 artifacts for `api_health`, `api_sources`, `api_user_performance`, `api_debug`.
+- `2026-05-26`: Phase 2 completion pass executed.
+  - Added parser module: `backend/app/parsers/tabular_parser.py`.
+  - Added segmentation service: `backend/app/services/segmentation/engine.py`.
+  - Added analytics service: `backend/app/services/analytics/user_performance.py`.
+  - Added package scaffolding for `backend/app/services/sync/`.
+  - Core now delegates parser/segmentation/analytics runtime paths to modular service files.
+  - Shared API payload builders were introduced in `core.py` and reused by both Flask routes (`api.py`) and standalone handler (`DashboardHandler`) to reduce duplicated response logic.
+  - Metrics lock validation matched Phase 0 for KPI/debug counters and segment count.
+  - Reconciled Phase 2 checklist + exit criteria checkboxes in `ARCHITECTURE_REFACTOR_PLAN.md` so phase status is consistently marked complete in all sections.
+
+### Phase 2 Module Map
+
+- `backend/app/contracts/constants.py`: centralized constants/path/config source
+- `backend/app/db/sqlite_store.py`: DB connection/signature/schema/firestore bootstrap-sync wiring
+- `backend/app/parsers/tabular_parser.py`: XLSX/CSV decode + parse pipeline
+- `backend/app/services/segmentation/engine.py`: normalized events + segmentation engine
+- `backend/app/services/analytics/user_performance.py`: KPI aggregation + debug snapshot payloads

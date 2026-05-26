@@ -55,6 +55,9 @@ from .db.sqlite_store import (
     init_db,
 )
 from .firebase_sync import is_firestore_enabled
+from .parsers import tabular_parser
+from .services.analytics import user_performance as analytics_service
+from .services.segmentation import engine as segmentation_engine
 
 # In-memory caches for expensive reads; invalidated on upload/delete.
 _NORMALIZED_EVENTS_CACHE_SIGNATURE: tuple[int, int] | None = None
@@ -250,6 +253,8 @@ def invalidate_runtime_caches() -> None:
     _NORMALIZED_EVENTS_CACHE_VALUE = None
     _USER_PERFORMANCE_CACHE_SIGNATURE = None
     _USER_PERFORMANCE_CACHE_VALUE = None
+    segmentation_engine.clear_normalized_events_cache()
+    analytics_service.clear_user_performance_cache()
 
 
 
@@ -2273,6 +2278,51 @@ def build_health_payload() -> dict:
     }
 
 
+def api_sources_payload() -> dict:
+    return {"sources": list_sources()}
+
+
+def api_gsheet_connections_payload() -> dict:
+    return {"connections": list_gsheet_connections()}
+
+
+def api_upload_payload(files: list[tuple[str, bytes]]) -> dict:
+    uploaded = [ingest_file(name, binary) for name, binary in files]
+    return {"uploaded": uploaded, **api_sources_payload()}
+
+
+def api_connect_gsheet_payload(url: str) -> dict:
+    result = connect_gsheet(url)
+    return {
+        "connected": result,
+        **api_gsheet_connections_payload(),
+        **api_sources_payload(),
+    }
+
+
+def api_sync_gsheet_payload() -> dict:
+    results = sync_all_gsheets()
+    return {
+        "synced": results,
+        **api_sources_payload(),
+        **api_gsheet_connections_payload(),
+    }
+
+
+def api_delete_source_payload(source_id: str) -> dict:
+    delete_source(source_id)
+    return {"ok": True, **api_sources_payload()}
+
+
+def api_delete_gsheet_payload(connection_id: str) -> dict:
+    disconnect_gsheet(connection_id)
+    return {
+        "ok": True,
+        **api_gsheet_connections_payload(),
+        **api_sources_payload(),
+    }
+
+
 def json_response(
     handler: SimpleHTTPRequestHandler, payload: dict, status: int = 200
 ) -> None:
@@ -2323,25 +2373,11 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
     def _handle_api_get(self, parsed) -> bool:
         if parsed.path == "/api/health":
-            db_exists = DB_PATH.exists()
-            json_response(
-                self,
-                {
-                    "ok": True,
-                    "db": str(DB_PATH.name),
-                    "dbExists": db_exists,
-                    "version": APP_VERSION,
-                    "processId": os.getpid(),
-                    "serverStartedAt": SERVER_STARTED_AT,
-                    "appFileMtime": dt.datetime.fromtimestamp(
-                        Path(__file__).stat().st_mtime
-                    ).isoformat(),
-                },
-            )
+            json_response(self, build_health_payload())
             return True
 
         if parsed.path == "/api/sources":
-            json_response(self, {"sources": list_sources()})
+            json_response(self, api_sources_payload())
             return True
 
         if parsed.path == "/api/debug":
@@ -2353,7 +2389,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             return True
 
         if parsed.path == "/api/gsheet/connections":
-            json_response(self, {"connections": list_gsheet_connections()})
+            json_response(self, api_gsheet_connections_payload())
             return True
 
         return False
@@ -2366,7 +2402,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 if not isinstance(files, list) or not files:
                     raise ValueError("Request must include files[]")
 
-                uploaded = []
+                ingest_files: list[tuple[str, bytes]] = []
                 for item in files:
                     if not isinstance(item, dict):
                         continue
@@ -2375,9 +2411,9 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     if not name or not content_b64:
                         continue
                     binary = base64.b64decode(content_b64)
-                    uploaded.append(ingest_file(name, binary))
+                    ingest_files.append((name, binary))
 
-                json_response(self, {"uploaded": uploaded, "sources": list_sources()})
+                json_response(self, api_upload_payload(ingest_files))
                 return True
             except Exception as exc:
                 json_response(
@@ -2395,15 +2431,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                     raise ValueError(
                         "Request must include a 'url' field with the Google Sheet URL."
                     )
-                result = connect_gsheet(url)
-                json_response(
-                    self,
-                    {
-                        "connected": result,
-                        "connections": list_gsheet_connections(),
-                        "sources": list_sources(),
-                    },
-                )
+                json_response(self, api_connect_gsheet_payload(url))
                 return True
             except Exception as exc:
                 json_response(
@@ -2415,15 +2443,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/gsheet/sync":
             try:
-                results = sync_all_gsheets()
-                json_response(
-                    self,
-                    {
-                        "synced": results,
-                        "sources": list_sources(),
-                        "connections": list_gsheet_connections(),
-                    },
-                )
+                json_response(self, api_sync_gsheet_payload())
                 return True
             except Exception as exc:
                 json_response(
@@ -2441,23 +2461,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             if not source_id:
                 json_response(self, {"error": "Missing source id"}, status=400)
                 return True
-            delete_source(source_id)
-            json_response(self, {"ok": True, "sources": list_sources()})
+            json_response(self, api_delete_source_payload(source_id))
             return True
         if parsed.path.startswith("/api/gsheet/"):
             connection_id = unquote(parsed.path.replace("/api/gsheet/", "", 1)).strip()
             if not connection_id:
                 json_response(self, {"error": "Missing connection id"}, status=400)
                 return True
-            disconnect_gsheet(connection_id)
-            json_response(
-                self,
-                {
-                    "ok": True,
-                    "connections": list_gsheet_connections(),
-                    "sources": list_sources(),
-                },
-            )
+            json_response(self, api_delete_gsheet_payload(connection_id))
             return True
         return False
 
@@ -2487,6 +2498,25 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             json_response(self, {"error": "Not found"}, status=404)
             return
         json_response(self, {"error": "Not found"}, status=404)
+
+
+# Delegate monolith sections to modularized implementations (Phase 2).
+parse_xlsx_bytes = tabular_parser.parse_xlsx_bytes
+decode_csv_payload = tabular_parser.decode_csv_payload
+parse_csv_bytes = tabular_parser.parse_csv_bytes
+parse_uploaded_file = tabular_parser.parse_uploaded_file
+
+build_canonical_map = segmentation_engine.build_canonical_map
+pick_field = segmentation_engine.pick_field
+assign_time_group = segmentation_engine.assign_time_group
+fetch_normalized_events = segmentation_engine.fetch_normalized_events
+build_segments_for_document = segmentation_engine.build_segments_for_document
+countable_segment_seconds = segmentation_engine.countable_segment_seconds
+
+empty_user_performance_response = analytics_service.empty_user_performance_response
+compute_user_performance = analytics_service.compute_user_performance
+build_debug_snapshot = analytics_service.build_debug_snapshot
+build_health_payload = analytics_service.build_health_payload
 
 
 def run_server(port: int) -> None:
