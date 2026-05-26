@@ -95,11 +95,11 @@ Scope Target Structure (proposed):
 - `backend/app/contracts/` (constants/types)
 
 Checklist:
-- [ ] แยก DB access และ schema init ออกจาก core monolith
+- [x] แยก DB access และ schema init ออกจาก core monolith
 - [ ] แยก parser (`xlsx/csv`) ออกจาก analytics logic
 - [ ] แยก segmentation engine เป็นโมดูลเฉพาะ
 - [ ] แยก response aggregation (`compute_user_performance`) เป็น service layer
-- [ ] รวมแหล่ง schema definition ให้เหลือ single source-of-truth
+- [x] รวมแหล่ง schema definition ให้เหลือ single source-of-truth
 - [ ] ลด logic ซ้ำระหว่าง Flask routes กับ standalone HTTP handler
 - [ ] คง API contract เดิม (keys, field names, data types)
 - [ ] เทียบ baseline จาก Phase 0 แล้วต้องตรง

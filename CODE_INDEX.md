@@ -176,7 +176,7 @@ dashboard/
 
 ---
 
-## 🟩 BACKEND — `backend/app/core.py` (2,834 lines)
+## 🟩 BACKEND — `backend/app/core.py` (2,225 lines)
 
 ### Architecture
 - **Framework**: Flask (used via api.py)
@@ -336,7 +336,7 @@ dashboard/
 
 ---
 
-## 🟨 BACKEND — `backend/app/api.py` (151 lines)
+## 🟨 BACKEND — `backend/app/api.py` (285 lines)
 
 Flask app factory with routes:
 
@@ -358,7 +358,7 @@ Flask app factory with routes:
 
 ---
 
-## 🟧 BACKEND — `backend/app/firebase_sync.py` (327 lines)
+## 🟧 BACKEND — `backend/app/firebase_sync.py` (278 lines)
 
 | Line | Function | Purpose |
 |------|----------|---------|
@@ -408,7 +408,7 @@ Flask app factory with routes:
 | Filter logic | `app.jsx` | L2500–2700 (ใน App function) |
 | Data fetch | `app.jsx` | L2850–3000 (useEffect hooks) |
 | Sidebar nav | `app.jsx` | L747–820 (`Sidebar`) |
-| API routes | `api.py` | L1–151 (ทั้งไฟล์) |
+| API routes | `api.py` | L1–285 (ทั้งไฟล์) |
 | File parsing | `core.py` | L573–870 |
 | Segment classification | `core.py` | L1317–1360 (`assign_time_group`) + L1631–2060 |
 | Event normalization | `core.py` | L1359–1530 (`fetch_normalized_events`) |
@@ -417,7 +417,7 @@ Flask app factory with routes:
 | Google Sheets | `core.py` | L868–1200 |
 | Firebase sync | `firebase_sync.py` | ทั้งไฟล์ (327 lines) |
 | Workflow states | `core.py` | L53–65 + L299–342 |
-| DB schema | `core.py` | L522–568 (`init_db`) |
+| DB schema | `db/sqlite_store.py` | L60–104 (`init_db`) |
 
 ---
 
@@ -492,3 +492,17 @@ Flask app factory with routes:
   - Flask test-client smoke checks passed for `/api/health`, `/api/sources`, `/api/user-performance`, `/frontend/src/app.jsx`, SPA fallback route
   - Traversal/static block checks returned `404` as expected (`/README.md`, `/..%2FREADME.md`)
   - With `DASHBOARD_WRITE_TOKEN` set: write endpoint without token returned `401`, with valid bearer token returned success
+
+---
+
+## Phase 2 Execution Log (In Progress)
+
+- `2026-05-26`: Continued Phase 2 backend modularization with no intended behavior changes.
+- Structural changes completed in this pass:
+  - Added `backend/app/contracts/constants.py` and moved path/config/workflow/parser constants out of `core.py`.
+  - Added `backend/app/db/sqlite_store.py` and moved DB connection + signature + schema init + Firestore bootstrap/sync wiring out of `core.py`.
+  - Updated `backend/app/core.py` to import constants and DB primitives from the new modules while keeping existing call-sites/contract shape.
+- Validation completed:
+  - `python -m compileall backend/app` passed.
+  - Flask test-client smoke checks passed for `/api/health`, `/api/sources`, `/api/user-performance`, `/api/debug`.
+  - Baseline top-level response key set matched Phase 0 artifacts for `api_health`, `api_sources`, `api_user_performance`, `api_debug`.

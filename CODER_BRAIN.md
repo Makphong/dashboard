@@ -158,6 +158,14 @@ This file must be read before making any code change.
   - If encoding damage occurs, restore exact bytes from Git object (`git show HEAD:<file>`) before applying any new edits.
   - Validate with both Thai-mojibake scan and a Unicode sanity check immediately after recovery.
 
+- Incident: shell assumptions caused avoidable command errors during Phase 2 continuation.
+- Root cause:
+  - Ran `git status` in an environment where `git` was not available in PATH.
+  - Used invalid Windows argument patterns for `rg` (`*.py`, `test*.py` as direct paths) instead of glob flags.
+- Prevention rule:
+  - Before Git-dependent checks, run `Get-Command git -ErrorAction SilentlyContinue` and choose non-git fallback if missing.
+  - On Windows, always use `rg --glob` for wildcard filtering and keep positional targets to valid paths.
+
 ## Encoding Recurrence RCA (2026-05-26)
 - Why this happened again even after prior notes:
   - Previous prevention was too narrow (focused on a specific file incident), but did not explicitly ban risky shell piping patterns.
@@ -172,4 +180,3 @@ This file must be read before making any code change.
     - verify file still contains expected Thai range
     - verify no mojibake markers (`Ã`, `à¸`, `à¹`)
   - If sanity check fails, stop further edits and restore before continuing.
-
