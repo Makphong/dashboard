@@ -188,9 +188,23 @@ This file must be read before making any code change.
     1) phase progress row,
     2) checklist items,
     3) exit criteria items.
-  - Run a final checkbox audit with line-targeted read of that phase section before final response.
-
-## Encoding Recurrence RCA (2026-05-26)
+## Incident Postmortem (2026-05-26) - Phase 3 White Screen
+- **Incident:** Decomposition of `app.jsx` into multiple files caused a permanent "white screen" on reload.
+- **Root Cause:** 
+  1. **ESM vs JSX:** Browsers can load ESM modules, but they cannot parse JSX syntax inside those modules.
+  2. **Babel Standalone Limitation:** The `<script type="text/babel">` tag only transpiles the entry file. It does *not* intercept or transpile subsequent `import` calls made by that file.
+  3. **Bundler Complexity:** My first two attempts at a backend "Auto-Bundler" failed because they produced syntax errors (duplicate `import` and `export` statements) in a single-file scope.
+- **Solution:** 
+  - Implemented a **Fail-Safe Bundler** in `backend/app/api.py`.
+  - It uses a **Fixed Header** for global library imports (React, Lucide, etc.) to prevent duplicates.
+  - It recursively strips all `import` and `export` keywords from local components and concatenates them into a single monolithic `app.jsx` for the browser.
+- **Analysis (Should we keep it?):** 
+  - **YES, keep the structure.** The new directory structure (`features/`, `components/`, `lib/`) is much more maintainable and follows modern standards.
+  - **The Bundler is necessary:** In a "No Node.js" environment, we cannot have a real build step (Vite/Webpack). The backend bundler is a perfect "Zero-Config" bridge that allows us to write clean code while delivering compatible JS to the browser.
+- **Prevention Rule:**
+  - When refactoring a monolith into multiple JSX files in a No-Node.js project, **always** verify the backend delivery mechanism first.
+  - Never assume a browser can handle JSX `import` statements natively.
+  - If "White Screen" occurs after a file-split, check for `Uncaught SyntaxError: Unexpected token '<'` in the console—this always means JSX was delivered as plain JS.
 - Why this happened again even after prior notes:
   - Previous prevention was too narrow (focused on a specific file incident), but did not explicitly ban risky shell piping patterns.
   - A nested shell pattern was used: `@' ... '@ | powershell -NoProfile -Command -`.

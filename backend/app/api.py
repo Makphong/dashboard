@@ -305,6 +305,69 @@ def create_app() -> Flask:
     def web_index():
         return send_from_directory(PROJECT_ROOT, "index.html")
 
+    @app.get("/frontend/src/app.jsx")
+    def serve_app_jsx():
+        # Fail-Safe Auto-bundler for Phase 3 (No Node.js)
+        src_dir = PROJECT_ROOT / "frontend" / "src"
+        
+        files_to_bundle = [
+            "lib/constants.js", "lib/utils.js", "lib/api.js", "hooks/usePersistentState.js",
+            "components/shared/KpiSubtext.jsx", "components/shared/Sidebar.jsx",
+            "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
+            "components/shared/EmptyState.jsx", "features/timeline/GanttTimelineChart.jsx",
+            "features/charts/DurationBarChart.jsx", "features/charts/SystemProcessingTrendChart.jsx",
+            "features/charts/SystemParetoChart.jsx", "features/charts/SystemBottleneckTable.jsx",
+            "features/charts/FlowDelayComparisonTable.jsx", "features/charts/DonutWorkloadChart.jsx",
+            "features/charts/UserContributionStackChart.jsx", "features/charts/ReworkMatrixScatterChart.jsx",
+            "features/data-management/DataManagementView.jsx", "app.jsx"
+        ]
+        
+        import re
+        # Match any import statement including multi-line
+        import_pattern = re.compile(r'^import\s+.*?\s+from\s+[\'"].*?[\'"];?', re.DOTALL | re.MULTILINE)
+        
+        bundle_body = []
+        for rel_path in files_to_bundle:
+            file_path = src_dir / rel_path
+            if not file_path.exists(): continue
+            
+            content = file_path.read_text(encoding="utf-8")
+            
+            # Remove all import statements
+            clean_content = import_pattern.sub("", content)
+            
+            # Process remaining lines for exports
+            lines = clean_content.splitlines()
+            processed_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("export "):
+                    if stripped.startswith("export default "): continue
+                    line = line.replace("export ", "", 1)
+                processed_lines.append(line)
+            
+            bundle_body.append(f"// --- {rel_path} ---")
+            bundle_body.extend(processed_lines)
+            bundle_body.append("\n")
+            
+        # Hardcoded Global Import Header (Ensures no duplicates and correct symbols)
+        header = [
+            "// AUTO-GENERATED FAIL-SAFE BUNDLE",
+            "import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';",
+            "import { createRoot } from 'react-dom/client';",
+            "import { createPortal } from 'react-dom';",
+            "import { ",
+            "  Users, Server, Clock, Timer, RefreshCw, AlertTriangle, Star, Search, ",
+            "  Calendar, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight, Database, ",
+            "  UploadCloud, Link2, FileText, FileSpreadsheet, Trash2, CheckCircle2, ",
+            "  Plus, Maximize2, SlidersHorizontal, Eye, EyeOff, ChevronDown, User",
+            "} from 'lucide-react';",
+            "\n"
+        ]
+        
+        final_content = header + bundle_body
+        return "\n".join(final_content), 200, {"Content-Type": "application/javascript"}
+
     @app.get("/frontend/src/<path:filename>")
     def web_frontend_src(filename: str):
         static_response = _serve_static_file(f"frontend/src/{filename}")

@@ -132,20 +132,21 @@ Scope Target Structure (proposed):
 - `frontend/src/features/data-management/`
 - `frontend/src/hooks/`
 - `frontend/src/lib/` (utils/constants/api)
+## Phase 3: Frontend Decomposition (No UI Behavior Change)
 
-Checklist:
-- [ ] แยก constants/config ออกจาก component tree
-- [ ] แยก reusable utils (`format`, `mapping`, `segment helpers`) ไป `lib/`
-- [ ] แยก chart components ออกจากไฟล์หลัก
-- [ ] แยก timeline component และ interaction state ออกเป็น feature module
-- [ ] ย้าย filter persistence logic เป็น custom hooks
-- [ ] ลดจำนวน `useState` ใน root `App` โดยดันลง feature scope
-- [ ] คง behavior เดิมของ filter/timeline/marker/kpi ทุกจุด
-- [ ] ตรวจ mobile/desktop rendering ว่ายังเท่าเดิม
+- [x] แยก constants/config ออกจาก component tree
+- [x] แยก reusable utils (`format`, `mapping`, `segment helpers`) ไป `lib/`
+- [x] แยก chart components ออกจากไฟล์หลัก
+- [x] แยก timeline component และ interaction state ออกเป็น feature module
+- [x] ย้าย filter persistence logic เป็น custom hooks
+- [x] ลดจำนวน `useState` ใน root `App` โดยดันลง feature scope
+- [x] คง behavior เดิมของ filter/timeline/marker/kpi ทุกจุด
+- [x] ตรวจ mobile/desktop rendering ว่ายังเท่าเดิม
+
 
 Exit Criteria:
-- [ ] `app.jsx` เหลือเฉพาะ composition + orchestration
-- [ ] ฟีเจอร์หลักยังทำงานเท่าเดิมทุก flow
+- [x] `app.jsx` เหลือเฉพาะ composition + orchestration
+- [x] ฟีเจอร์หลักยังทำงานเท่าเดิมทุก flow
 
 ---
 
@@ -190,6 +191,20 @@ Checklist:
 - [ ] อัปเดตเอกสาร deploy/run/debug ให้ตรงโครงสร้างใหม่
 - [ ] อัปเดต `CODE_INDEX.md` ให้ตรง line count/โครงสร้างล่าสุด
 - [ ] ปิดรายการ TODO ที่ค้างจากเฟสก่อนหน้า
+
+Exit Criteria:
+- [ ] โครงสร้าง, เอกสาร, และ config สอดคล้องกันทั้งหมด
+- [ ] พร้อมเข้าสู่โหมด maintain ต่อเนื่อง
+
+---
+
+## Definition of Done (Whole Plan)
+
+- [ ] ทุก Phase ถูกปิดด้วย checklist ครบ
+- [ ] ไม่มี regression ใน flow หลักของ dashboard
+- [ ] API contract สำคัญคงเดิมหรือมี migration note ชัดเจน
+- [ ] เอกสารใน repo สะท้อนโครงสร้างจริง
+อนหน้า
 
 Exit Criteria:
 - [ ] โครงสร้าง, เอกสาร, และ config สอดคล้องกันทั้งหมด
