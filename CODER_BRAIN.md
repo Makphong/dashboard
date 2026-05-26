@@ -139,3 +139,13 @@ This file must be read before making any code change.
 - If uncertain between 2 interpretations, ask one short clarification.
 - Otherwise assume literal interpretation and execute directly.
 
+## Feedback Log (2026-05-26)
+- Incident: `CODE_INDEX.md` was unintentionally mojibake-corrupted during a date/update write step.
+- Root cause:
+  - Used a text rewrite path that changed encoding after reading content in a non-safe way.
+  - Attempted `git checkout -- CODE_INDEX.md` recovery failed with `.git/index.lock` permission issue in environment.
+- Prevention rule:
+  - For UTF-sensitive markdown files, avoid raw rewrite commands unless strictly needed; prefer targeted `apply_patch`.
+  - If full-file recovery is required, verify first 10 lines immediately after restore before any further edits.
+  - When Git lock/permission errors occur, switch to read-only `git show HEAD:<file>` restoration workflow and re-validate encoding.
+

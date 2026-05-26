@@ -1,7 +1,30 @@
 # 📖 CODE INDEX — สารบัญโค้ด Dashboard
 
 > **วัตถุประสงค์**: ให้ AI อ่านไฟล์นี้ก่อนเมื่อต้องแก้ไขโค้ด แทนการสแกนทั้ง Project → ประหยัด Token  
-> **อัปเดตล่าสุด**: 2026-05-25
+> **อัปเดตล่าสุด**: 2026-05-26
+
+---
+
+## Project Context Snapshot (Cross-Session)
+
+ใช้ section นี้เป็นบริบทสั้นสำหรับ Agent ใหม่เวลาเปลี่ยน chat/session
+
+- Product: Analytics Dashboard for workflow timeline and user/system performance
+- Frontend runtime: React 18 via CDN + Tailwind CDN + Babel in-browser (no Node build)
+- Backend runtime: Flask + SQLite with optional Firestore sync
+- Deploy modes:
+  - Local: `python app.py --port 8000` or `start.ps1`
+  - Vercel: `api/index.py` as serverless entrypoint
+- Main data flow:
+  - Upload/GSheet → parse → `unified_rows` → normalize events → build segments → KPI/charts
+- Single source docs for continuity:
+  - `CODER_BRAIN.md` = strict execution rules + incident lessons
+  - `CODE_INDEX.md` = code map + context + planning artifacts
+  - `ARCHITECTURE_REFACTOR_PLAN.md` = phased refactor checklist
+- Mandatory start order for any new Agent/Session:
+  1. Read `CODER_BRAIN.md`
+  2. Read `CODE_INDEX.md` (this file)
+  3. Confirm `brain-read done | CODE_INDEX checked`
 
 ---
 
@@ -395,3 +418,42 @@ Flask app factory with routes:
 | Firebase sync | `firebase_sync.py` | ทั้งไฟล์ (327 lines) |
 | Workflow states | `core.py` | L53–65 + L299–342 |
 | DB schema | `core.py` | L522–568 (`init_db`) |
+
+---
+
+## Instruction Update Log
+
+- 2026-05-26: Simplified agent instruction docs to mandatory rules only.
+- Updated files: `AGENTS.md`, `CLAUDE.md`, `.gemini/styleguide.md`.
+- Enforced rules:
+  1. Read `CODER_BRAIN.md` and `CODE_INDEX.md` before every task, and follow `CODER_BRAIN.md` strictly.
+  2. Update `CODE_INDEX.md` after every completed task.
+  3. Record feedback in `CODER_BRAIN.md` whenever a request must be repeated due to incorrect execution, or when errors/debug incidents occur.
+- 2026-05-26: Updated all 3 agent instruction files to require reading `.aiignore` before every task and respecting AI ignore rules.
+
+---
+
+## Planning Artifacts
+
+- `ARCHITECTURE_REFACTOR_PLAN.md`
+  - Purpose: phased architecture remediation checklist for step-by-step execution.
+  - Added: 2026-05-26
+
+---
+
+## Brain Feedback Updates
+
+- 2026-05-26: Added `Feedback Log` entry in `CODER_BRAIN.md` for:
+  - encoding corruption incident handling (`CODE_INDEX.md`)
+  - Git lock/permission fallback workflow
+
+---
+
+## AI Ignore Policy
+
+- `2026-05-26`: Added `.aiignore` to reduce AI input-token waste on non-logic files.
+- Primary blocked groups:
+  - caches/build outputs (`__pycache__/`, `build/`, `dist/`, `.next/`, `coverage/`)
+  - dependency artifacts (`node_modules/`, lockfiles)
+  - local data/binaries (`*.db`, `local_dashboard.db`, image/video/archive binaries)
+  - VCS/editor/deploy metadata (`.git/`, `.vscode/`, `.vercel/`)
