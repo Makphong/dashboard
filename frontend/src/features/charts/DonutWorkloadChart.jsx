@@ -115,6 +115,15 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
     ? data.filter(d => d.user === hoveredUser) 
     : data;
 
+  // Stable 6-user view height for the legend (approx 44.5px per row)
+  const maxLegendRows = 6;
+  const legendRowHeight = 44.5; 
+  const legendMaxHeight = maxLegendRows * legendRowHeight;
+  
+  const legendWrapperStyle = !expanded 
+    ? { maxHeight: `${legendMaxHeight}px` } 
+    : undefined;
+
   return (
     <div className={`mt-2 grid grid-cols-1 ${expanded ? 'xl:grid-cols-[1fr_300px] gap-12' : 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-8'} items-start`}>
       {/* SVG Visualization Container */}
@@ -147,7 +156,10 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
       </div>
 
       {/* Interactive Legend (Dual-Mode Focus) */}
-      <div className={`flex flex-col gap-1.5 py-4 ${expanded ? 'max-h-[500px] overflow-y-auto pr-2 custom-scrollbar' : 'max-h-[320px] overflow-y-auto pr-1 no-scrollbar'}`}>
+      <div 
+        className={`flex flex-col gap-1.5 py-4 ${expanded ? 'max-h-[500px] overflow-y-auto pr-2 custom-scrollbar' : 'overflow-y-auto pr-1 no-scrollbar'}`}
+        style={legendWrapperStyle}
+      >
         {legendItems.map((d) => {
           const isFaded = hoverSource === 'legend' && hoveredUser && d.user !== hoveredUser;
           
