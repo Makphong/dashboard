@@ -554,6 +554,8 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
     if (!onSelectSegment) return;
     onSelectSegment({
       lane,
+      userName: segment.userName,
+      actorType: segment.origLane === 'System' ? 'System' : 'User',
       segmentType: segment.segmentType,
       start: segment.start,
       end: segment.end,

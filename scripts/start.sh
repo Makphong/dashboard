@@ -27,7 +27,7 @@ stop_existing_python_on_port() {
 
 # Change to the dashboard directory if we are not in it
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR"
+cd "$DIR/.."
 
 # Install dependencies if needed (optional, but good for first run)
 # pip install -r requirements.txt

@@ -4,23 +4,15 @@
 
 ```text
 .
-|- api/
-|  `- index.py                 # Vercel function entrypoint
-|- backend/
-|  |- main.py                  # Local Python server entry
-|  `- app/
-|     |- api.py                # Flask routes
-|     |- core.py               # Analytics and ingestion core logic
-|     `- firebase_sync.py      # Firestore bridge (SQLite <-> Firestore)
-|- frontend/
-|  `- src/
-|     `- app.jsx               # React dashboard UI
-|- data/
-|  `- local_dashboard.db       # Optional location if LOCAL_DB_PATH is used
-|- app.py                      # Compatibility runner (python app.py)
-|- index.html                  # Web entry (loads frontend/src/app.jsx)
-|- requirements.txt
-`- vercel.json
+|- api/                # Vercel function entrypoint
+|- backend/            # Python backend source
+|- docs/               # Documentation (.md files)
+|- frontend/           # React frontend source
+|- scripts/            # Startup scripts (start.sh, etc.)
+|- app.py              # Main entry point
+|- index.html          # Web entry
+|- requirements.txt    # Dependencies
+`- vercel.json         # Vercel config
 ```
 
 ## Local Run
@@ -28,7 +20,8 @@
 1. Install dependencies:
    `pip install -r requirements.txt`
 2. Start server:
-   `python app.py --port 8000`
+   `python app.py --port 8000` 
+   (or use `./scripts/start.sh`)
 3. Open:
    `http://localhost:8000/`
 

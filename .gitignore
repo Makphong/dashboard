@@ -13,3 +13,5 @@ __pycache__/
 
 # Optional local DB copy
 data/*.db
+local_dashboard.db
+artifacts/

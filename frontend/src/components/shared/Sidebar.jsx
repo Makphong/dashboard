@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  Users, Server, Database, User, X, ChevronLeft, ChevronRight
+  Users, Server, Database, User, X, ChevronLeft, ChevronRight, LayoutDashboard
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, activeView, setActiveView }) => (
-  <aside className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transform transition-all duration-300 ease-in-out flex flex-col
+  <aside className={`fixed inset-y-0 left-0 z-[150] bg-white border-r border-slate-200 transform transition-all duration-300 ease-in-out flex flex-col
     ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
     lg:translate-x-0 ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} lg:static`}>
 
@@ -32,20 +32,21 @@ export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollap
     <div className="p-4 flex-1 overflow-y-auto no-scrollbar">
       {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-3">Dashboards</div>}
       <nav className="space-y-2">
-        <a href="#" onClick={() => setActiveView('user-performance')} className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors
+        <a href="#" onClick={() => setActiveView('dashboard')} className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors
           ${isCollapsed ? 'justify-center px-0' : 'px-3'}
-          ${activeView === 'user-performance' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-100/50 shadow-sm' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`} title="User Performance">
-          <Users className={`w-5 h-5 flex-shrink-0 ${activeView === 'user-performance' ? 'text-blue-600' : ''}`} />
-          {!isCollapsed && <span>User Performance</span>}
+          ${activeView === 'dashboard' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-100/50 shadow-sm' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`} title="Dashboard">
+          <LayoutDashboard className={`w-5 h-5 flex-shrink-0 ${activeView === 'dashboard' ? 'text-blue-600' : ''}`} />
+          {!isCollapsed && <span>Dashboard Overview</span>}
         </a>
         <a
           href="#"
-          onClick={(event) => event.preventDefault()}
-          className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors text-slate-600 hover:bg-slate-50 border border-transparent
-          ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
+          onClick={() => setActiveView('system-performance')}
+          className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors
+          ${isCollapsed ? 'justify-center px-0' : 'px-3'}
+          ${activeView === 'system-performance' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-100/50 shadow-sm' : 'text-slate-600 hover:bg-slate-50 border border-transparent'}`}
           title="System Performance"
         >
-          <Server className="w-5 h-5 flex-shrink-0" />
+          <Server className={`w-5 h-5 flex-shrink-0 ${activeView === 'system-performance' ? 'text-blue-600' : ''}`} />
           {!isCollapsed && <span>System Performance</span>}
         </a>
       </nav>

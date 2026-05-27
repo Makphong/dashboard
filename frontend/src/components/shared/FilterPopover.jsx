@@ -74,7 +74,7 @@ export const FilterPopover = ({
       <button
         onClick={() => setOpenDropdown(isOpen ? '' : id)}
         className={`w-full h-11 rounded-xl border px-3 flex items-center gap-2 transition-colors text-left
-          ${active ? 'bg-blue-50 border-blue-200 shadow-[0_8px_24px_-14px_rgba(37,99,235,0.5)]' : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}
+          ${active ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}
       >
         {Icon ? <Icon className={`w-4 h-4 ${active ? 'text-blue-600' : 'text-slate-400'} shrink-0`} /> : null}
         <div className="min-w-0 flex-1 leading-tight">

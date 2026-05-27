@@ -312,9 +312,12 @@ def create_app() -> Flask:
         
         files_to_bundle = [
             "lib/constants.js", "lib/utils.js", "lib/api.js", "hooks/usePersistentState.js",
+            "hooks/useDashboardData.js",
             "components/shared/KpiSubtext.jsx", "components/shared/Sidebar.jsx",
             "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
-            "components/shared/EmptyState.jsx", "features/timeline/GanttTimelineChart.jsx",
+            "components/shared/EmptyState.jsx", 
+            "features/dashboard/FilterBar.jsx",
+            "features/timeline/GanttTimelineChart.jsx",
             "features/charts/DurationBarChart.jsx", "features/charts/SystemProcessingTrendChart.jsx",
             "features/charts/SystemParetoChart.jsx", "features/charts/SystemBottleneckTable.jsx",
             "features/charts/FlowDelayComparisonTable.jsx", "features/charts/DonutWorkloadChart.jsx",

@@ -43,6 +43,7 @@ coverage/
 
 # Local databases and large data artifacts
 local_dashboard.db
+artifacts
 data/*.db
 *.db
 *.sqlite
