@@ -151,6 +151,11 @@ export const FLOW_INSIGHT_GROUPS = [
     description: '',
   },
   {
+    id: 'processing-round-2-to-user',
+    label: 'Round 2 Processing -> User Action',
+    description: '',
+  },
+  {
     id: 'user-review-edit-to-next-user-step',
     label: 'User Action -> Next User Step',
     description: '',
@@ -158,11 +163,6 @@ export const FLOW_INSIGHT_GROUPS = [
   {
     id: 'upload-to-latest-complete',
     label: 'Upload -> Final Complete',
-    description: '',
-  },
-  {
-    id: 'processing-round-2-to-user',
-    label: 'Round 2 Processing -> User Action',
     description: '',
   },
 ];

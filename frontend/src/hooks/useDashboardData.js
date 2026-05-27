@@ -39,6 +39,7 @@ export function useDashboardData() {
   const [selectedUsers, setSelectedUsers] = usePersistentState('filter_selectedUsers', []);
   const [selectedSegmentTypes, setSelectedSegmentTypes] = usePersistentState('filter_selectedSegmentTypes', []);
   const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', false);
+  const [showWorkloadIdle, setShowWorkloadIdle] = usePersistentState('filter_showWorkloadIdle', false);
   const [showWorkloadSystem, setShowWorkloadSystem] = usePersistentState('filter_showWorkloadSystem', false);
   const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
@@ -344,17 +345,26 @@ export function useDashboardData() {
 
   const workloadContributors = useMemo(() => {
     const laneDurationMap = new Map();
-    ganttVisibleSegments.forEach((segment) => {
+    filteredBaseSegments.forEach((segment) => {
       const segmentType = String(segment.segmentType || '');
       const durationSeconds = safeNumber(segment.durationSeconds);
       if (durationSeconds <= 0) return;
+
+      const isIdle = isIdleContextSegment(segmentType);
+      if (isIdle && !showWorkloadIdle) return;
+      
+      // Respect segment type selection
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
+        if (!segmentType.startsWith('SYSTEM_')) return;
+      }
+      
       let lane = toTimelineLane(segmentType, segment.userName);
       if (segmentType.startsWith('SYSTEM_')) lane = 'System';
-      if (isIdleContextSegment(segmentType)) lane = 'Idle';
+      if (isIdle) lane = 'Idle';
       laneDurationMap.set(lane, (laneDurationMap.get(lane) || 0) + durationSeconds);
     });
     return Array.from(laneDurationMap.entries()).map(([user, totalSeconds]) => ({ user, totalSeconds })).sort((a, b) => b.totalSeconds - a.totalSeconds);
-  }, [ganttVisibleSegments]);
+  }, [filteredBaseSegments, showWorkloadIdle, selectedSegmentTypes]);
 
   const refreshAll = async (options = {}) => {
     setLoading(true);
@@ -393,7 +403,7 @@ export function useDashboardData() {
     datePreset, setDatePreset, dateStart, setDateStart, dateEnd, setDateEnd,
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
     selectedUsers, setSelectedUsers, selectedSegmentTypes, setSelectedSegmentTypes,
-    showIdle, setShowIdle, showWorkloadSystem, setShowWorkloadSystem,
+    showIdle, setShowIdle, showWorkloadIdle, setShowWorkloadIdle, showWorkloadSystem, setShowWorkloadSystem,
     activeDocumentFile, setActiveDocumentFile,
     documentTree, userOptions, segmentTypeOptions,
     ganttVisibleSegments, kpiData, filteredBaseSegments,

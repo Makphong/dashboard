@@ -61,7 +61,7 @@ function App() {
     loading, syncing, errorMessage, setErrorMessage,
     datePreset, dateStart, dateEnd,
     selectedFiles, selectedSheets, selectedUsers, selectedSegmentTypes,
-    showIdle, setShowIdle, showWorkloadSystem, setShowWorkloadSystem,
+    showIdle, setShowIdle, showWorkloadIdle, setShowWorkloadIdle, showWorkloadSystem, setShowWorkloadSystem,
     ganttVisibleSegments, kpiData, filteredBaseSegments,
     flowRows, contributionRows, matrixRows, workloadContributors,
     refreshAll
@@ -250,7 +250,12 @@ function App() {
                  </div>
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                    <h2 className="text-lg font-bold mb-6">Flow Comparison</h2>
-                   <FlowDelayComparisonTable segments={ganttVisibleSegments} />
+                   <FlowDelayComparisonTable 
+                     rows={flowRows.map(r => ({
+                       ...r,
+                       label: r.transitionLabel
+                     }))} 
+                   />
                  </div>
                </div>
                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -370,10 +375,10 @@ function App() {
                           <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Workload Settings</div>
                           <div className="space-y-3">
                             <label className="flex items-center gap-3 cursor-pointer group">
-                              <div className={`w-8 h-4 rounded-full transition-colors relative ${showIdle ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showIdle ? 'translate-x-4' : ''}`} />
+                              <div className={`w-8 h-4 rounded-full transition-colors relative ${showWorkloadIdle ? 'bg-blue-600' : 'bg-slate-200'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${showWorkloadIdle ? 'translate-x-4' : ''}`} />
                               </div>
-                              <input type="checkbox" className="hidden" checked={showIdle} onChange={() => setShowIdle(!showIdle)} />
+                              <input type="checkbox" className="hidden" checked={showWorkloadIdle} onChange={() => setShowWorkloadIdle(!showWorkloadIdle)} />
                               <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900">Show Idle Time</span>
                             </label>
                             <label className="flex items-center gap-3 cursor-pointer group">
