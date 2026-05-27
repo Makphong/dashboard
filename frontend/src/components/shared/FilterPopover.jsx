@@ -87,7 +87,7 @@ export const FilterPopover = ({
         <div
           ref={panelRef}
           style={panelStyle}
-          className={`fixed z-[120] rounded-2xl border border-slate-200 bg-white shadow-[0_20px_45px_-18px_rgba(15,23,42,0.35)] overflow-y-auto no-scrollbar ${panelClassName}`}
+          className={`fixed z-[200] rounded-2xl border border-slate-200 bg-white shadow-[0_20px_45px_-18px_rgba(15,23,42,0.35)] overflow-y-auto no-scrollbar ${panelClassName}`}
         >
           {children}
         </div>,

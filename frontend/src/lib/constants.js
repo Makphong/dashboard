@@ -142,28 +142,6 @@ export const WORKFLOW_FLOW_SEGMENT_TYPES = new Set([
   'IDLE_AFTER_SYSTEM_REPROCESS',
   'POST_COMPLETED_ELAPSED',
 ]);
-export const SYSTEM_STAGE_FILTER_GROUPS = [
-  {
-    value: 'initial-processing',
-    label: 'Initial Processing',
-    segmentTypes: ['SYSTEM_INITIAL_PROCESSING'],
-  },
-  {
-    value: 'repeat-processing',
-    label: 'Repeat Processing',
-    segmentTypes: ['SYSTEM_SCHEDULED_REPROCESSING', 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2', 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS'],
-  },
-  {
-    value: 'system-handoff',
-    label: 'System Handoff',
-    segmentTypes: ['SYSTEM_INTERNAL_TRANSITION'],
-  },
-  {
-    value: 'waiting',
-    label: 'Waiting',
-    segmentTypes: ['IDLE_WAITING_FOR_REVIEW', 'IDLE_WAITING_FOR_REREVIEW', 'IDLE_AFTER_SYSTEM_REPROCESS'],
-  },
-];
 
 export const FLOW_INSIGHT_GROUPS = [
   {

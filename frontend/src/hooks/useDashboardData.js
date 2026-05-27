@@ -38,7 +38,6 @@ export function useDashboardData() {
   const [selectedSheets, setSelectedSheets] = usePersistentState('filter_selectedSheets', []);
   const [selectedUsers, setSelectedUsers] = usePersistentState('filter_selectedUsers', []);
   const [selectedSegmentTypes, setSelectedSegmentTypes] = usePersistentState('filter_selectedSegmentTypes', []);
-  const [selectedSystemStages, setSelectedSystemStages] = usePersistentState('filter_selectedSystemStages', []);
   const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', true);
   const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
@@ -154,14 +153,6 @@ export function useDashboardData() {
     [parsedSegments]
   );
 
-  const systemStageOptions = useMemo(
-    () => {
-      const availableTypes = new Set(parsedSegments.map(s => String(s.segmentType || '')));
-      return SYSTEM_STAGE_FILTER_GROUPS.filter((group) => group.segmentTypes.some((type) => availableTypes.has(type)));
-    },
-    [parsedSegments]
-  );
-
   const dateRangeBounds = useMemo(() => {
     if (parsedSegments.length === 0) return { minTs: Number.NEGATIVE_INFINITY, maxTs: Number.POSITIVE_INFINITY };
     if (datePreset === 'custom') {
@@ -208,20 +199,8 @@ export function useDashboardData() {
       return true;
     });
 
-    if (selectedSystemStages.length > 0) {
-      const allowedSystemTypes = new Set();
-      selectedSystemStages.forEach(val => {
-        const group = SYSTEM_STAGE_FILTER_GROUPS.find(g => g.value === val);
-        if (group) group.segmentTypes.forEach(t => allowedSystemTypes.add(t));
-      });
-      filtered = filtered.filter(s => {
-        const st = String(s.segmentType || '');
-        if (st.startsWith('USER_')) return true;
-        return allowedSystemTypes.has(st);
-      });
-    }
     return filtered;
-  }, [filteredBaseSegments, showIdle, selectedSegmentTypes, selectedSystemStages]);
+  }, [filteredBaseSegments, showIdle, selectedSegmentTypes]);
 
   const kpiData = useMemo(() => {
     const kpis = ganttVisibleSegments.length > 0 ? buildKpisFromSegments(ganttVisibleSegments) : null;
@@ -410,9 +389,9 @@ export function useDashboardData() {
     datePreset, setDatePreset, dateStart, setDateStart, dateEnd, setDateEnd,
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
     selectedUsers, setSelectedUsers, selectedSegmentTypes, setSelectedSegmentTypes,
-    selectedSystemStages, setSelectedSystemStages, showIdle, setShowIdle,
+    showIdle, setShowIdle,
     activeDocumentFile, setActiveDocumentFile,
-    documentTree, userOptions, segmentTypeOptions, systemStageOptions,
+    documentTree, userOptions, segmentTypeOptions,
     ganttVisibleSegments, kpiData, filteredBaseSegments,
     flowRows, contributionRows, matrixRows, workloadContributors,
     refreshAll

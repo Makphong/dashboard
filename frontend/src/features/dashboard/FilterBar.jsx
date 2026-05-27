@@ -101,12 +101,57 @@ export function FilterBar({
           <FilterPopover
             id="date-range"
             title="Date Range"
-            summary={datePreset === 'all' ? 'All Time' : datePreset}
+            summary={datePreset === 'all' ? 'All Time' : (datePreset === 'custom' ? `${dateStart} - ${dateEnd}` : datePreset)}
             openDropdown={openDropdown}
             setOpenDropdown={setOpenDropdown}
             icon={Calendar}
             active={datePreset !== 'all'}
-          />
+          >
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                {['all', '7d', '30d', '90d'].map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setDatePreset(preset)}
+                    className={`h-9 rounded-lg text-sm font-semibold transition-colors ${datePreset === preset ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    {preset === 'all' ? 'All Time' : (preset === '7d' ? 'Last 7 Days' : (preset === '30d' ? 'Last 30 Days' : 'Last 90 Days'))}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setDatePreset('custom')}
+                  className={`h-9 rounded-lg text-sm font-semibold transition-colors col-span-2 ${datePreset === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                >
+                  Custom Range
+                </button>
+              </div>
+
+              {datePreset === 'custom' && (
+                <div className="space-y-3 pt-3 border-t border-slate-100 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
+                      <input
+                        type="date"
+                        value={dateStart}
+                        onChange={(e) => setDateStart(e.target.value)}
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">End Date</label>
+                      <input
+                        type="date"
+                        value={dateEnd}
+                        onChange={(e) => setDateEnd(e.target.value)}
+                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </FilterPopover>
 
           {/* Document Filter */}
           <FilterPopover
@@ -254,36 +299,6 @@ export function FilterBar({
             </div>
           </FilterPopover>
 
-          {/* System Stage Filter */}
-          <FilterPopover
-            id="system-stage"
-            title="System Stage"
-            summary={selectedSystemStages.length === 0 ? 'All Stages' : `${selectedSystemStages.length} Stages`}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-            icon={RefreshCw}
-            active={selectedSystemStages.length > 0}
-          >
-            <div className="p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">System Stages</div>
-                <button onClick={() => setSelectedSystemStages([])} className="text-[11px] font-semibold text-slate-400">Clear</button>
-              </div>
-              <div className="space-y-1">
-                {systemStageOptions.map((group) => (
-                  <label key={group.value} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedSystemStages.includes(group.value)}
-                      onChange={() => toggleSelectedValue(setSelectedSystemStages, group.value)}
-                      className="h-4 w-4 accent-blue-600 rounded"
-                    />
-                    <span className="text-sm text-slate-700">{group.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </FilterPopover>
         </div>
 
         {/* Refresh Button */}
