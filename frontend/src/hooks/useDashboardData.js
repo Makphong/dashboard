@@ -38,7 +38,7 @@ export function useDashboardData() {
   const [selectedSheets, setSelectedSheets] = usePersistentState('filter_selectedSheets', []);
   const [selectedUsers, setSelectedUsers] = usePersistentState('filter_selectedUsers', []);
   const [selectedSegmentTypes, setSelectedSegmentTypes] = usePersistentState('filter_selectedSegmentTypes', []);
-  const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', false);
+  const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', true);
   const [showWorkloadSystem, setShowWorkloadSystem] = usePersistentState('filter_showWorkloadSystem', false);
   const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');

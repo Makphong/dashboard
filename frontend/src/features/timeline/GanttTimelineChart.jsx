@@ -48,6 +48,11 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
   const [zoomScale, setZoomScale] = useState(1);
   const zoomScaleRef = useRef(1);
   const pendingZoomAnchorRef = useRef(null);
+
+  // Virtualization State
+  const [scrollState, setScrollState] = useState({ left: 0, top: 0, viewW: 1000, viewH: 600 });
+  const scrollRequestRef = useRef(null);
+
   const timelineMetricsRef = useRef({
     displayMinTs: 0,
     displaySpanMs: 1,
@@ -82,6 +87,7 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
         id: `${segmentType}-${idx}`,
         segmentType,
         lane,
+        userName: segment.userName,
         origLane: toTimelineLane(segmentType, segment.userName),
         startTs,
         endTs: Math.max(endTsRaw, startTs + 1000),
@@ -126,6 +132,40 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
     return parsedRows;
   }, [segments, singleLane]);
 
+  // Viewport tracking
+  useEffect(() => {
+    const updateSize = () => {
+      if (bodyScrollRef.current) {
+        setScrollState(prev => ({
+          ...prev,
+          viewW: bodyScrollRef.current.clientWidth,
+          viewH: verticalScrollRef.current?.clientHeight || 600
+        }));
+      }
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  const onBodyScroll = (event) => {
+    const { scrollLeft } = event.currentTarget;
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = scrollLeft;
+    
+    if (scrollRequestRef.current) cancelAnimationFrame(scrollRequestRef.current);
+    scrollRequestRef.current = requestAnimationFrame(() => {
+      setScrollState(prev => ({ ...prev, left: scrollLeft }));
+    });
+  };
+
+  const onVerticalScroll = (event) => {
+    const { scrollTop } = event.currentTarget;
+    if (scrollRequestRef.current) cancelAnimationFrame(scrollRequestRef.current);
+    scrollRequestRef.current = requestAnimationFrame(() => {
+      setScrollState(prev => ({ ...prev, top: scrollTop }));
+    });
+  };
+
   useEffect(() => {
     const bodyViewport = bodyScrollRef.current;
     if (!bodyViewport) return;
@@ -133,113 +173,112 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
       bodyViewport.scrollLeft = 0;
       if (headerScrollRef.current) headerScrollRef.current.scrollLeft = 0;
       if (verticalScrollRef.current) verticalScrollRef.current.scrollTop = 0;
+      setScrollState(prev => ({ ...prev, left: 0, top: 0 }));
     });
   }, [mapped.length]);
 
   if (mapped.length === 0) return null;
 
-  const laneVisibleSegments = mapped.filter((segment) => {
+  const laneVisibleSegments = useMemo(() => mapped.filter((segment) => {
     if (!showSystemLane && segment.origLane === 'System') return false;
     if (!showIdleLane && segment.origLane === 'Idle') return false;
     return true;
-  });
+  }), [mapped, showSystemLane, showIdleLane]);
 
-  const boundsSegments = laneVisibleSegments.length > 0 ? laneVisibleSegments : mapped;
-  const fullMinTs = boundsSegments.reduce((min, item) => Math.min(min, item.startTs), boundsSegments[0].startTs);
-  const fullMaxTs = boundsSegments.reduce((max, item) => Math.max(max, item.endTs), boundsSegments[0].endTs);
+  const { displayMinTs, displayMaxTs } = useMemo(() => {
+    const boundsSegments = laneVisibleSegments.length > 0 ? laneVisibleSegments : mapped;
+    const fMin = boundsSegments.reduce((min, item) => Math.min(min, item.startTs), boundsSegments[0].startTs);
+    const fMax = boundsSegments.reduce((max, item) => Math.max(max, item.endTs), boundsSegments[0].endTs);
+    const pad = Math.min(10 * 60 * 1000, Math.max(1 * 60 * 1000, (fMax - fMin) * 0.005));
+    return { displayMinTs: fMin - pad, displayMaxTs: fMax + pad };
+  }, [laneVisibleSegments, mapped]);
 
-  const rangePadMs = Math.min(10 * 60 * 1000, Math.max(1 * 60 * 1000, (fullMaxTs - fullMinTs) * 0.005));
-
-  const displayMinTs = fullMinTs - rangePadMs;
-  const displayMaxTs = fullMaxTs + rangePadMs;
-
-  const visibleSegments = mapped.filter((segment) => {
+  const visibleSegments = useMemo(() => mapped.filter((segment) => {
     if (segment.endTs < displayMinTs || segment.startTs > displayMaxTs) return false;
     if (!showSystemLane && segment.origLane === 'System') return false;
     if (!showIdleLane && segment.origLane === 'Idle') return false;
     return true;
-  });
-
-  if (visibleSegments.length === 0) return null;
+  }), [mapped, displayMinTs, displayMaxTs, showSystemLane, showIdleLane]);
 
   const COMPACTION_THRESHOLD_MS = 30 * 1000;
   const VISUAL_GAP_MS = 10 * 1000;
 
-  let getCompactedTs = (ts) => ts;
-  let displaySpanMs = Math.max(displayMaxTs - displayMinTs, 60 * 1000);
-  let displaySpanHours = displaySpanMs / (1000 * 60 * 60);
-
-  if (collapseGaps) {
+  const gapsInfo = useMemo(() => {
+    if (!collapseGaps || visibleSegments.length === 0) return { gaps: [], compactedMinTs: displayMinTs, compactedMaxTs: displayMaxTs, totalExcess: 0 };
+    
     const activeIntervals = [];
     visibleSegments.forEach((seg) => {
-      if (seg.origLane === 'Idle' && !showIdleLane) return;
-      if (seg.origLane === 'System' && !showSystemLane) return;
       activeIntervals.push({ start: seg.startTs, end: seg.endTs });
-    });
-    visibleSegments.forEach((seg) => {
       if (Array.isArray(seg.reopenMarkerList)) {
-        seg.reopenMarkerList.forEach((m) => {
-          activeIntervals.push({ start: m.ts, end: m.ts });
-        });
+        seg.reopenMarkerList.forEach((m) => activeIntervals.push({ start: m.ts, end: m.ts }));
       }
     });
 
     activeIntervals.sort((a, b) => a.start - b.start);
 
-    const mergedIntervals = [];
+    const merged = [];
     activeIntervals.forEach((interval) => {
-      const prev = mergedIntervals[mergedIntervals.length - 1];
-      if (!prev) {
-        mergedIntervals.push({ ...interval });
-        return;
-      }
-      if (interval.start <= prev.end + 5 * 1000) {
-        prev.end = Math.max(prev.end, interval.end);
-      } else {
-        mergedIntervals.push({ ...interval });
-      }
+      const prev = merged[merged.length - 1];
+      if (!prev) { merged.push({ ...interval }); return; }
+      if (interval.start <= prev.end + 5000) { prev.end = Math.max(prev.end, interval.end); }
+      else { merged.push({ ...interval }); }
     });
 
     const gaps = [];
-    let lastRealTs = displayMinTs;
-    mergedIntervals.forEach((interval) => {
-      if (interval.start > lastRealTs + COMPACTION_THRESHOLD_MS) {
-        gaps.push({
-          start: lastRealTs,
-          end: interval.start,
-          originalSpan: interval.start - lastRealTs,
-          excessSpan: (interval.start - lastRealTs) - VISUAL_GAP_MS,
-        });
+    let lastTs = displayMinTs;
+    let cumulativeExcess = 0;
+    
+    merged.forEach((interval) => {
+      if (interval.start > lastTs + COMPACTION_THRESHOLD_MS) {
+        const span = interval.start - lastTs;
+        const excess = span - VISUAL_GAP_MS;
+        gaps.push({ start: lastTs, end: interval.start, originalSpan: span, excessSpan: excess, cumulativeExcess });
+        cumulativeExcess += excess;
       }
-      lastRealTs = interval.end;
+      lastTs = interval.end;
     });
-    if (displayMaxTs > lastRealTs + COMPACTION_THRESHOLD_MS) {
-      gaps.push({
-        start: lastRealTs,
-        end: displayMaxTs,
-        originalSpan: displayMaxTs - lastRealTs,
-        excessSpan: (displayMaxTs - lastRealTs) - VISUAL_GAP_MS,
-      });
+
+    const lastSpan = displayMaxTs - lastTs;
+    if (lastSpan > COMPACTION_THRESHOLD_MS) {
+      const excess = lastSpan - VISUAL_GAP_MS;
+      gaps.push({ start: lastTs, end: displayMaxTs, originalSpan: lastSpan, excessSpan: excess, cumulativeExcess });
+      cumulativeExcess += excess;
     }
 
-    getCompactedTs = (realTs) => {
-      let excessSum = 0;
-      for (const gap of gaps) {
-        if (realTs > gap.end) {
-          excessSum += gap.excessSpan;
-        } else if (realTs > gap.start) {
-          const fraction = (realTs - gap.start) / gap.originalSpan;
-          excessSum += fraction * gap.excessSpan;
-        }
-      }
-      return realTs - excessSum;
-    };
+    return { gaps, compactedMinTs: displayMinTs, compactedMaxTs: displayMaxTs - cumulativeExcess, totalExcess: cumulativeExcess };
+  }, [collapseGaps, visibleSegments, displayMinTs, displayMaxTs]);
 
-    const compactedMinTs = getCompactedTs(displayMinTs);
-    const compactedMaxTs = getCompactedTs(displayMaxTs);
-    displaySpanMs = Math.max(compactedMaxTs - compactedMinTs, 60 * 1000);
-    displaySpanHours = displaySpanMs / (1000 * 60 * 60);
-  }
+  const getCompactedTs = (realTs) => {
+    const { gaps } = gapsInfo;
+    if (gaps.length === 0) return realTs;
+    
+    let low = 0, high = gaps.length - 1;
+    let foundGap = null;
+    let prevGapsExcess = 0;
+
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const gap = gaps[mid];
+      if (realTs < gap.start) {
+        high = mid - 1;
+      } else if (realTs > gap.end) {
+        prevGapsExcess = gap.cumulativeExcess + gap.excessSpan;
+        low = mid + 1;
+      } else {
+        foundGap = gap;
+        break;
+      }
+    }
+
+    if (foundGap) {
+      const fraction = (realTs - foundGap.start) / foundGap.originalSpan;
+      return realTs - (foundGap.cumulativeExcess + fraction * foundGap.excessSpan);
+    }
+    return realTs - prevGapsExcess;
+  };
+
+  const displaySpanMs = Math.max(displayMaxTs - displayMinTs - gapsInfo.totalExcess, 60000);
+  const displaySpanHours = displaySpanMs / 3600000;
 
   const pxPerHour = 120;
   const legendItems = GANTT_DRILL_GROUPS.filter((item) => {
@@ -250,586 +289,301 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
     return true;
   });
 
-  const laneDurationMap = {};
-  visibleSegments.forEach((item) => {
-    if (!laneDurationMap[item.lane]) laneDurationMap[item.lane] = 0;
-    laneDurationMap[item.lane] += item.durationSeconds;
-  });
+  const lanes = useMemo(() => {
+    const laneDurationMap = {};
+    visibleSegments.forEach((item) => {
+      if (!laneDurationMap[item.lane]) laneDurationMap[item.lane] = 0;
+      laneDurationMap[item.lane] += item.durationSeconds;
+    });
 
-  const lanes = Object.keys(laneDurationMap).sort((a, b) => {
-    const lanePriority = (laneName) => {
-      if (laneName === 'System') return 1;
-      if (laneName === 'Idle') return 2;
-      return 3;
-    };
-    const priorityDiff = lanePriority(a) - lanePriority(b);
-    if (priorityDiff !== 0) return priorityDiff;
-    const durationDiff = laneDurationMap[b] - laneDurationMap[a];
-    if (durationDiff !== 0) return durationDiff;
-    return a.localeCompare(b);
-  }).filter((lane) => {
-    if (!showSystemLane && lane === 'System') return false;
-    if (!showIdleLane && lane === 'Idle') return false;
-    return true;
-  });
+    return Object.keys(laneDurationMap).sort((a, b) => {
+      const p = (n) => n === 'System' ? 1 : (n === 'Idle' ? 2 : 3);
+      const diff = p(a) - p(b);
+      if (diff !== 0) return diff;
+      return (laneDurationMap[b] - laneDurationMap[a]) || a.localeCompare(b);
+    }).filter((l) => (showSystemLane || l !== 'System') && (showIdleLane || l !== 'Idle'));
+  }, [visibleSegments, showSystemLane, showIdleLane]);
 
-  const laneToSegments = {};
-  lanes.forEach((lane) => {
-    const laneSegments = visibleSegments
-      .filter((item) => item.lane === lane)
-      .sort((a, b) => a.startTs - b.startTs);
-    laneToSegments[lane] = mergeContinuousReprocessingSegments(laneSegments);
-  });
+  const laneToSegments = useMemo(() => {
+    const groups = {};
+    visibleSegments.forEach(s => {
+      if (!groups[s.lane]) groups[s.lane] = [];
+      groups[s.lane].push(s);
+    });
+    const res = {};
+    lanes.forEach(l => {
+      const segs = (groups[l] || []).sort((a, b) => a.startTs - b.startTs);
+      res[l] = mergeContinuousReprocessingSegments(segs);
+    });
+    return res;
+  }, [lanes, visibleSegments]);
 
   const timelinePadLeft = 14;
   const timelinePadRight = 18;
-  const tempMinTimelinePx = collapseGaps ? (singleLane ? 1950 : 1600) : 2200;
-  const tempBaseTimelineWidth = Math.min(120000, Math.max(tempMinTimelinePx, Math.round(displaySpanHours * pxPerHour)));
-  const tempTimelineWidth = Math.min(
-    GANTT_MAX_TIMELINE_WIDTH_PX,
-    Math.max(tempMinTimelinePx, Math.round(tempBaseTimelineWidth * zoomScale))
-  );
-
-  const getTempX = (timeValue) => {
-    const realTs = typeof timeValue === 'number' ? timeValue : Date.parse(String(timeValue));
-    const normalizedTs = Number.isFinite(realTs) ? realTs : displayMinTs;
-    const targetCompacted = getCompactedTs(normalizedTs);
-    const baseCompacted = getCompactedTs(displayMinTs);
-    return timelinePadLeft + ((targetCompacted - baseCompacted) / displaySpanMs) * tempTimelineWidth;
-  };
-
-  const laneToPositionedBars = {};
-  let maxRightCoordinate = 0;
-
-  lanes.forEach((lane) => {
-    const bars = laneToSegments[lane] || [];
-    const positionedBars = [];
-    bars.forEach((segment, barIdx) => {
-      const clippedStart = Math.max(segment.startTs, displayMinTs);
-      const clippedEnd = Math.min(segment.endTs, displayMaxTs);
-      const x1 = getTempX(clippedStart);
-      const x2 = getTempX(clippedEnd);
-      const naturalWidth = x2 - x1;
-      const minBarWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
-      const barWidth = Math.max(minBarWidth, naturalWidth);
-
-      let xRender = x1;
-      if (barIdx > 0) {
-        const prevBar = positionedBars[barIdx - 1];
-        const minStart = prevBar.x + prevBar.width + 1.5;
-        if (xRender < minStart) {
-          xRender = minStart;
-        }
-      }
-
-      positionedBars.push({
-        segment,
-        x: xRender,
-        width: barWidth,
-        clippedStart,
-        clippedEnd,
-      });
-
-      if (xRender + barWidth > maxRightCoordinate) {
-        maxRightCoordinate = xRender + barWidth;
-      }
-    });
-    laneToPositionedBars[lane] = positionedBars;
-  });
-
-  const laneLabelWidth = expanded ? 210 : 132;
   const minTimelinePx = collapseGaps ? (singleLane ? 1950 : 1600) : 2200;
   const baseTimelineWidth = Math.min(120000, Math.max(minTimelinePx, Math.round(displaySpanHours * pxPerHour)));
-  const timelineWidth = Math.min(
-    GANTT_MAX_TIMELINE_WIDTH_PX,
-    Math.max(minTimelinePx, Math.round(baseTimelineWidth * zoomScale))
-  );
+  const timelineWidth = Math.min(GANTT_MAX_TIMELINE_WIDTH_PX, Math.max(minTimelinePx, Math.round(baseTimelineWidth * zoomScale)));
 
-  const baseSvgWidth = timelinePadLeft + timelineWidth + timelinePadRight;
-  const timelineSvgWidth = Math.max(baseSvgWidth, maxRightCoordinate + timelinePadRight + 45);
-  const effectivePxPerHour = timelineWidth / Math.max(displaySpanHours, 1);
+  const baseCompactedTs = useMemo(() => getCompactedTs(displayMinTs), [displayMinTs, gapsInfo]);
+  const pxPerMs = useMemo(() => timelineWidth / displaySpanMs, [timelineWidth, displaySpanMs]);
+
+  const getX = (ts) => {
+    const realTs = typeof ts === 'number' ? ts : Date.parse(String(ts));
+    const nTs = Number.isFinite(realTs) ? realTs : displayMinTs;
+    return timelinePadLeft + (getCompactedTs(nTs) - baseCompactedTs) * pxPerMs;
+  };
+
+  const laneToPositionedBars = useMemo(() => {
+    const res = {};
+    const bComp = baseCompactedTs;
+    const ppm = pxPerMs;
+    const padL = timelinePadLeft;
+    
+    lanes.forEach(l => {
+      const bars = laneToSegments[l] || [];
+      const positioned = [];
+      let lastRight = -1;
+      
+      bars.forEach(s => {
+        const x1 = padL + (getCompactedTs(Math.max(s.startTs, displayMinTs)) - bComp) * ppm;
+        const x2 = padL + (getCompactedTs(Math.min(s.endTs, displayMaxTs)) - bComp) * ppm;
+        
+        let x = x1;
+        const minW = s.segmentType === 'USER_UPLOADING' ? 14 : 8;
+        const w = Math.max(minW, x2 - x1);
+        
+        if (x < lastRight + 1.5) {
+          x = lastRight + 1.5;
+        }
+        
+        positioned.push({ s, x, w });
+        lastRight = x + w;
+      });
+      res[l] = positioned;
+    });
+    return res;
+  }, [lanes, laneToSegments, timelineWidth, displayMinTs, displayMaxTs, baseCompactedTs, pxPerMs, gapsInfo]);
+
+  const timelineSvgWidth = useMemo(() => {
+    let maxR = timelinePadLeft + timelineWidth + timelinePadRight;
+    lanes.forEach(l => {
+      const pBars = laneToPositionedBars[l] || [];
+      if (pBars.length > 0) {
+        const last = pBars[pBars.length - 1];
+        maxR = Math.max(maxR, last.x + last.w + timelinePadRight + 45);
+      }
+    });
+    return maxR;
+  }, [lanes, laneToPositionedBars, timelineWidth]);
+
+  const laneLabelWidth = expanded ? 210 : 132;
   const headerHeight = 50;
   const rowHeight = 34;
   const rowGap = 10;
-  const laneVisibleLimit = expanded ? Math.max(7, lanes.length) : 7;
   const rowSlotHeight = rowHeight + rowGap;
   const rowTopPadding = 8;
   const bodyChartHeight = rowTopPadding + lanes.length * rowSlotHeight + 10;
-  const timelineViewportHeight = expanded
-    ? Math.max(rowSlotHeight + 12, lanes.length * rowSlotHeight + 12)
-    : (Math.max(1, Math.min(laneVisibleLimit, lanes.length)) * rowSlotHeight + 12);
+  const timelineViewportHeight = expanded ? Math.max(rowSlotHeight + 12, lanes.length * rowSlotHeight + 12) : (Math.max(1, Math.min(7, lanes.length)) * rowSlotHeight + 12);
 
-  const tickStepCandidatesMs = [
-    30 * 60 * 1000,
-    60 * 60 * 1000,
-    2 * 60 * 60 * 1000,
-    3 * 60 * 60 * 1000,
-    4 * 60 * 60 * 1000,
-    6 * 60 * 60 * 1000,
-    8 * 60 * 60 * 1000,
-    12 * 60 * 60 * 1000,
-    24 * 60 * 60 * 1000,
-  ];
-  const minTickPx = 120;
-  const tickStepMs = tickStepCandidatesMs.find(
-    (candidate) => ((candidate / (60 * 60 * 1000)) * effectivePxPerHour) >= minTickPx
-  ) || (24 * 60 * 60 * 1000);
-  const alignedTickStart = Math.floor(displayMinTs / tickStepMs) * tickStepMs;
-  let ticks = [];
-  for (let tickTs = alignedTickStart; tickTs <= displayMaxTs + tickStepMs; tickTs += tickStepMs) {
-    if (tickTs >= displayMinTs && tickTs <= displayMaxTs) {
-      ticks.push(tickTs);
+  const ticks = useMemo(() => {
+    const stepCandidates = [1800000, 3600000, 7200000, 10800000, 14400000, 21600000, 28800000, 43200000, 86400000];
+    const effPxPerHour = timelineWidth / Math.max(displaySpanHours, 1);
+    const step = stepCandidates.find(c => (c / 3600000 * effPxPerHour) >= 120) || 86400000;
+    const start = Math.floor(displayMinTs / step) * step;
+    let res = [];
+    for (let t = start; t <= displayMaxTs + step; t += step) {
+      if (t >= displayMinTs && t <= displayMaxTs) res.push(t);
     }
-  }
-  if (ticks.length === 0) ticks.push(displayMinTs);
-  if (ticks[ticks.length - 1] < displayMaxTs) ticks.push(displayMaxTs);
+    if (res.length === 0) res.push(displayMinTs);
+    if (res[res.length - 1] < displayMaxTs) res.push(displayMaxTs);
 
-  if (collapseGaps) {
-    ticks = ticks.filter((tickTs) => {
-      if (tickTs === displayMinTs || tickTs === displayMaxTs) return true;
-      const inActiveRange = visibleSegments.some((seg) => {
-        return tickTs >= seg.startTs - 2 * 60 * 1000 && tickTs <= seg.endTs + 2 * 60 * 1000;
-      });
-      return inActiveRange;
+    if (collapseGaps) {
+      res = res.filter(t => t === displayMinTs || t === displayMaxTs || visibleSegments.some(s => t >= s.startTs - 120000 && t <= s.endTs + 120000));
+    }
+
+    const final = [];
+    res.sort((a,b)=>a-b).forEach(t => {
+      if (final.length === 0) { final.push(t); return; }
+      const lastX = getX(final[final.length-1]);
+      const currX = getX(t);
+      if (t === displayMaxTs) {
+        if (currX - lastX >= 65) final.push(t);
+        else if (final.length > 1) final[final.length-1] = t;
+      } else if (currX - lastX >= 65) final.push(t);
     });
-  }
+    return final;
+  }, [timelineWidth, displayMinTs, displayMaxTs, collapseGaps, visibleSegments, baseCompactedTs, pxPerMs, gapsInfo]);
 
-  const getX = (timeValue) => {
-    const realTs = typeof timeValue === 'number' ? timeValue : Date.parse(String(timeValue));
-    const normalizedTs = Number.isFinite(realTs) ? realTs : displayMinTs;
-    const targetCompacted = getCompactedTs(normalizedTs);
-    const baseCompacted = getCompactedTs(displayMinTs);
-    return timelinePadLeft + ((targetCompacted - baseCompacted) / displaySpanMs) * timelineWidth;
-  };
-
-  const minTickDistancePx = 65;
-  const finalTicks = [];
-  ticks.sort((a, b) => a - b).forEach((tick) => {
-    if (finalTicks.length === 0) {
-      finalTicks.push(tick);
-      return;
-    }
-    const lastTick = finalTicks[finalTicks.length - 1];
-    const currentX = getX(tick);
-    const lastX = getX(lastTick);
-
-    if (tick === displayMaxTs) {
-      if (currentX - lastX >= minTickDistancePx) {
-        finalTicks.push(tick);
-      } else {
-        if (finalTicks.length > 1) {
-          const prevPrevTick = finalTicks[finalTicks.length - 2];
-          if (currentX - getX(prevPrevTick) >= minTickDistancePx) {
-            finalTicks[finalTicks.length - 1] = tick;
-          }
-        }
-      }
-    } else if (currentX - lastX >= minTickDistancePx) {
-      finalTicks.push(tick);
-    }
+  // Virtualization calculations
+  const bufferLanes = 3;
+  const startLaneIdx = Math.max(0, Math.floor((scrollState.top - rowTopPadding) / rowSlotHeight) - bufferLanes);
+  const endLaneIdx = Math.min(lanes.length - 1, Math.ceil((scrollState.top + scrollState.viewH) / rowSlotHeight) + bufferLanes);
+  
+  const visibleLanes = lanes.slice(startLaneIdx, endLaneIdx + 1);
+  const visibleTicks = ticks.filter(t => {
+    const x = getX(t);
+    return x >= scrollState.left - 200 && x <= scrollState.left + scrollState.viewW + 200;
   });
-  ticks = finalTicks;
 
-  zoomScaleRef.current = zoomScale;
-  timelineMetricsRef.current = {
-    displayMinTs,
-    displaySpanMs,
-    baseTimelineWidth,
-    timelineWidth,
-    timelinePadLeft,
-    timelinePadRight,
-    timelineSvgWidth,
+  const onDragStart = (e) => {
+    if (!bodyScrollRef.current) return;
+    dragRef.current = { active: true, startX: e.clientX, startScrollLeft: bodyScrollRef.current.scrollLeft };
   };
 
-  const onBodyScroll = (event) => {
-    const headerViewport = headerScrollRef.current;
-    if (!headerViewport) return;
-    if (Math.abs(event.currentTarget.scrollLeft - headerViewport.scrollLeft) <= 1) return;
-    headerViewport.scrollLeft = event.currentTarget.scrollLeft;
+  const onDragMove = (e) => {
+    if (!dragRef.current.active || !bodyScrollRef.current) return;
+    bodyScrollRef.current.scrollLeft = dragRef.current.startScrollLeft - (e.clientX - dragRef.current.startX);
   };
 
-  const onDragStart = (event) => {
-    const viewport = bodyScrollRef.current;
-    if (!viewport) return;
-    dragRef.current.active = true;
-    dragRef.current.startX = event.clientX;
-    dragRef.current.startScrollLeft = viewport.scrollLeft;
-  };
-
-  const onDragMove = (event) => {
-    const viewport = bodyScrollRef.current;
-    if (!viewport || !dragRef.current.active) return;
-    const delta = event.clientX - dragRef.current.startX;
-    viewport.scrollLeft = dragRef.current.startScrollLeft - delta;
-  };
-
-  const onDragEnd = () => {
-    dragRef.current.active = false;
-  };
+  const onDragEnd = () => dragRef.current.active = false;
 
   useEffect(() => {
     const viewport = bodyScrollRef.current;
-    if (!viewport) return undefined;
+    if (!viewport) return;
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const zoomIn = e.deltaY < 0;
+      const nextZoom = Math.max(GANTT_MIN_ZOOM_SCALE, Math.min(GANTT_MAX_ZOOM_SCALE, zoomScaleRef.current * (zoomIn ? 1.15 : 0.87)));
+      if (Math.abs(nextZoom - zoomScaleRef.current) < 0.001) return;
 
-    const onNativeWheel = (event) => {
-      if (!event.ctrlKey) return;
-      const wheelDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
-      if (!wheelDelta) return;
-
-      event.preventDefault();
-      const metrics = timelineMetricsRef.current;
-      const currentZoom = zoomScaleRef.current;
-      const nextZoom = Math.max(
-        GANTT_MIN_ZOOM_SCALE,
-        Math.min(GANTT_MAX_ZOOM_SCALE, currentZoom * (wheelDelta < 0 ? 1.12 : (1 / 1.12)))
-      );
-      if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
-
-      const viewportRect = viewport.getBoundingClientRect();
-      const anchorX = Math.max(0, Math.min(viewportRect.width, event.clientX - viewportRect.left));
-      const absoluteContentX = viewport.scrollLeft + anchorX;
-      const anchorTimelineX = Math.max(0, Math.min(metrics.timelineWidth, absoluteContentX - metrics.timelinePadLeft));
-      const anchorTime = metrics.displayMinTs + (anchorTimelineX / Math.max(1, metrics.timelineWidth)) * metrics.displaySpanMs;
-
-      pendingZoomAnchorRef.current = { anchorX, anchorTime };
+      const rect = viewport.getBoundingClientRect();
+      const anchorX = e.clientX - rect.left;
+      const absoluteX = viewport.scrollLeft + anchorX;
+      const time = displayMinTs + ((absoluteX - timelinePadLeft) / timelineWidth) * displaySpanMs;
+      
+      pendingZoomAnchorRef.current = { anchorX, time };
       zoomScaleRef.current = nextZoom;
       setZoomScale(nextZoom);
     };
-
-    viewport.addEventListener('wheel', onNativeWheel, { passive: false });
-    return () => {
-      viewport.removeEventListener('wheel', onNativeWheel);
-    };
-  }, []);
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', onWheel);
+  }, [timelineWidth, displaySpanMs]);
 
   useLayoutEffect(() => {
-    const viewport = bodyScrollRef.current;
-    const pending = pendingZoomAnchorRef.current;
-    if (!viewport || !pending) return;
-
-    const metrics = timelineMetricsRef.current;
-    const anchorTimeRatio = (pending.anchorTime - metrics.displayMinTs) / Math.max(1, metrics.displaySpanMs);
-    const nextAnchorTimelineX = metrics.timelinePadLeft + (anchorTimeRatio * metrics.timelineWidth);
-    const nextRawScrollLeft = nextAnchorTimelineX - pending.anchorX;
-    const nextMaxScrollLeft = Math.max(0, metrics.timelineSvgWidth - viewport.clientWidth);
-    const nextScrollLeft = Math.max(0, Math.min(nextMaxScrollLeft, nextRawScrollLeft));
-
-    viewport.scrollLeft = nextScrollLeft;
-    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = nextScrollLeft;
+    if (!pendingZoomAnchorRef.current || !bodyScrollRef.current) return;
+    const { anchorX, time } = pendingZoomAnchorRef.current;
+    const nextX = getX(time);
+    bodyScrollRef.current.scrollLeft = nextX - anchorX;
     pendingZoomAnchorRef.current = null;
   }, [zoomScale]);
 
-  const showHoverTooltip = (event, segment, lane) => {
+  const showTT = (e, s, l) => {
     if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const rawX = event.clientX - rect.left + 12;
-    const rawY = event.clientY - rect.top + 12;
-    const tooltipWidth = 310;
-    const tooltipHeight = 124;
-    const x = Math.max(8, Math.min(rawX, rect.width - tooltipWidth - 8));
-    const y = Math.max(8, Math.min(rawY, rect.height - tooltipHeight - 8));
-    const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
+    const r = containerRef.current.getBoundingClientRect();
     setHoveredSegment({
-      x,
-      y,
-      lane,
-      groupLabel,
-      segmentType: segment.segmentType,
-      start: segment.start,
-      end: segment.end,
-      durationSeconds: segment.durationSeconds,
-    });
-  };
-
-  const hideHoverTooltip = () => {
-    setHoveredSegment(null);
-  };
-
-  const onBodyMouseLeave = () => {
-    onDragEnd();
-    hideHoverTooltip();
-  };
-
-  const pickSegment = (segment, lane) => {
-    if (!onSelectSegment) return;
-    onSelectSegment({
-      lane,
-      userName: segment.userName,
-      actorType: segment.origLane === 'System' ? 'System' : 'User',
-      segmentType: segment.segmentType,
-      start: segment.start,
-      end: segment.end,
-      durationSeconds: segment.durationSeconds,
-      documentId: segment.documentId,
-      fileName: segment.fileName,
-      pageName: segment.pageName,
-      autoTimeout: segment.autoTimeout,
+      x: Math.max(8, Math.min(e.clientX - r.left + 12, r.width - 318)),
+      y: Math.max(8, Math.min(e.clientY - r.top + 12, r.height - 132)),
+      lane: l,
+      groupLabel: GANTT_DRILL_GROUP_LABELS[s.drillGroup] || s.drillGroup,
+      segmentType: s.segmentType,
+      start: s.start,
+      end: s.end,
+      durationSeconds: s.durationSeconds,
     });
   };
 
   return (
-    <div className="space-y-2 relative" ref={containerRef}>
+    <div className="space-y-2 relative select-none" ref={containerRef}>
       {showGanttLegend && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1 text-xs text-slate-600">
-          {legendItems.map((item) => {
-            const isCompleteStar = item.key === 'EditAndComplete';
-            return (
-              <span key={item.key} className="inline-flex items-center gap-1.5">
-                {isCompleteStar ? (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={item.color}>
-                    <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" />
-                  </svg>
-                ) : (
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
-                )}
-                {item.label}
-              </span>
-            );
-          })}
-          {showStarMarkers && (
-            <>
-              <span className="inline-flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="#DC2626">
-                  <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" />
-                </svg>
-                Auto Close
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="#A855F7">
-                  <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" />
-                </svg>
-                Reopen
-              </span>
-            </>
-          )}
+          {legendItems.map((item) => (
+            <span key={item.key} className="inline-flex items-center gap-1.5">
+              {item.key === 'EditAndComplete' ? (
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={item.color}><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" /></svg>
+              ) : <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>}
+              {item.label}
+            </span>
+          ))}
         </div>
       )}
 
-      <div className="rounded-xl bg-slate-50/30 overflow-hidden">
-        <div className="sticky top-0 z-[6]">
-          <div className="flex border-b border-slate-200 bg-slate-50">
-            <svg width={laneLabelWidth} height={headerHeight} className="shrink-0 border-r border-slate-200 bg-slate-50/80">
-              <text x="10" y="22" className="fill-slate-500 text-[10px] font-semibold uppercase tracking-[0.08em]">
-                Lane
-              </text>
-            </svg>
-            <div
-              ref={headerScrollRef}
-              className="flex-1 overflow-x-hidden no-scrollbar"
-            >
-              <svg width={timelineSvgWidth} height={headerHeight} className="block">
-                <rect x="0" y="0" width={timelineSvgWidth} height={headerHeight} fill="#F8FAFC" />
-                {ticks.map((tick, tickIdx) => {
-                  const x = getX(tick);
-                  const header = formatTickHeader(tick);
-                  const prevTick = tickIdx > 0 ? ticks[tickIdx - 1] : null;
-                  const showDate = tickIdx === 0 || !isSameCalendarDay(prevTick, tick);
-                  const isFirst = tickIdx === 0;
-                  const isLast = tickIdx === ticks.length - 1;
-                  const textAnchor = isFirst ? 'start' : (isLast ? 'end' : 'middle');
-                  const textX = isFirst ? x + 3 : (isLast ? x - 3 : x);
-                  return (
-                    <g key={tick}>
-                      <line x1={x} x2={x} y1={headerHeight - 20} y2={headerHeight} stroke="#E2E8F0" strokeDasharray="4 4" />
-                      <text x={textX} y="14" textAnchor={textAnchor} className="fill-slate-500 text-[10px]">
-                        <tspan x={textX}>{showDate ? header.dateLabel : ''}</tspan>
-                        <tspan x={textX} dy="12">{header.timeLabel}</tspan>
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
+      <div className="rounded-xl bg-slate-50/30 border border-slate-200 overflow-hidden shadow-sm">
+        <div className="flex border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20">
+          <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 p-3 flex items-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lane</span>
           </div>
-        </div>
-
-        <div ref={verticalScrollRef} className="overflow-y-auto no-scrollbar" style={{ maxHeight: `${timelineViewportHeight}px` }}>
-          <div className="flex min-w-0">
-            <svg width={laneLabelWidth} height={bodyChartHeight} className="shrink-0 border-r border-slate-200 bg-slate-50/70">
-              {lanes.map((lane, laneIdx) => {
-                const y = rowTopPadding + laneIdx * rowSlotHeight;
+          <div ref={headerScrollRef} className="flex-1 overflow-hidden no-scrollbar">
+            <svg width={timelineSvgWidth} height={headerHeight}>
+              {visibleTicks.map((tick, idx) => {
+                const x = getX(tick);
+                const h = formatTickHeader(tick);
+                const showDate = idx === 0 || !isSameCalendarDay(visibleTicks[idx-1], tick);
                 return (
-                  <g key={lane}>
-                    <rect x="0" y={y - 2} width={laneLabelWidth} height={rowHeight + 4} fill={laneIdx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} />
-                    <text x="10" y={y + rowHeight / 2 + 5} className="fill-slate-700 text-[11px] font-medium">
-                      {lane}
+                  <g key={tick}>
+                    <line x1={x} x2={x} y1={headerHeight-15} y2={headerHeight} stroke="#CBD5E1" />
+                    <text x={x} y="18" textAnchor="middle" className="fill-slate-500 text-[10px] font-medium">
+                      <tspan x={x}>{showDate ? h.dateLabel : ''}</tspan>
+                      <tspan x={x} dy="13">{h.timeLabel}</tspan>
                     </text>
                   </g>
                 );
               })}
             </svg>
+          </div>
+        </div>
+
+        <div 
+          ref={verticalScrollRef} 
+          onScroll={onVerticalScroll}
+          className="overflow-y-auto no-scrollbar" 
+          style={{ maxHeight: timelineViewportHeight }}
+        >
+          <div className="flex min-w-0" style={{ height: bodyChartHeight }}>
+            <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 bg-white relative">
+              {visibleLanes.map((lane) => {
+                const idx = lanes.indexOf(lane);
+                const y = rowTopPadding + idx * rowSlotHeight;
+                return (
+                  <div key={lane} style={{ position: 'absolute', top: y, width: '100%', height: rowHeight }} className="px-3 flex items-center border-b border-slate-50">
+                    <span className="text-[11px] font-semibold text-slate-700 truncate">{lane}</span>
+                  </div>
+                );
+              })}
+            </div>
 
             <div
               ref={bodyScrollRef}
-              className="flex-1 overflow-x-auto no-scrollbar cursor-grab active:cursor-grabbing"
               onScroll={onBodyScroll}
               onMouseDown={onDragStart}
               onMouseMove={onDragMove}
               onMouseUp={onDragEnd}
-              onMouseLeave={onBodyMouseLeave}
+              onMouseLeave={() => { onDragEnd(); setHoveredSegment(null); }}
+              className="flex-1 overflow-x-auto no-scrollbar cursor-grab active:cursor-grabbing"
             >
-              <svg width={timelineSvgWidth} height={bodyChartHeight} className="block">
-                {lanes.map((lane, laneIdx) => {
+              <svg width={timelineSvgWidth} height={bodyChartHeight} className="block bg-white/50">
+                {visibleTicks.map(t => <line key={t} x1={getX(t)} x2={getX(t)} y1={0} y2={bodyChartHeight} stroke="#F1F5F9" />)}
+                
+                {visibleLanes.map((lane) => {
+                  const laneIdx = lanes.indexOf(lane);
                   const y = rowTopPadding + laneIdx * rowSlotHeight;
-                  return (
-                    <rect key={`row-bg-${lane}`} x="0" y={y - 2} width={timelineSvgWidth} height={rowHeight + 4} fill={laneIdx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'} />
-                  );
-                })}
-
-                {ticks.map((tick) => {
-                  const x = getX(tick);
-                  return (
-                    <line key={`tick-${tick}`} x1={x} x2={x} y1="0" y2={bodyChartHeight} stroke="#E2E8F0" strokeDasharray="4 4" />
-                  );
-                })}
-
-                {lanes.map((lane, laneIdx) => {
-                  const y = rowTopPadding + laneIdx * rowSlotHeight;
-                  const positionedBars = laneToPositionedBars[lane] || [];
+                  const pBars = laneToPositionedBars[lane] || [];
+                  const leftBound = scrollState.left - 500;
+                  const rightBound = scrollState.left + scrollState.viewW + 500;
 
                   return (
-                    <g key={`bars-${lane}`}>
-                      {positionedBars.map(({ segment, x, width }) => {
-                        const color = lane === 'Idle'
-                          ? '#94A3B8'
-                          : (GANTT_DRILL_GROUP_COLORS[segment.drillGroup] || SEGMENT_COLORS[segment.segmentType] || '#64748B');
-                        const groupLabel = GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup;
-                        const typeLabel = toGanttSegmentTypeLabel(segment.segmentType);
-                        const label = `${groupLabel} | ${typeLabel} (${toDisplaySegmentTypeCode(segment.segmentType)}) | ${lane} | ${formatTimeTick(segment.start)} -> ${formatTimeTick(segment.end)} | ${formatDuration(segment.durationSeconds)}`;
-                        const barOpacity = '0.94';
+                    <g key={lane}>
+                      {pBars.map((p, bIdx) => {
+                        const { s, x, w } = p;
+                        if (x + w < leftBound || x > rightBound) return null;
 
+                        const color = lane === 'Idle' ? '#94A3B8' : (GANTT_DRILL_GROUP_COLORS[s.drillGroup] || SEGMENT_COLORS[s.segmentType] || '#64748B');
                         return (
-                          <g
-                            key={segment.id}
-                            onClick={() => pickSegment(segment, lane)}
-                            onMouseEnter={(event) => showHoverTooltip(event, segment, lane)}
-                            onMouseMove={(event) => showHoverTooltip(event, segment, lane)}
-                            onMouseLeave={hideHoverTooltip}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            <rect
-                              x={x}
-                              y={y + 4}
-                              width={width}
-                              height={rowHeight - 8}
-                              rx="6"
-                              fill={color}
-                              stroke="none"
-                              strokeWidth="0"
-                              opacity={barOpacity}
-                            >
-                              <title>{label}</title>
-                            </rect>
-                          </g>
-                        );
-                      })}
-                    </g>
-                  );
-                })}
-
-                {showStarMarkers && lanes.map((lane, laneIdx) => {
-                  const y = rowTopPadding + laneIdx * rowSlotHeight;
-                  const positionedBars = laneToPositionedBars[lane] || [];
-
-                  return (
-                    <g key={`markers-${lane}`}>
-                      {positionedBars.map(({ segment, x, width }) => {
-                        const timeoutStarX = x + Math.max(4, width - 6);
-                        const timeoutStarY = y + rowHeight / 2;
-                        const isTimeoutAction = segment.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || segment.autoTimeout;
-                        const completeMarkerType = toCompleteMarkerType(segment);
-                        const hasCompleteMarker = completeMarkerType.length > 0;
-                        const completeMarkerX = x + width;
-                        const reopenMarkerList = Array.isArray(segment.reopenMarkerList) ? segment.reopenMarkerList : [];
-                        const visibleReopenMarkers = reopenMarkerList.filter((marker) => marker.ts >= displayMinTs && marker.ts <= displayMaxTs);
-                        const primaryReopenMarker = visibleReopenMarkers
-                          .slice()
-                          .sort((a, b) => {
-                            const aType = String(a.markerType || 'REOPEN_MARKER');
-                            const bType = String(b.markerType || 'REOPEN_MARKER');
-                            if (aType === 'REOPEN_MARKER' && bType !== 'REOPEN_MARKER') return -1;
-                            if (bType === 'REOPEN_MARKER' && aType !== 'REOPEN_MARKER') return 1;
-                            return safeNumber(a.ts) - safeNumber(b.ts);
-                          })[0] || null;
-                        const reopenMarkerColor = GANTT_DRILL_GROUP_COLORS[toDrillGroup('REOPEN_MARKER')]
-                          || SEGMENT_COLORS.REOPEN_MARKER
-                          || '#64748B';
-
-                        const markerItems = [];
-
-                        if (isTimeoutAction) {
-                          markerItems.push({
-                            key: `timeout-marker-${segment.id}`,
-                            rawX: timeoutStarX,
-                            fill: '#DC2626',
-                            markerSegment: {
-                              ...segment,
-                              segmentType: 'AUTO_TIMEOUT_MARKER',
-                              start: segment.end,
-                              end: segment.end,
-                              durationSeconds: 0,
-                            },
-                          });
-                        }
-
-                        if (hasCompleteMarker) {
-                          markerItems.push({
-                            key: `complete-marker-${segment.id}`,
-                            rawX: completeMarkerX,
-                            fill: COMPLETE_MARKER_COLOR,
-                            markerSegment: {
-                              ...segment,
-                              segmentType: completeMarkerType,
-                              start: segment.end,
-                              end: segment.end,
-                              durationSeconds: 0,
-                            },
-                          });
-                        }
-
-                        if (primaryReopenMarker) {
-                          const markerTs = primaryReopenMarker.ts;
-                          const markerType = String(primaryReopenMarker.markerType || 'REOPEN_MARKER');
-                          const markerTimestamp = new Date(markerTs).toISOString();
-                          const relativeReopenX = x + (getX(markerTs) - getX(segment.startTs));
-                          markerItems.push({
-                            key: `reopen-marker-${segment.id}`,
-                            rawX: Math.max(x, Math.min(x + width, relativeReopenX)),
-                            fill: reopenMarkerColor,
-                            markerSegment: {
-                              ...segment,
-                              segmentType: markerType,
-                              start: markerTimestamp,
-                              end: markerTimestamp,
-                              durationSeconds: 0,
-                            },
-                          });
-                        }
-
-                        const positionedMarkers = spreadMarkerPositions(markerItems, MARKER_STAR_MIN_GAP_PX);
-
-                        return (
-                          <g key={`marker-layer-${segment.id}`}>
-                            {positionedMarkers.map((markerItem) => (
-                              <polygon
-                                key={markerItem.key}
-                                points={buildAsteriskPoints(
-                                  markerItem.x,
-                                  timeoutStarY,
-                                  MARKER_STAR_OUTER_RADIUS,
-                                  MARKER_STAR_INNER_RADIUS
+                          <g key={`${s.id}-${bIdx}`} onClick={() => pickSegment(s, lane)} onMouseEnter={e => showTT(e, s, lane)} onMouseMove={e => showTT(e, s, lane)} style={{ cursor: 'pointer' }}>
+                            <rect x={x} y={y + 4} width={w} height={rowHeight - 8} rx="6" fill={color} opacity="0.9" />
+                            {showStarMarkers && (
+                              <g>
+                                {(s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout) && (
+                                  <polygon points={buildAsteriskPoints(x + w - 2, y + rowHeight/2, 4, 2)} fill="#EF4444" />
                                 )}
-                                fill={markerItem.fill}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  pickSegment(markerItem.markerSegment, lane);
-                                }}
-                                onMouseEnter={(event) => showHoverTooltip(event, markerItem.markerSegment, lane)}
-                                onMouseMove={(event) => showHoverTooltip(event, markerItem.markerSegment, lane)}
-                                onMouseLeave={hideHoverTooltip}
-                                style={{ cursor: 'pointer' }}
-                              />
-                            ))}
+                                {toCompleteMarkerType(s) && (
+                                  <polygon points={buildAsteriskPoints(x + w + 4, y + rowHeight/2, 4, 2)} fill={COMPLETE_MARKER_COLOR} />
+                                )}
+                                {s.reopenMarkerList && s.reopenMarkerList.length > 0 && (
+                                  <polygon points={buildAsteriskPoints(x + 2, y + rowHeight/2, 4, 2)} fill="#A855F7" />
+                                )}
+                              </g>
+                            )}
                           </g>
                         );
                       })}
@@ -841,22 +595,23 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
           </div>
         </div>
       </div>
-      {hoveredSegment ? (
-        <div
-          className="pointer-events-none absolute z-20 w-[310px] rounded-lg border border-slate-200 bg-white/95 px-3 py-2 shadow-[0_16px_32px_-20px_rgba(15,23,42,0.65)]"
-          style={{ left: `${hoveredSegment.x}px`, top: `${hoveredSegment.y}px` }}
-        >
-          <div className="text-[11px] font-semibold text-slate-800">
-            {toGanttSegmentTypeLabel(hoveredSegment.segmentType)} ({toDisplaySegmentTypeCode(hoveredSegment.segmentType)})
-          </div>
-          <div className="mt-0.5 text-[11px] text-slate-600">Group: {hoveredSegment.groupLabel || '-'}</div>
-          <div className="mt-1 text-[11px] text-slate-600">Lane: {hoveredSegment.lane || '-'}</div>
-          <div className="mt-0.5 text-[11px] text-slate-600">Start: {toDisplayDate(hoveredSegment.start)}</div>
-          <div className="mt-0.5 text-[11px] text-slate-600">End: {toDisplayDate(hoveredSegment.end)}</div>
-          <div className="mt-0.5 text-[11px] text-slate-600">Duration: {formatDuration(hoveredSegment.durationSeconds)}</div>
-        </div>
-      ) : null}
 
+      {hoveredSegment && (
+        <div 
+          className="pointer-events-none fixed z-[200] w-[310px] rounded-xl border border-slate-200 bg-white/95 backdrop-blur-sm p-4 shadow-2xl animate-in fade-in zoom-in duration-150"
+          style={{ left: hoveredSegment.x + (containerRef.current?.getBoundingClientRect().left || 0), top: hoveredSegment.y + (containerRef.current?.getBoundingClientRect().top || 0) }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+            <div className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate">{toGanttSegmentTypeLabel(hoveredSegment.segmentType)}</div>
+          </div>
+          <div className="space-y-1 text-[10px] font-medium text-slate-500">
+            <div className="flex justify-between"><span>Lane</span><span className="text-slate-800">{hoveredSegment.lane}</span></div>
+            <div className="flex justify-between"><span>Duration</span><span className="text-slate-800">{formatDuration(hoveredSegment.durationSeconds)}</span></div>
+            <div className="flex justify-between"><span>Time</span><span className="text-slate-800">{formatTimeTick(hoveredSegment.start)} - {formatTimeTick(hoveredSegment.end)}</span></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
