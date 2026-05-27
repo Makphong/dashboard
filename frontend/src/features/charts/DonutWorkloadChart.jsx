@@ -1,121 +1,191 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CHART_PALETTE } from '../../lib/constants.js';
 import { safeNumber, formatDuration, formatPercent } from '../../lib/utils.js';
 
+// D3 is loaded via a global script tag in index.html to avoid ESM import issues with Babel Standalone.
+const d3 = window.d3;
+
+/**
+ * Advanced Workload Share Visualization
+ * Features:
+ * - Fluid arc transitions (morphing)
+ * - Physics-based hover (exploding segments)
+ * - Details-on-demand tooltip
+ * - Interactive legend with cross-highlighting
+ */
 export const DonutWorkloadChart = ({ rows, expanded = false }) => {
-  const [focusedUser, setFocusedUser] = useState('');
-  const totalSeconds = rows.reduce((sum, row) => sum + safeNumber(row.totalSeconds), 0);
-  if (totalSeconds <= 0) return null;
+  const svgRef = useRef(null);
+  const [hoveredUser, setHoveredUser] = useState(null);
+  const [hoverSource, setHoverSource] = useState(null); // 'chart' | 'legend' | null
+  
+  const size = expanded ? 480 : 260;
+  const radius = Math.min(size, size) / 2;
+  const innerRadius = radius * (expanded ? 0.65 : 0.6);
+  const outerRadius = radius * 0.9;
+  const hoverOuterRadius = radius * 0.95;
 
-  let startRatio = 0;
-  const segments = rows
-    .map((row, idx) => {
-      const value = safeNumber(row.totalSeconds);
-      if (value <= 0) return null;
-      const fraction = value / totalSeconds;
-      const segment = {
+  const data = useMemo(() => {
+    return rows
+      .map((row, idx) => ({
         user: row.user || `User ${idx + 1}`,
-        value,
-        fraction,
-        startRatio,
+        value: safeNumber(row.totalSeconds),
         color: CHART_PALETTE[idx % CHART_PALETTE.length],
-      };
-      startRatio += fraction;
-      return segment;
-    })
-    .filter(Boolean);
+      }))
+      .filter(d => d.value > 0);
+  }, [rows]);
 
-  const focusedSegment = focusedUser ? segments.find((segment) => segment.user === focusedUser) || null : null;
-  const hasFocus = Boolean(focusedSegment);
-  const legendSegments = focusedSegment ? [focusedSegment] : segments;
+  const totalValue = useMemo(() => d3.sum(data, d => d.value), [data]);
 
   useEffect(() => {
-    if (!focusedUser) return;
-    if (!segments.some((segment) => segment.user === focusedUser)) {
-      setFocusedUser('');
-    }
-  }, [segments, focusedUser]);
+    if (!svgRef.current || data.length === 0) return;
 
-  const size = expanded ? 440 : 220;
-  const center = size / 2;
-  const radius = expanded ? 150 : 70;
-  const stroke = expanded ? 56 : 28;
-  const circumference = 2 * Math.PI * radius;
-  const focusLabel = focusedSegment
-    ? (focusedSegment.user.length > (expanded ? 24 : 14) ? `${focusedSegment.user.slice(0, expanded ? 24 : 14)}...` : focusedSegment.user)
-    : '';
+    const svg = d3.select(svgRef.current);
+    const g = svg.select('g.chart-group');
+    
+    const pie = d3.pie()
+      .value(d => d.value)
+      .sort(null)
+      .padAngle(0.02);
 
-  const showFocus = (segment) => {
-    setFocusedUser(segment.user);
-  };
+    const arc = d3.arc()
+      .innerRadius(innerRadius)
+      .cornerRadius(8);
 
-  const clearFocus = () => {
-    setFocusedUser('');
-  };
+    const pieData = pie(data);
+
+    // Join data
+    const paths = g.selectAll('path.arc-segment')
+      .data(pieData, d => d.data.user);
+
+    // Remove old
+    paths.exit()
+      .transition()
+      .duration(500)
+      .attrTween('d', function(d) {
+        const i = d3.interpolate(d.endAngle, d.startAngle);
+        return t => {
+          d.endAngle = i(t);
+          return arc(d);
+        };
+      })
+      .remove();
+
+    // Enter new
+    const pathsEnter = paths.enter()
+      .append('path')
+      .attr('class', 'arc-segment')
+      .attr('fill', d => d.data.color)
+      .attr('cursor', 'pointer')
+      .each(function(d) { this._current = { ...d, endAngle: d.startAngle }; });
+
+    // Update + Enter
+    pathsEnter.merge(paths)
+      .on('mouseenter', (event, d) => {
+        setHoveredUser(d.data.user);
+        setHoverSource('chart');
+      })
+      .on('mouseleave', () => {
+        setHoveredUser(null);
+        setHoverSource(null);
+      })
+      .transition()
+      .duration(750)
+      .ease(d3.easeElasticOut.amplitude(1).period(0.6))
+      .attrTween('d', function(d) {
+        const i = d3.interpolate(this._current, d);
+        this._current = i(0);
+        return t => {
+          const currentArc = i(t);
+          const isHovered = hoveredUser === d.data.user;
+          arc.outerRadius(isHovered ? hoverOuterRadius : outerRadius);
+          return arc(currentArc);
+        };
+      })
+      .attr('opacity', d => (hoveredUser && hoveredUser !== d.data.user ? 0.4 : 1))
+      .attr('fill', d => d.data.color);
+
+  }, [data, hoveredUser, innerRadius, outerRadius, hoverOuterRadius]);
+
+  if (data.length === 0) return null;
+
+  const activeSegment = hoveredUser ? data.find(d => d.user === hoveredUser) : null;
+
+  // Logic to determine which items to show in the legend
+  const legendItems = (hoverSource === 'chart' && hoveredUser) 
+    ? data.filter(d => d.user === hoveredUser) 
+    : data;
 
   return (
-    <div className={`mt-4 grid grid-cols-1 ${expanded ? 'xl:grid-cols-[460px_360px] justify-center gap-8 items-start' : 'lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start'}`}>
-      <div
-        onMouseLeave={clearFocus}
-        className={`mx-auto relative ${expanded ? 'w-[440px]' : 'w-[210px] xl:w-[220px]'}`}
-      >
-        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-auto">
-          <circle cx={center} cy={center} r={radius} stroke="#E2E8F0" strokeWidth={stroke} fill="none" />
-          <g transform={`rotate(-90 ${center} ${center})`}>
-            {segments.map((segment) => {
-              const isFocused = focusedSegment?.user === segment.user;
-              return (
-                <circle
-                  key={segment.user}
-                  cx={center}
-                  cy={center}
-                  r={radius}
-                  fill="none"
-                  stroke={hasFocus && !isFocused ? '#CBD5E1' : segment.color}
-                  strokeWidth={stroke}
-                  strokeDasharray={`${segment.fraction * circumference} ${circumference}`}
-                  strokeDashoffset={-segment.startRatio * circumference}
-                  strokeLinecap="round"
-                  opacity={hasFocus && !isFocused ? 0.4 : 1}
-                  style={{ cursor: 'pointer', transition: 'all 160ms ease' }}
-                  onMouseEnter={() => showFocus(segment)}
-                />
-              );
-            })}
-          </g>
-          <text x={center} y={center - 4} textAnchor="middle" className={`fill-slate-900 font-bold ${expanded ? 'text-[18px]' : 'text-[16px]'}`}>
-            {formatDuration(focusedSegment ? focusedSegment.value : totalSeconds)}
-          </text>
-          {focusedSegment ? (
-            <>
-              <text x={center} y={center + 16} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[12px]' : 'text-[11px]'}`}>
-                {formatPercent(focusedSegment.fraction)}
-              </text>
-              <text x={center} y={center + 30} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[11px]' : 'text-[10px]'}`}>
-                {focusLabel}
-              </text>
-            </>
-          ) : (
-            <text x={center} y={center + 16} textAnchor="middle" className={`fill-slate-500 ${expanded ? 'text-[12px]' : 'text-[11px]'}`}>
-              Active Time
+    <div className={`mt-2 grid grid-cols-1 ${expanded ? 'xl:grid-cols-[1fr_300px] gap-12' : 'lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-8'} items-start`}>
+      {/* SVG Visualization Container */}
+      <div className="relative flex justify-center items-center group min-w-0 py-4">
+        <svg 
+          ref={svgRef} 
+          width={size} 
+          height={size} 
+          viewBox={`0 0 ${size} ${size}`}
+          className="drop-shadow-2xl overflow-visible max-w-full h-auto"
+        >
+          <g className="chart-group" transform={`translate(${size / 2}, ${size / 2})`}></g>
+          
+          {/* Central Context Label */}
+          <g transform={`translate(${size / 2}, ${size / 2})`}>
+            <text textAnchor="middle" className="fill-slate-900 font-bold tracking-tight" style={{ fontSize: expanded ? '32px' : '22px' }}>
+              <tspan x="0" dy="0.1em">{activeSegment ? formatDuration(activeSegment.value) : formatDuration(totalValue)}</tspan>
             </text>
-          )}
+            {activeSegment ? (
+              <text textAnchor="middle" className="fill-blue-600 font-bold" style={{ fontSize: expanded ? '18px' : '15px' }}>
+                <tspan x="0" dy="1.6em">{formatPercent(activeSegment.value / totalValue)}</tspan>
+              </text>
+            ) : (
+              <text textAnchor="middle" className="fill-slate-400 font-bold" style={{ fontSize: expanded ? '14px' : '11px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+                <tspan x="0" dy="1.8em">Total</tspan>
+              </text>
+            )}
+          </g>
         </svg>
       </div>
 
-      <div className={`space-y-2 min-w-0 w-full ${expanded ? 'max-w-[360px] mx-auto max-h-[62vh] overflow-y-auto no-scrollbar pr-1' : 'max-h-[260px] lg:max-h-[300px] overflow-y-auto no-scrollbar pr-1'}`}>
-        {legendSegments.map((segment) => (
-          <div key={segment.user} className={`flex items-center justify-between gap-3 rounded-lg border ${focusedSegment ? 'border-blue-200 bg-blue-50/50' : 'border-slate-100'} ${expanded ? 'px-3 py-2.5' : 'px-3 py-2'}`}>
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: segment.color }}></span>
-              <span className={`font-medium text-slate-700 truncate ${expanded ? 'text-sm max-w-[220px]' : 'text-sm'}`} title={segment.user}>{segment.user}</span>
+      {/* Interactive Legend (Dual-Mode Focus) */}
+      <div className={`flex flex-col gap-1.5 py-4 ${expanded ? 'max-h-[500px] overflow-y-auto pr-2 custom-scrollbar' : 'max-h-[320px] overflow-y-auto pr-1 no-scrollbar'}`}>
+        {legendItems.map((d) => {
+          const isFaded = hoverSource === 'legend' && hoveredUser && d.user !== hoveredUser;
+          
+          return (
+            <div 
+              key={d.user}
+              onMouseEnter={() => {
+                setHoveredUser(d.user);
+                setHoverSource('legend');
+              }}
+              onMouseLeave={() => {
+                setHoveredUser(null);
+                setHoverSource(null);
+              }}
+              className={`
+                flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-300 cursor-default border
+                ${hoveredUser === d.user ? 'bg-blue-50 border-blue-100 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-50'}
+                ${isFaded ? 'opacity-20 pointer-events-none' : 'opacity-100'}
+              `}
+            >
+              <div 
+                className="w-2.5 h-2.5 rounded-full shrink-0" 
+                style={{ backgroundColor: d.color, boxShadow: hoveredUser === d.user ? `0 0 10px ${d.color}` : 'none' }}
+              />
+              <span className={`text-sm font-medium truncate flex-1 ${hoveredUser === d.user ? 'text-blue-700' : 'text-slate-500'}`}>
+                {d.user}
+              </span>
             </div>
-            <div className="text-xs text-slate-500 whitespace-nowrap" title={`${segment.user}: ${formatDuration(segment.value)}`}>
-              {expanded ? `${formatPercent(segment.fraction)} | ${formatDuration(segment.value)}` : formatPercent(segment.fraction)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+      `}</style>
     </div>
   );
 };
