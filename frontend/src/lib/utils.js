@@ -393,7 +393,7 @@ export function toDrillGroup(segmentType) {
   if (isProcessingEquivalentIdleSegment(type)) return 'Reprocessing';
   if (type === 'SYSTEM_INITIAL_PROCESSING' || type === 'SYSTEM_INTERNAL_TRANSITION') return 'Processing';
   if (type === 'USER_REVIEW_COMMENT_CHECK') return 'Review';
-  if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
+  if (isIdleContextSegment(type)) return 'Idle';
   if (type === 'USER_REVIEW_AUTO_TIMEOUT' || type === 'AUTO_TIMEOUT_MARKER') return 'ReviewAutoClose';
   if (
     type === 'SYSTEM_SCHEDULED_REPROCESSING'
@@ -409,7 +409,7 @@ export function toTimelineLane(segmentType, userNameRaw) {
   const type = String(segmentType || '');
   if (isProcessingEquivalentIdleSegment(type)) return 'System';
   if (type.startsWith('SYSTEM_')) return 'System';
-  if (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE') return 'Idle';
+  if (isIdleContextSegment(type)) return 'Idle';
   const userName = String(userNameRaw || '').trim();
   if (userName.toLowerCase() === 'system') return 'System';
   return userName || 'Unknown User';
@@ -417,7 +417,7 @@ export function toTimelineLane(segmentType, userNameRaw) {
 
 export function isIdleContextSegment(segmentType) {
   const type = String(segmentType || '');
-  return (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE')
+  return (type.startsWith('IDLE_') || type === 'UNKNOWN_FALLBACK_TO_IDLE' || type === 'POST_COMPLETED_ELAPSED' || type === 'UNKNOWN_OR_LOW_CONFIDENCE')
     && !isProcessingEquivalentIdleSegment(type);
 }
 

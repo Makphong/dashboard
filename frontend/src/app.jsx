@@ -61,7 +61,7 @@ function App() {
     loading, syncing, errorMessage, setErrorMessage,
     datePreset, dateStart, dateEnd,
     selectedFiles, selectedSheets, selectedUsers, selectedSegmentTypes,
-    showIdle, setShowIdle,
+    showIdle, setShowIdle, showWorkloadSystem, setShowWorkloadSystem,
     ganttVisibleSegments, kpiData, filteredBaseSegments,
     flowRows, contributionRows, matrixRows, workloadContributors,
     refreshAll
@@ -93,11 +93,16 @@ function App() {
   const [showStarMarkers, setShowStarMarkers] = useState(true);
   const [ganttCollapseGaps, setGanttCollapseGaps] = useState(false);
   const [showGanttLegend, setShowGanttLegend] = useState(true);
-  const [showWorkloadSystem, setShowWorkloadSystem] = useState(true);
   const [timelineNotice, setTimelineNotice] = useState('');
 
   const timelineFilterRef = useRef(null);
   const workloadFilterRef = useRef(null);
+
+  const workloadVisibleRows = useMemo(() => {
+    const filtered = workloadContributors.filter(r => showWorkloadSystem || r.user !== 'System');
+    const total = filtered.reduce((sum, r) => sum + r.totalSeconds, 0);
+    return filtered.map(r => ({ ...r, share: total > 0 ? r.totalSeconds / total : 0 }));
+  }, [workloadContributors, showWorkloadSystem]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -386,9 +391,9 @@ function App() {
                   </div>
                   <h2 className="text-lg font-bold mb-4">Workload Share</h2>
                   <div className="flex-1 min-h-0">
-                    {workloadContributors.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
+                    {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
                       <DonutWorkloadChart 
-                        rows={workloadContributors.filter(r => showWorkloadSystem || r.user !== 'System')} 
+                        rows={workloadVisibleRows} 
                       />
                     )}
                   </div>
@@ -489,7 +494,7 @@ function App() {
                   </div>
                   <div className="flex-1 overflow-auto p-6">
                     {expandedVisualizationId === 'gantt' && <GanttTimelineChart segments={ganttVisibleSegments} expanded />}
-                    {expandedVisualizationId === 'donut' && <DonutWorkloadChart rows={workloadContributors} expanded />}
+                    {expandedVisualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
                     {expandedVisualizationId === 'flow' && (
                       <DurationBarChart
                         rows={flowRows.map((row) => ({

@@ -38,7 +38,8 @@ export function useDashboardData() {
   const [selectedSheets, setSelectedSheets] = usePersistentState('filter_selectedSheets', []);
   const [selectedUsers, setSelectedUsers] = usePersistentState('filter_selectedUsers', []);
   const [selectedSegmentTypes, setSelectedSegmentTypes] = usePersistentState('filter_selectedSegmentTypes', []);
-  const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', true);
+  const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', false);
+  const [showWorkloadSystem, setShowWorkloadSystem] = usePersistentState('filter_showWorkloadSystem', false);
   const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
   
@@ -195,7 +196,9 @@ export function useDashboardData() {
     let filtered = filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!showIdle && isIdleContextSegment(segmentType)) return false;
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) return false;
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
+        return segmentType.startsWith('SYSTEM_');
+      }
       return true;
     });
 
@@ -302,7 +305,7 @@ export function useDashboardData() {
         maxSeconds: stats.count > 0 ? safeNumber(stats.maxSeconds) : 0,
       };
     });
-  }, [filteredBaseSegments]);
+  }, [ganttVisibleSegments]);
 
   const userStatsRows = useMemo(() => {
     const userStatsMap = new Map();
@@ -351,9 +354,7 @@ export function useDashboardData() {
       if (isIdleContextSegment(segmentType)) lane = 'Idle';
       laneDurationMap.set(lane, (laneDurationMap.get(lane) || 0) + durationSeconds);
     });
-    const total = Array.from(laneDurationMap.values()).reduce((sum, val) => sum + val, 0);
-    if (total <= 0) return [];
-    return Array.from(laneDurationMap.entries()).map(([user, totalSeconds]) => ({ user, totalSeconds, share: totalSeconds / total })).sort((a, b) => b.totalSeconds - a.totalSeconds);
+    return Array.from(laneDurationMap.entries()).map(([user, totalSeconds]) => ({ user, totalSeconds })).sort((a, b) => b.totalSeconds - a.totalSeconds);
   }, [ganttVisibleSegments]);
 
   const refreshAll = async (options = {}) => {
@@ -393,7 +394,7 @@ export function useDashboardData() {
     datePreset, setDatePreset, dateStart, setDateStart, dateEnd, setDateEnd,
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
     selectedUsers, setSelectedUsers, selectedSegmentTypes, setSelectedSegmentTypes,
-    showIdle, setShowIdle,
+    showIdle, setShowIdle, showWorkloadSystem, setShowWorkloadSystem,
     activeDocumentFile, setActiveDocumentFile,
     documentTree, userOptions, segmentTypeOptions,
     ganttVisibleSegments, kpiData, filteredBaseSegments,
