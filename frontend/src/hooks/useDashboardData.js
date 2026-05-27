@@ -280,7 +280,7 @@ export function useDashboardData() {
         }
       }
       let round2AnchorIdx = sorted.findIndex(s => String(s.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2');
-      if (round2AnchorIdx < 0) round2AnchorIdx = reprocessIndices.length >= 2 ? reprocessIndices[1] : -1;
+      if (round2AnchorIdx < 0) round2AnchorIdx = reprocessIndices.length >= 1 ? reprocessIndices[0] : -1;
       if (round2AnchorIdx >= 0) {
         const nextUserIdx = sorted.findIndex((c, i) => i > round2AnchorIdx && USER_ACTION_TYPES.has(String(c.segmentType || '')));
         if (nextUserIdx > round2AnchorIdx) {
