@@ -562,27 +562,56 @@ export const GanttTimelineChart = ({ segments, onSelectSegment, expanded = false
                   const rightBound = scrollState.left + scrollState.viewW + 500;
 
                   return (
-                    <g key={lane}>
+                    <g key={`bars-${lane}`}>
                       {pBars.map((p, bIdx) => {
                         const { s, x, w } = p;
                         if (x + w < leftBound || x > rightBound) return null;
 
                         const color = lane === 'Idle' ? '#94A3B8' : (GANTT_DRILL_GROUP_COLORS[s.drillGroup] || SEGMENT_COLORS[s.segmentType] || '#64748B');
                         return (
-                          <g key={`${s.id}-${bIdx}`} onClick={() => pickSegment(s, lane)} onMouseEnter={e => showTT(e, s, lane)} onMouseMove={e => showTT(e, s, lane)} style={{ cursor: 'pointer' }}>
+                          <g key={`${s.id}-${bIdx}`} onClick={() => pickSegment(s, lane)} onMouseEnter={e => showTT(e, s, lane)} onMouseMove={e => showTT(e, s, lane)} onMouseLeave={() => setHoveredSegment(null)} style={{ cursor: 'pointer' }}>
                             <rect x={x} y={y + 4} width={w} height={rowHeight - 8} rx="6" fill={color} opacity="0.9" />
-                            {showStarMarkers && (
-                              <g>
-                                {(s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout) && (
-                                  <polygon points={buildAsteriskPoints(x + w - 2, y + rowHeight/2, 4, 2)} fill="#EF4444" />
-                                )}
-                                {toCompleteMarkerType(s) && (
-                                  <polygon points={buildAsteriskPoints(x + w + 4, y + rowHeight/2, 4, 2)} fill={COMPLETE_MARKER_COLOR} />
-                                )}
-                                {s.reopenMarkerList && s.reopenMarkerList.length > 0 && (
-                                  <polygon points={buildAsteriskPoints(x + 2, y + rowHeight/2, 4, 2)} fill="#A855F7" />
-                                )}
-                              </g>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+
+                {showStarMarkers && visibleLanes.map((lane) => {
+                  const laneIdx = lanes.indexOf(lane);
+                  const y = rowTopPadding + laneIdx * rowSlotHeight;
+                  const pBars = laneToPositionedBars[lane] || [];
+                  const leftBound = scrollState.left - 500;
+                  const rightBound = scrollState.left + scrollState.viewW + 500;
+
+                  return (
+                    <g key={`stars-${lane}`}>
+                      {pBars.map((p, bIdx) => {
+                        const { s, x, w } = p;
+                        if (x + w < leftBound || x > rightBound) return null;
+                        const hasStars = (s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout) || 
+                                       toCompleteMarkerType(s) || 
+                                       (s.reopenMarkerList && s.reopenMarkerList.length > 0);
+                        if (!hasStars) return null;
+
+                        return (
+                          <g 
+                            key={`star-${s.id}-${bIdx}`}
+                            onClick={() => pickSegment(s, lane)} 
+                            onMouseEnter={e => showTT(e, s, lane)} 
+                            onMouseMove={e => showTT(e, s, lane)} 
+                            onMouseLeave={() => setHoveredSegment(null)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {(s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout) && (
+                              <polygon points={buildAsteriskPoints(x + w - 2, y + rowHeight/2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill="#EF4444" />
+                            )}
+                            {toCompleteMarkerType(s) && (
+                              <polygon points={buildAsteriskPoints(x + w + 4, y + rowHeight/2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill={COMPLETE_MARKER_COLOR} />
+                            )}
+                            {s.reopenMarkerList && s.reopenMarkerList.length > 0 && (
+                              <polygon points={buildAsteriskPoints(x + 2, y + rowHeight/2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill="#A855F7" />
                             )}
                           </g>
                         );

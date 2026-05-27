@@ -258,6 +258,7 @@ def compute_user_performance() -> dict:
     contribution_rows = []
     for user_name, stats in user_stats.items():
         sessions = stats["sessions"] or 1
+        active_time = stats["review_seconds"] + stats["edit_seconds"]
         contribution_rows.append(
             {
                 "user": user_name,
@@ -267,7 +268,7 @@ def compute_user_performance() -> dict:
                 "uploadSeconds": stats["upload_seconds"],
                 "totalSeconds": stats["total_effective_seconds"],
                 "sessionCount": stats["sessions"],
-                "reworkRate": stats["rework_sessions"] / sessions,
+                "reworkRate": stats["edit_seconds"] / active_time if active_time > 0 else 0.0,
                 "autoClosedRate": stats["auto_timeout_sessions"] / sessions,
                 "documents": len(stats["documents"]),
             }
@@ -291,11 +292,12 @@ def compute_user_performance() -> dict:
     for user_name, stats in user_stats.items():
         sessions = stats["sessions"] or 1
         docs_count = len(stats["documents"]) or 1
+        active_time = stats["review_seconds"] + stats["edit_seconds"]
         matrix_rows.append(
             {
                 "user": user_name,
                 "avgTimePerDocSeconds": stats["total_effective_seconds"] / docs_count,
-                "reworkRate": stats["rework_sessions"] / sessions,
+                "reworkRate": stats["edit_seconds"] / active_time if active_time > 0 else 0.0,
                 "autoClosedRate": stats["auto_timeout_sessions"] / sessions,
                 "totalActiveSeconds": stats["total_effective_seconds"],
                 "documents": len(stats["documents"]),

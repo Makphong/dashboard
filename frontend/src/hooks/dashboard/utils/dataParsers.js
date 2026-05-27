@@ -133,7 +133,7 @@ export function calculateUserStatsRows(ganttVisibleSegments) {
   });
   return Array.from(userStatsMap.values()).map((stats) => ({
     user: stats.user, totalSeconds: stats.totalSeconds, reviewSeconds: stats.reviewSeconds, editSeconds: stats.editSeconds, uploadSeconds: stats.uploadSeconds,
-    reworkRate: stats.sessionCount > 0 ? stats.reworkCount / stats.sessionCount : 0,
+    reworkRate: (stats.reviewSeconds + stats.editSeconds) > 0 ? stats.editSeconds / (stats.reviewSeconds + stats.editSeconds) : 0,
     autoClosedRate: stats.sessionCount > 0 ? stats.autoClosedCount / stats.sessionCount : 0,
     avgTimePerDocSeconds: stats.totalSeconds / Math.max(1, stats.documents.size),
     sessionCount: stats.sessionCount,
