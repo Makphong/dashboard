@@ -12,6 +12,10 @@
       "dest": "/api/index.py"
     },
     {
+      "src": "/frontend/src/app.jsx",
+      "dest": "/api/index.py"
+    },
+    {
       "src": "/frontend/src/(.*\\.(?:js|jsx|mjs|css|json|map))",
       "dest": "/frontend/src/$1"
     },
