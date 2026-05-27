@@ -209,7 +209,7 @@ export function useDashboardData() {
 
   const flowRows = useMemo(() => {
     const groupedByDocument = new Map();
-    filteredBaseSegments.forEach((segment) => {
+    ganttVisibleSegments.forEach((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!WORKFLOW_FLOW_SEGMENT_TYPES.has(segmentType)) return;
       const documentKey = String(segment.documentId || segment.sheetKey || `${segment.fileName || ''}::${segment.pageName || ''}`);
@@ -319,10 +319,14 @@ export function useDashboardData() {
       stats.documents.add(segment.sheetKey || segment.documentId);
       if (segment.segmentType === 'USER_UPLOADING') { stats.uploadSeconds += durationSeconds; return; }
       stats.sessionCount += 1;
-      if (segment.segmentType === 'USER_EDITING_CORRECTION') { stats.editSeconds += durationSeconds; stats.reworkCount += 1; }
-      else if (segment.segmentType === 'USER_COMPLETION_APPROVAL') { stats.completeSeconds += durationSeconds; }
+      const st = String(segment.segmentType || '');
+      if (st === 'USER_EDITING_CORRECTION' || st === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') { 
+        stats.editSeconds += durationSeconds; 
+        stats.reworkCount += 1; 
+      }
+      else if (st === 'USER_COMPLETION_APPROVAL') { stats.completeSeconds += durationSeconds; }
       else { stats.reviewSeconds += durationSeconds; }
-      if (segment.autoTimeout || segment.segmentType === 'USER_REVIEW_AUTO_TIMEOUT') { stats.autoClosedCount += 1; }
+      if (segment.autoTimeout || st === 'USER_REVIEW_AUTO_TIMEOUT') { stats.autoClosedCount += 1; }
     });
     return Array.from(userStatsMap.values()).map((stats) => ({
       user: stats.user, totalSeconds: stats.totalSeconds, reviewSeconds: stats.reviewSeconds, editSeconds: stats.editSeconds, completeSeconds: stats.completeSeconds, uploadSeconds: stats.uploadSeconds,

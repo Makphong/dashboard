@@ -2,6 +2,8 @@
 # Purpose: prevent AI from spending input tokens on non-essential files.
 # Syntax follows gitignore-style patterns.
 
+docs/
+
 # VCS and editor metadata
 .git/
 .vscode/

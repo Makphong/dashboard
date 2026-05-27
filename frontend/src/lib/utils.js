@@ -85,7 +85,10 @@ export function buildKpisFromSegments(segments) {
   const idleWaitingSeconds = idleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
   const idleWaitingOccurrences = idleSegments.length;
   const autoClosedSessions = coreUserSegments.filter((segment) => segment.autoTimeout || String(segment.segmentType || '') === 'USER_REVIEW_AUTO_TIMEOUT').length;
-  const reworkSessions = coreUserSegments.filter((segment) => String(segment.segmentType || '') === 'USER_EDITING_CORRECTION').length;
+  const reworkSessions = coreUserSegments.filter((segment) => {
+    const type = String(segment.segmentType || '');
+    return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+  }).length;
   const reworkRate = coreUserSegments.length > 0 ? (reworkSessions / coreUserSegments.length) : 0;
 
   const processingEquivalentSystemSeconds = processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);

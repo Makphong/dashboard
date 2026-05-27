@@ -236,21 +236,21 @@ function App() {
             <div className="max-w-[1600px] mx-auto space-y-6">
                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                  <h2 className="text-lg font-bold mb-6">Processing Trend</h2>
-                 <SystemProcessingTrendChart segments={filteredBaseSegments} />
+                 <SystemProcessingTrendChart segments={ganttVisibleSegments} />
                </div>
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                    <h2 className="text-lg font-bold mb-6">Pareto Analysis</h2>
-                   <SystemParetoChart segments={filteredBaseSegments} />
+                   <SystemParetoChart segments={ganttVisibleSegments} />
                  </div>
                  <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                    <h2 className="text-lg font-bold mb-6">Flow Comparison</h2>
-                   <FlowDelayComparisonTable segments={filteredBaseSegments} />
+                   <FlowDelayComparisonTable segments={ganttVisibleSegments} />
                  </div>
                </div>
                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                  <h2 className="text-lg font-bold mb-6">System Bottlenecks</h2>
-                 <SystemBottleneckTable segments={filteredBaseSegments} />
+                 <SystemBottleneckTable segments={ganttVisibleSegments} />
                </div>
             </div>
           ) : (
