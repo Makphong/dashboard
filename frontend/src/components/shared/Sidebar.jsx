@@ -38,7 +38,7 @@ export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollap
           <LayoutDashboard className={`w-5 h-5 flex-shrink-0 ${activeView === 'dashboard' ? 'text-blue-600' : ''}`} />
           {!isCollapsed && <span>Dashboard Overview</span>}
         </a>
-        <a
+        {/* <a
           href="#"
           onClick={() => setActiveView('system-performance')}
           className={`flex items-center gap-3 py-2.5 rounded-xl font-semibold transition-colors
@@ -48,7 +48,7 @@ export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollap
         >
           <Server className={`w-5 h-5 flex-shrink-0 ${activeView === 'system-performance' ? 'text-blue-600' : ''}`} />
           {!isCollapsed && <span>System Performance</span>}
-        </a>
+        </a> */}
       </nav>
 
       {!isCollapsed && <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-8 mb-4 px-3">Data Management</div>}

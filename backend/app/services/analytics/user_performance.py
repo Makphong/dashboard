@@ -122,6 +122,7 @@ def compute_user_performance() -> dict:
         lambda: {
             "review_seconds": 0.0,
             "edit_seconds": 0.0,
+            "complete_seconds": 0.0,
             "upload_seconds": 0.0,
             "total_effective_seconds": 0.0,
             "total_observed_seconds": 0.0,
@@ -232,7 +233,7 @@ def compute_user_performance() -> dict:
             stats["rework_sessions"] += 1
             total_rework_sessions += 1
         elif segment_type == "USER_COMPLETION_APPROVAL":
-            stats["review_seconds"] += counted_seconds
+            stats["complete_seconds"] += counted_seconds
         else:
             stats["review_seconds"] += counted_seconds
 
