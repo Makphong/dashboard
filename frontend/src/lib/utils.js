@@ -47,7 +47,7 @@ export function buildKpiData(kpis) {
       id: 5,
       label: 'Edit Rate',
       value: kpis.reworkRateDisplay || '0.0%',
-      subtext: `${kpis.reworkSessions || 0} edit / ${kpis.totalSessions || 0} actions`,
+      subtext: `${formatDuration(kpis.editTimeSeconds || 0)} edit / ${kpis.activeUserTimeDisplay || '0s'} active`,
       icon: RefreshCw,
       color: 'text-violet-600',
       bg: 'bg-violet-50',
@@ -85,11 +85,13 @@ export function buildKpisFromSegments(segments) {
   const idleWaitingSeconds = idleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
   const idleWaitingOccurrences = idleSegments.length;
   const autoClosedSessions = coreUserSegments.filter((segment) => segment.autoTimeout || String(segment.segmentType || '') === 'USER_REVIEW_AUTO_TIMEOUT').length;
-  const reworkSessions = coreUserSegments.filter((segment) => {
-    const type = String(segment.segmentType || '');
-    return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
-  }).length;
-  const reworkRate = coreUserSegments.length > 0 ? (reworkSessions / coreUserSegments.length) : 0;
+  const editTimeSeconds = coreUserSegments
+    .filter((segment) => {
+      const type = String(segment.segmentType || '');
+      return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+    })
+    .reduce((sum, segment) => sum + effectiveDuration(segment), 0);
+  const reworkRate = activeUserTimeSeconds > 0 ? (editTimeSeconds / activeUserTimeSeconds) : 0;
 
   const processingEquivalentSystemSeconds = processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
   const totalCycleSeconds = activeUserTimeSeconds + idleWaitingSeconds +
@@ -117,6 +119,11 @@ export function buildKpisFromSegments(segments) {
   const totalSessions = coreUserSegments.length;
   const autoClosedRate = totalSessions > 0 ? (autoClosedSessions / totalSessions) * 100 : 0;
 
+  const reworkSessions = coreUserSegments.filter((segment) => {
+    const type = String(segment.segmentType || '');
+    return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+  }).length;
+
   return {
     activeUserTimeSeconds,
     activeUserTimeDisplay: formatDuration(activeUserTimeSeconds),
@@ -140,6 +147,7 @@ export function buildKpisFromSegments(segments) {
     minSessionDisplay: formatDuration(minSessionSeconds),
     maxSessionDisplay: formatDuration(maxSessionSeconds),
     reworkSessions,
+    editTimeSeconds,
     totalSessions,
     autoClosedRate,
   };

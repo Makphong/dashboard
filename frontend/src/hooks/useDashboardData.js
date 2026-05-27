@@ -315,7 +315,7 @@ export function useDashboardData() {
       if (!String(segment.segmentType || '').startsWith('USER_')) return;
       const durationSeconds = safeNumber(segment.durationSeconds);
       if (!userStatsMap.has(userName)) {
-        userStatsMap.set(userName, { user: userName, totalSeconds: 0, reviewSeconds: 0, editSeconds: 0, completeSeconds: 0, uploadSeconds: 0, sessionCount: 0, reworkCount: 0, autoClosedCount: 0, documents: new Set() });
+        userStatsMap.set(userName, { user: userName, totalSeconds: 0, reviewSeconds: 0, editSeconds: 0, uploadSeconds: 0, sessionCount: 0, reworkCount: 0, autoClosedCount: 0, documents: new Set() });
       }
       const stats = userStatsMap.get(userName);
       stats.totalSeconds += durationSeconds;
@@ -327,12 +327,11 @@ export function useDashboardData() {
         stats.editSeconds += durationSeconds; 
         stats.reworkCount += 1; 
       }
-      else if (st === 'USER_COMPLETION_APPROVAL') { stats.completeSeconds += durationSeconds; }
       else { stats.reviewSeconds += durationSeconds; }
       if (segment.autoTimeout || st === 'USER_REVIEW_AUTO_TIMEOUT') { stats.autoClosedCount += 1; }
     });
     return Array.from(userStatsMap.values()).map((stats) => ({
-      user: stats.user, totalSeconds: stats.totalSeconds, reviewSeconds: stats.reviewSeconds, editSeconds: stats.editSeconds, completeSeconds: stats.completeSeconds, uploadSeconds: stats.uploadSeconds,
+      user: stats.user, totalSeconds: stats.totalSeconds, reviewSeconds: stats.reviewSeconds, editSeconds: stats.editSeconds, uploadSeconds: stats.uploadSeconds,
       reworkRate: stats.sessionCount > 0 ? stats.reworkCount / stats.sessionCount : 0,
       autoClosedRate: stats.sessionCount > 0 ? stats.autoClosedCount / stats.sessionCount : 0,
       avgTimePerDocSeconds: stats.totalSeconds / Math.max(1, stats.documents.size),

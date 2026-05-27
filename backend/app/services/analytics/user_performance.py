@@ -122,7 +122,6 @@ def compute_user_performance() -> dict:
         lambda: {
             "review_seconds": 0.0,
             "edit_seconds": 0.0,
-            "complete_seconds": 0.0,
             "upload_seconds": 0.0,
             "total_effective_seconds": 0.0,
             "total_observed_seconds": 0.0,
@@ -233,7 +232,7 @@ def compute_user_performance() -> dict:
             stats["rework_sessions"] += 1
             total_rework_sessions += 1
         elif segment_type == "USER_COMPLETION_APPROVAL":
-            stats["complete_seconds"] += counted_seconds
+            stats["review_seconds"] += counted_seconds
         else:
             stats["review_seconds"] += counted_seconds
 
@@ -247,6 +246,12 @@ def compute_user_performance() -> dict:
     )
     rework_rate = (
         total_rework_sessions / total_user_sessions if total_user_sessions > 0 else 0.0
+    )
+    # Edit rate based on time duration: Edit Time / Total Active User Time
+    time_based_edit_rate = (
+        sum(stats["edit_seconds"] for stats in user_stats.values()) / total_active_user_seconds
+        if total_active_user_seconds > 0
+        else 0.0
     )
 
     contribution_rows = []
@@ -315,8 +320,8 @@ def compute_user_performance() -> dict:
             "idleWaitingSeconds": total_idle_waiting_seconds,
             "idleWaitingDisplay": format_duration(total_idle_waiting_seconds),
             "idleWaitingOccurrences": idle_waiting_occurrences,
-            "reworkRate": rework_rate,
-            "reworkRateDisplay": format_percent(rework_rate),
+            "reworkRate": time_based_edit_rate,
+            "reworkRateDisplay": format_percent(time_based_edit_rate),
             "autoClosedSessions": auto_timeout_count,
             "scheduledWaitSeconds": total_scheduled_wait_seconds,
             "scheduledWaitDisplay": format_duration(total_scheduled_wait_seconds),
