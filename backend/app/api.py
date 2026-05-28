@@ -311,7 +311,10 @@ def create_app() -> Flask:
         src_dir = PROJECT_ROOT / "frontend" / "src"
         
         files_to_bundle = [
-            "lib/constants.js", "lib/utils.js", "lib/api.js", "hooks/usePersistentState.js",
+            "lib/constants.js",
+            "lib/numberUtils.js", "lib/durationFormatters.js", "lib/dateFormatters.js",
+            "lib/excelExport.js", "lib/segmentUtils.js", "lib/kpiUtils.js",
+            "lib/api.js", "hooks/usePersistentState.js",
             "hooks/useDashboardData.js", "hooks/useAppController.js",
             "components/shared/KpiSubtext.jsx", "components/shared/Sidebar.jsx",
             "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
