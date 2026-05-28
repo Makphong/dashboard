@@ -20,7 +20,7 @@ export const GanttLegend = ({ items }) => (
   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1 text-xs text-slate-600">
     {items.map((item) => (
       <span key={item.key} className="inline-flex items-center gap-1.5">
-        {item.key === 'EditAndComplete' ? (
+        {item.isStar || item.key === 'EditAndComplete' ? (
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={item.color}>
             <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" />
           </svg>

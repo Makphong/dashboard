@@ -9,13 +9,20 @@ const GANTT_TICK_STEP_CANDIDATES_MS = [
 ];
 
 export function buildGanttLegendItems(showIdleLane, showSystemLane, showStarMarkers) {
-  return GANTT_DRILL_GROUPS.filter((item) => {
+  const items = GANTT_DRILL_GROUPS.filter((item) => {
     if (item.key === 'Reprocessing' || item.key === 'ReviewAutoClose') return false;
     if (!showIdleLane && item.key === 'Idle') return false;
     if (!showSystemLane && item.key === 'Processing') return false;
     if (!showStarMarkers && item.key === 'EditAndComplete') return false;
     return true;
   });
+
+  if (showStarMarkers) {
+    items.push({ key: 'MarkerAutoTimeout', label: 'Auto Closed', color: '#EF4444', isStar: true });
+    items.push({ key: 'MarkerReopen', label: 'Reopen', color: '#A855F7', isStar: true });
+  }
+
+  return items;
 }
 
 export function buildGanttDisplayBounds(laneVisibleSegments, mappedSegments) {
