@@ -452,7 +452,10 @@ function App() {
                         <div className="relative" ref={matrixFilterRef}>
                           <button onClick={() => setShowMatrixFilterMenu(!showMatrixFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showMatrixFilterMenu ? 'text-blue-600 border-blue-200 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
                           {showMatrixFilterMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter">
+                            <div 
+                              className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter"
+                              onMouseLeave={() => setShowMatrixFilterMenu(false)}
+                            >
                               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Chart Controls</div>
                               <div className="space-y-3">
                                 <label className="flex items-center gap-3 cursor-pointer group">

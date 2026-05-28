@@ -3,6 +3,8 @@ import { SlidersHorizontal, Maximize2, RefreshCw } from 'lucide-react';
 import { CHART_PALETTE } from '../../lib/constants.js';
 import { safeNumber, formatDuration, formatPercent } from '../../lib/utils.js';
 
+const VIBRANT_PALETTE = ['#F43F5E', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#D946EF', '#84CC16', '#F97316'];
+
 export const ReworkMatrixScatterChart = ({ 
   rows = [], 
   expanded = false, 
@@ -12,7 +14,14 @@ export const ReworkMatrixScatterChart = ({
   const dragRef = useRef({ active: false, x: 0, y: 0, view: null });
   const panFrameRef = useRef(null);
   const pendingViewRef = useRef(null);
+  const [hoveredUser, setHoveredUser] = useState(null);
+  const [mounted, setMounted] = useState(false);
   
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   const sourceRows = Array.isArray(rows) ? rows : [];
 
   const prepared = useMemo(() => sourceRows
@@ -31,7 +40,7 @@ export const ReworkMatrixScatterChart = ({
   const maxX = prepared.reduce((max, row) => Math.max(max, row.avgTimePerDocSeconds), 0) || 1;
   const xDomainMax = Math.max(1, maxX * 1.08);
   const maxY = prepared.reduce((max, row) => Math.max(max, row.reworkRate), 0) || 0;
-  const yDomainMax = Math.max(0.05, maxY * 1.1); // Use at least 5%, or more if data exceeds it
+  const yDomainMax = Math.max(0.05, maxY * 1.1);
   const [view, setView] = useState({ xMin: 0, xMax: xDomainMax, yMin: 0, yMax: yDomainMax });
 
   useEffect(() => {
@@ -49,7 +58,6 @@ export const ReworkMatrixScatterChart = ({
   const height = expanded ? 380 : 300;
   const maxBubbleRadius = expanded ? 25 : 18;
 
-  // Increased margins to prevent bubble clipping and text overlap
   const margin = expanded
     ? { top: 40, right: 50, bottom: 70, left: 80 }
     : { top: 30, right: 40, bottom: 60, left: 70 };
@@ -78,7 +86,7 @@ export const ReworkMatrixScatterChart = ({
   const ySpan = normalizedView.yMax - normalizedView.yMin;
   const isZoomed = xSpan < xDomainMax - 0.001 || ySpan < yDomainMax - 0.0001;
   const x = (v) => margin.left + ((safeNumber(v) - normalizedView.xMin) / xSpan) * innerWidth;
-  const y = (v) => margin.top + ((normalizedView.yMax - Math.max(0, Math.min(1, safeNumber(v)))) / ySpan) * innerHeight;
+  const y = (v) => margin.top + ((normalizedView.yMax - Math.max(0, Math.min(yDomainMax, safeNumber(v)))) / ySpan) * innerHeight;
   const xTicks = [0, 0.25, 0.5, 0.75, 1].map((tick) => normalizedView.xMin + xSpan * tick);
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((tick) => normalizedView.yMin + ySpan * tick);
 
@@ -188,11 +196,14 @@ export const ReworkMatrixScatterChart = ({
 
   const onPointerLeave = () => {
     dragRef.current.active = false;
+    setHoveredUser(null);
   };
 
   const clipId = `quality-edit-plot-${expanded ? 'expanded' : 'compact'}`;
 
   if (prepared.length === 0) return null;
+
+  const hoveredData = hoveredUser ? prepared.find(p => p.user === hoveredUser) : null;
 
   return (
     <div className={`mt-2 overflow-hidden relative group ${expanded ? 'w-full max-w-[820px] mx-auto px-1' : ''}`}>
@@ -209,7 +220,6 @@ export const ReworkMatrixScatterChart = ({
       >
         <defs>
           <clipPath id={clipId}>
-            {/* Expanded clip path to allow bubbles to peak slightly outside the inner area without being cut off mid-render */}
             <rect
               x={margin.left - maxBubbleRadius}
               y={margin.top - maxBubbleRadius}
@@ -217,15 +227,22 @@ export const ReworkMatrixScatterChart = ({
               height={innerHeight + maxBubbleRadius * 2}
             />
           </clipPath>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
 
         {/* Quadrant Background Colors */}
         {showQuadrants && !isZoomed && (
           <g opacity="0.05" className="pointer-events-none">
-            <rect x={margin.left} y={margin.top} width={innerWidth / 2} height={innerHeight / 2} fill="#F59E0B" /> {/* Amber: Fast Iteration */}
-            <rect x={margin.left + innerWidth / 2} y={margin.top} width={innerWidth / 2} height={innerHeight / 2} fill="#EF4444" /> {/* Red: High Complexity */}
-            <rect x={margin.left} y={margin.top + innerHeight / 2} width={innerWidth / 2} height={innerHeight / 2} fill="#10B981" /> {/* Emerald: Precision Speed */}
-            <rect x={margin.left + innerWidth / 2} y={margin.top + innerHeight / 2} width={innerWidth / 2} height={innerHeight / 2} fill="#3B82F6" /> {/* Blue: Careful Analysis */}
+            <rect x={margin.left} y={margin.top} width={innerWidth / 2} height={innerHeight / 2} fill="#F59E0B" />
+            <rect x={margin.left + innerWidth / 2} y={margin.top} width={innerWidth / 2} height={innerHeight / 2} fill="#EF4444" />
+            <rect x={margin.left} y={margin.top + innerHeight / 2} width={innerWidth / 2} height={innerHeight / 2} fill="#10B981" />
+            <rect x={margin.left + innerWidth / 2} y={margin.top + innerHeight / 2} width={innerWidth / 2} height={innerHeight / 2} fill="#3B82F6" />
           </g>
         )}
 
@@ -255,24 +272,40 @@ export const ReworkMatrixScatterChart = ({
           />
         ))}
 
-        {/* Quadrant Text Labels - No Background Boxes */}
+        {/* Hover Crosshairs */}
+        {hoveredData && (
+          <g className="pointer-events-none transition-opacity duration-300">
+            <line 
+              x1={margin.left} x2={x(hoveredData.avgTimePerDocSeconds)} 
+              y1={y(hoveredData.reworkRate)} y2={y(hoveredData.reworkRate)} 
+              stroke="#94A3B8" strokeWidth="1" strokeDasharray="4 4" 
+            />
+            <line 
+              x1={x(hoveredData.avgTimePerDocSeconds)} x2={x(hoveredData.avgTimePerDocSeconds)} 
+              y1={y(hoveredData.reworkRate)} y2={height - margin.bottom} 
+              stroke="#94A3B8" strokeWidth="1" strokeDasharray="4 4" 
+            />
+          </g>
+        )}
+
+        {/* Quadrant Text Labels */}
         {showQuadrants && !isZoomed && (
           <g className="pointer-events-none select-none" opacity="0.85">
-            <text x={margin.left + 14} y={margin.top + 24} className="fill-amber-600/70 text-[11px] font-black italic tracking-tighter uppercase">FAST ITERATION</text>
-            <text x={width - margin.right - 14} y={margin.top + 24} textAnchor="end" className="fill-red-600/70 text-[11px] font-black italic tracking-tighter uppercase">HIGH COMPLEXITY</text>
-            <text x={margin.left + 14} y={height - margin.bottom - 16} className="fill-emerald-600/70 text-[11px] font-black italic tracking-tighter uppercase">PRECISION SPEED</text>
-            <text x={width - margin.right - 14} y={height - margin.bottom - 16} textAnchor="end" className="fill-blue-600/70 text-[11px] font-black italic tracking-tighter uppercase">CAREFUL ANALYSIS</text>
+            <text x={margin.left + 14} y={margin.top + 28} className="fill-amber-600/70 text-[11px] font-black italic tracking-tighter uppercase">FAST ITERATION</text>
+            <text x={width - margin.right - 14} y={margin.top + 28} textAnchor="end" className="fill-red-600/70 text-[11px] font-black italic tracking-tighter uppercase">HIGH COMPLEXITY</text>
+            <text x={margin.left + 14} y={height - margin.bottom - 12} className="fill-emerald-600/70 text-[11px] font-black italic tracking-tighter uppercase">PRECISION SPEED</text>
+            <text x={width - margin.right - 14} y={height - margin.bottom - 12} textAnchor="end" className="fill-blue-600/70 text-[11px] font-black italic tracking-tighter uppercase">CAREFUL ANALYSIS</text>
           </g>
         )}
 
         {/* Axis Ticks */}
         {yTicks.map((tick) => (
-          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-slate-500 text-[10px]">
-            {Math.round(tick * 100)}%
+          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[10px]">
+            {Math.round(tick * 1000) / 10}%
           </text>
         ))}
         {xTicks.map((tick) => (
-          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-slate-500 text-[10px]">
+          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[10px]">
             {formatDuration(tick)}
           </text>
         ))}
@@ -282,37 +315,59 @@ export const ReworkMatrixScatterChart = ({
             const px = x(row.avgTimePerDocSeconds);
             const py = y(row.reworkRate);
             const pointRadius = bubbleRadius(row.totalActiveSeconds);
-            const color = CHART_PALETTE[idx % CHART_PALETTE.length];
+            const color = VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length];
             const shortUserLabel = row.user.length > 14 ? `${row.user.slice(0, 14)}...` : row.user;
+            const isHovered = hoveredUser === row.user;
             
-            // Adjust label position to avoid overlapping bubbles
             const labelX = Math.max(margin.left + 10, Math.min(width - margin.right - 10, px));
-            const preferredLabelY = py - pointRadius - 8;
-            const labelY = preferredLabelY < margin.top + 12
-              ? Math.min(height - margin.bottom - 8, py + pointRadius + 14)
-              : preferredLabelY;
+            const qTopY = margin.top + 28;
+            const qBottomY = height - margin.bottom - 12;
+            const qTextWidth = 105; 
+            const isOverLeftText = px < margin.left + 14 + qTextWidth;
+            const isOverRightText = px > width - margin.right - 14 - qTextWidth;
+
+            let labelY = py - pointRadius - 8; 
+            if (showQuadrants && !isZoomed && (isOverLeftText || isOverRightText)) {
+              if (py < margin.top + 70) {
+                 const currentLabelTop = labelY;
+                 if (currentLabelTop < qTopY + 10 && currentLabelTop > qTopY - 20) {
+                    const canFlipBelow = (py + pointRadius + 24) < (height - margin.bottom - 40);
+                    labelY = canFlipBelow ? (py + pointRadius + 14) : (qTopY - 14);
+                 }
+              } else if (py > height - margin.bottom - 70) {
+                if (labelY > qBottomY - 16 && labelY < qBottomY + 10) {
+                   labelY = qBottomY - 20; 
+                }
+              }
+            } else if (labelY < margin.top + 12) {
+               labelY = py + pointRadius + 14;
+            }
 
             if (px + pointRadius < margin.left - 10 || px - pointRadius > width - margin.right + 10 || py + pointRadius < margin.top - 10 || py - pointRadius > height - margin.bottom + 10) return null;
             
             return (
-              <g key={row.user}>
+              <g 
+                key={row.user} 
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredUser(row.user)}
+                onMouseLeave={() => setHoveredUser(null)}
+              >
                 <circle 
                   cx={px} 
                   cy={py} 
-                  r={pointRadius} 
+                  r={mounted ? (isHovered ? pointRadius * 1.15 : pointRadius) : 0} 
                   fill={color} 
-                  opacity="0.75" 
+                  opacity={isHovered ? 1 : 0.85} 
                   stroke="#ffffff" 
-                  strokeWidth="2" 
-                  className="transition-all duration-500 ease-out hover:opacity-100"
-                >
-                  <title>{`${row.user} | Avg/Doc ${formatDuration(row.avgTimePerDocSeconds)} | Edit ${formatPercent(row.reworkRate)} | Active ${formatDuration(row.totalActiveSeconds)} | Auto Closed ${formatPercent(row.autoClosedRate)}`}</title>
-                </circle>
+                  strokeWidth={isHovered ? 3 : 2}
+                  filter={isHovered ? 'url(#glow)' : ''}
+                  className="transition-all duration-300 ease-out"
+                />
                 <text 
                   x={labelX} 
                   y={labelY} 
                   textAnchor="middle" 
-                  className="fill-slate-700 text-[10px] font-medium pointer-events-none"
+                  className={`fill-black text-[10px] pointer-events-none transition-all duration-300 ${isHovered ? 'font-bold' : 'font-medium'} ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 >
                   {shortUserLabel}
                 </text>
@@ -321,15 +376,42 @@ export const ReworkMatrixScatterChart = ({
           })}
         </g>
 
-        {/* Axis Titles */}
-        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-slate-500 text-[11px]">
+        {/* Custom Rich Tooltip */}
+        {hoveredData && (
+          <g className="pointer-events-none">
+            {(() => {
+              const tx = x(hoveredData.avgTimePerDocSeconds);
+              const ty = y(hoveredData.reworkRate);
+              const tr = bubbleRadius(hoveredData.totalActiveSeconds);
+              const tooltipW = 160;
+              const tooltipH = 85;
+              const boxX = Math.max(margin.left + 5, Math.min(width - margin.right - tooltipW - 5, tx + tr + 10));
+              const boxY = Math.max(margin.top + 5, Math.min(height - margin.bottom - tooltipH - 5, ty - tooltipH / 2));
+              
+              return (
+                <g transform={`translate(${boxX}, ${boxY})`} className="drop-shadow-lg">
+                  <rect width={tooltipW} height={tooltipH} rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
+                  <rect width="4" height={tooltipH} rx="2" fill={VIBRANT_PALETTE[prepared.findIndex(p => p.user === hoveredUser) % VIBRANT_PALETTE.length]} />
+                  <text x="12" y="20" className="fill-black text-[11px] font-bold">{hoveredData.user}</text>
+                  <text x="12" y="42" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Avg Time</text>
+                  <text x="150" y="42" textAnchor="end" className="fill-black text-[10px] font-mono">{formatDuration(hoveredData.avgTimePerDocSeconds)}</text>
+                  <text x="12" y="58" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Edit Rate</text>
+                  <text x="150" y="58" textAnchor="end" className="fill-black text-[10px] font-mono">{formatPercent(hoveredData.reworkRate)}</text>
+                  <text x="12" y="74" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Total Active</text>
+                  <text x="150" y="74" textAnchor="end" className="fill-black text-[10px] font-mono">{formatDuration(hoveredData.totalActiveSeconds)}</text>
+                </g>
+              );
+            })()}
+          </g>
+        )}
+
+        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[11px]">
           Avg Time per Document
         </text>
-        <text transform={`translate(22 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-slate-500 text-[11px]">
+        <text transform={`translate(22 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[11px]">
           Edit Rate
         </text>
       </svg>
-      
     </div>
   );
 };
