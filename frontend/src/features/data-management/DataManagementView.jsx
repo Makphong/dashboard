@@ -40,7 +40,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-6 animate-in fade-in duration-300">
+    <>
       <input
         type="file"
         multiple
@@ -50,12 +50,13 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         accept=".csv,.xlsx,.xlsm,.xls"
       />
 
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
-          <p className="text-slate-500 mt-1">Upload Excel/CSV and consolidate all data into one central SQLite table with file and page names.</p>
+      <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="flex justify-between items-end mb-6">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
+            <p className="text-slate-500 mt-1">Upload Excel/CSV and consolidate all data into one central SQLite table with file and page names.</p>
+          </div>
         </div>
-      </div>
 
       <div className="bg-gradient-to-br from-[#00a4e4] to-[#3860be] rounded-2xl p-6 text-white shadow-lg flex items-center justify-between animate-stagger-1">
         <div>
@@ -230,5 +231,6 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         </div>
       )}
     </div>
+    </>
   );
 };
