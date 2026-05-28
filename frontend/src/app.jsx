@@ -88,6 +88,9 @@ function App() {
   // Timeline & Workload local toggles
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
+  const [showMatrixFilterMenu, setShowMatrixFilterMenu] = useState(false);
+  const [showMatrixQuadrants, setShowMatrixQuadrants] = useState(false);
+
   const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(false);
   const [showSystemLane, setShowSystemLane] = useState(true);
   const [showStarMarkers, setShowStarMarkers] = useState(true);
@@ -97,6 +100,7 @@ function App() {
 
   const timelineFilterRef = useRef(null);
   const workloadFilterRef = useRef(null);
+  const matrixFilterRef = useRef(null);
 
   const workloadVisibleRows = useMemo(() => {
     const filtered = workloadContributors.filter(r => showWorkloadSystem || r.user !== 'System');
@@ -111,6 +115,9 @@ function App() {
       }
       if (workloadFilterRef.current && !workloadFilterRef.current.contains(event.target)) {
         setShowWorkloadFilterMenu(false);
+      }
+      if (matrixFilterRef.current && !matrixFilterRef.current.contains(event.target)) {
+        setShowMatrixFilterMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -403,8 +410,11 @@ function App() {
                     )}
                   </div>
                 </div>
-                <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px]">
-                  <h2 className="text-lg font-bold mb-4">Top User Work Mix</h2>
+                <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold">Top User Work Mix</h2>
+                    <button onClick={() => setExpandedVisualizationId('contribution')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
+                  </div>
                   <div className="flex-1 min-h-0">
                     {contributionRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : <UserContributionStackChart rows={contributionRows} maxVisibleRows={3} />}
                   </div>
@@ -412,10 +422,10 @@ function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px]">
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
                    <div className="flex items-center justify-between mb-6">
                       <h2 className="text-lg font-bold">Step Delay Analysis</h2>
-                      <button onClick={() => setExpandedVisualizationId('flow')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600"><Maximize2 className="w-4 h-4" /></button>
+                      <button onClick={() => setExpandedVisualizationId('flow')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
                    </div>
                    <div className="flex-1 min-h-0">
                       {flowRows.length === 0 ? <EmptyState icon={RefreshCw} title="No Data" /> : (
@@ -435,13 +445,34 @@ function App() {
                       )}
                    </div>
                  </div>
-                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px]">
+                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-lg font-bold">Quality vs Edit Matrix</h2>
-                      <button onClick={() => setExpandedVisualizationId('matrix')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600"><Maximize2 className="w-4 h-4" /></button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="relative" ref={matrixFilterRef}>
+                          <button onClick={() => setShowMatrixFilterMenu(!showMatrixFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showMatrixFilterMenu ? 'text-blue-600 border-blue-200 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
+                          {showMatrixFilterMenu && (
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Chart Controls</div>
+                              <div className="space-y-3">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                  <input 
+                                    type="checkbox" 
+                                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                                    checked={showMatrixQuadrants} 
+                                    onChange={() => setShowMatrixQuadrants(!showMatrixQuadrants)} 
+                                  />
+                                  <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Show Quadrant Labels</span>
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={() => setExpandedVisualizationId('matrix')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
+                      </div>
                    </div>
                    <div className="flex-1 min-h-0">
-                      {matrixRows.length === 0 ? <EmptyState icon={Search} title="No Data" /> : <ReworkMatrixScatterChart rows={matrixRows} />}
+                      {matrixRows.length === 0 ? <EmptyState icon={Search} title="No Data" /> : <ReworkMatrixScatterChart rows={matrixRows} showQuadrants={showMatrixQuadrants} />}
                    </div>
                  </div>
               </div>
@@ -515,7 +546,7 @@ function App() {
                         }))}
                       />
                     )}
-                    {expandedVisualizationId === 'matrix' && <ReworkMatrixScatterChart rows={matrixRows} expanded />}
+                    {expandedVisualizationId === 'matrix' && <ReworkMatrixScatterChart rows={matrixRows} showQuadrants={showMatrixQuadrants} expanded />}
                   </div>
                </div>
             </div>
