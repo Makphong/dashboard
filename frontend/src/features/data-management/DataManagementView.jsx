@@ -57,7 +57,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-[#00a4e4] to-[#3860be] rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
+      <div className="bg-gradient-to-br from-[#00a4e4] to-[#3860be] rounded-2xl p-6 text-white shadow-lg flex items-center justify-between animate-stagger-1">
         <div>
           <div className="text-blue-100 font-medium mb-1">Central Table Rows</div>
           <div className="text-3xl font-extrabold">{totalRows.toLocaleString()} <span className="text-lg font-medium text-blue-200">Rows</span></div>
@@ -71,7 +71,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div
           onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-ktb ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#00a4e4]'}`}
+          className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-ktb animate-stagger-2 ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#00a4e4]'}`}
         >
           <div className="w-16 h-16 bg-[#e8f7fd] text-[#00a4e4] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <UploadCloud className="w-8 h-8" />
@@ -82,7 +82,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
           </button>
         </div>
 
-        <div className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center shadow-ktb transition-all group ${gsheetLoading ? 'border-[#bfe8f8] bg-[#e8f7fd]' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#00a4e4]'}`}>
+        <div className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center shadow-ktb transition-all group animate-stagger-3 ${gsheetLoading ? 'border-[#bfe8f8] bg-[#e8f7fd]' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#00a4e4]'}`}>
           <div className="w-16 h-16 bg-[#e8f7fd] text-[#00a4e4] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <Link2 className="w-8 h-8" />
           </div>
@@ -115,7 +115,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
       </div>
 
       {gsheetConnections.length > 0 && (
-        <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden animate-stagger-4">
           <div className="px-6 py-4 border-b border-[#d7e8f6] flex justify-between items-center bg-[#e8f7fd]">
             <div className="flex items-center gap-2">
               <Link2 className="w-4 h-4 text-[#00a4e4]" />
@@ -151,7 +151,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden animate-stagger-5">
         <div className="px-6 py-5 border-b border-[#d7e8f6] flex justify-between items-center bg-[#f6fbff]">
           <h2 className="text-lg font-bold text-[#17335f]">Connected Sources</h2>
         </div>

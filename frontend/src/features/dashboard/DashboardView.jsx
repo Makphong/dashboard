@@ -123,8 +123,8 @@ export function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {kpiData.map((kpi) => (
-          <div key={kpi.id} className="bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb">
+        {kpiData.map((kpi, idx) => (
+          <div key={kpi.id} className={`bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}>
             <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
@@ -135,7 +135,7 @@ export function DashboardView({
         ))}
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group">
+      <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2">
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => setShowExportConfirm(true)} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><FileSpreadsheet className="w-4 h-4" /></button>
           <div className="relative" ref={timelineFilterRef}>
@@ -172,7 +172,7 @@ export function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="absolute right-4 top-4 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="relative" ref={workloadFilterRef}>
               <button onClick={() => setShowWorkloadFilterMenu(!showWorkloadFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showWorkloadFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
@@ -194,7 +194,7 @@ export function DashboardView({
           </div>
         </div>
 
-        <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
+        <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-[#17335f]">Top User Work Mix</h2>
             <button onClick={() => setExpandedVisualizationId('contribution')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
@@ -206,7 +206,7 @@ export function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
+        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-[#17335f]">Step Delay Analysis</h2>
             <button onClick={() => setExpandedVisualizationId('flow')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
@@ -216,7 +216,7 @@ export function DashboardView({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
+        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-[#17335f]">Quality vs Edit Matrix</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
