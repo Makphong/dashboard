@@ -6,6 +6,7 @@ import { safeNumber, clampPercent, formatDuration, formatPercent } from '../../l
  */
 export const UserContributionStackChart = ({ rows = [] }) => {
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: '', color: '' });
+  const containerRef = React.useRef(null);
 
   const prepared = useMemo(() => {
     if (!Array.isArray(rows)) return [];
@@ -33,67 +34,66 @@ export const UserContributionStackChart = ({ rows = [] }) => {
 
   if (prepared.length === 0) return null;
 
-  // Stable 4-user view height - precisely calibrated to hide the 5th row
   const maxVisibleRows = 4;
   const rowSlotHeight = 63.5; 
   const useScroll = prepared.length > maxVisibleRows;
   const wrapperStyle = useScroll ? { maxHeight: `${maxVisibleRows * rowSlotHeight}px` } : undefined;
 
+  const handleMouseMove = (e, content, color) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    setTooltip({
+      show: true,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      content,
+      color
+    });
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-1 px-1">
+    <div className="space-y-4 relative" ref={containerRef}>
+      <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 px-1">
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] shadow-[0_0_8px_rgba(37,99,235,0.2)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#00a4e4] shadow-[0_0_8px_rgba(0,164,228,0.4)]"></span>
           Review
         </div>
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.2)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
           Edit
         </div>
       </div>
 
       <div 
-        className={`${useScroll ? 'overflow-y-auto no-scrollbar pr-2 pb-4 space-y-0.5' : 'space-y-0.5'}`} 
+        className={`${useScroll ? 'overflow-y-auto no-scrollbar pr-2 pb-2' : ''} space-y-1`} 
         style={wrapperStyle}
       >
         {prepared.map((row) => {
           const currentMax = maxTotal || 1;
-          const totalWidth = clampPercent(Math.max((row.total / currentMax) * 100, 8));
+          const totalWidth = clampPercent(Math.max((row.total / currentMax) * 100, 12));
           const reviewWidth = row.total > 0 ? clampPercent((row.review / row.total) * 100) : 0;
           const editWidth = row.total > 0 ? clampPercent((row.edit / row.total) * 100) : 0;
 
           return (
-            <div key={row.user} className="py-2.5 transition-all group border-b border-slate-50 last:border-0">
-              <div className="flex items-center justify-between text-sm mb-2 px-0.5">
-                <span className="font-semibold text-slate-700 truncate">{row.user}</span>
-                <span className="text-slate-500">{formatDuration(row.total)}</span>
+            <div key={row.user} className="py-2.5 transition-all group border-b border-slate-50 last:border-0 hover:bg-slate-50/50 rounded-xl px-2 -mx-2">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="font-bold text-[#17335f] truncate">{row.user}</span>
+                <span className="text-[11px] font-bold text-slate-400">{formatDuration(row.total)}</span>
               </div>
-              <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full rounded-full overflow-hidden flex" style={{ width: `${totalWidth}%` }}>
+              <div className="h-2.5 w-full rounded-full bg-slate-100/80 overflow-hidden shadow-inner">
+                <div className="h-full rounded-full overflow-hidden flex shadow-sm" style={{ width: `${totalWidth}%` }}>
                   <div 
-                    onMouseEnter={(e) => setTooltip({
-                      show: true,
-                      x: e.clientX,
-                      y: e.clientY,
-                      content: `Review: ${formatDuration(row.review)} (${formatPercent(row.review / (row.total || 1))})`,
-                      color: '#2563EB'
-                    })}
-                    onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                    onMouseEnter={(e) => handleMouseMove(e, `Review: ${formatDuration(row.review)} (${formatPercent(row.review / (row.total || 1))})`, '#00a4e4')}
+                    onMouseMove={(e) => handleMouseMove(e, `Review: ${formatDuration(row.review)} (${formatPercent(row.review / (row.total || 1))})`, '#00a4e4')}
                     onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-[#2563EB] cursor-pointer transition-opacity hover:opacity-80" 
+                    className="h-full bg-[#00a4e4] cursor-pointer transition-all hover:brightness-110" 
                     style={{ width: `${reviewWidth}%` }}
                   />
                   <div 
-                    onMouseEnter={(e) => setTooltip({
-                      show: true,
-                      x: e.clientX,
-                      y: e.clientY,
-                      content: `Edit: ${formatDuration(row.edit)} (${formatPercent(row.edit / (row.total || 1))})`,
-                      color: '#10B981'
-                    })}
-                    onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
+                    onMouseEnter={(e) => handleMouseMove(e, `Edit: ${formatDuration(row.edit)} (${formatPercent(row.edit / (row.total || 1))})`, '#10B981')}
+                    onMouseMove={(e) => handleMouseMove(e, `Edit: ${formatDuration(row.edit)} (${formatPercent(row.edit / (row.total || 1))})`, '#10B981')}
                     onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-[#10B981] cursor-pointer transition-opacity hover:opacity-80" 
+                    className="h-full bg-emerald-500 cursor-pointer transition-all hover:brightness-110" 
                     style={{ width: `${editWidth}%` }}
                   />
                 </div>
@@ -103,19 +103,19 @@ export const UserContributionStackChart = ({ rows = [] }) => {
         })}
       </div>
 
-      {/* Floating tooltip (white theme) */}
+      {/* Floating tooltip (absolute theme) */}
       {tooltip.show && (
         <div 
-          className="fixed pointer-events-none z-[9999]"
+          className="absolute pointer-events-none z-[200] animate-in fade-in zoom-in duration-150"
           style={{ 
-            left: Math.min(tooltip.x + 12, window.innerWidth - 180), 
-            top: Math.max(tooltip.y - 12, 100),
-            transform: 'translate(0, -100%)'
+            left: Math.max(0, Math.min(tooltip.x + 10, (containerRef.current?.clientWidth || 0) - 190)), 
+            top: tooltip.y - 10,
+            transform: 'translateY(-100%)'
           }}
         >
-          <div className="bg-white text-slate-800 px-3 py-1.5 rounded-lg shadow-lg border border-slate-200 flex items-center gap-2 animate-in fade-in zoom-in duration-150">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tooltip.color }}></div>
-            <span className="text-[11px] font-bold tracking-wide whitespace-nowrap">{tooltip.content}</span>
+          <div className="bg-white/95 backdrop-blur-md text-[#17335f] px-3 py-1.5 rounded-xl shadow-ktb border border-[#d7e8f6] flex items-center gap-2 min-w-[170px]">
+            <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: tooltip.color }}></div>
+            <span className="text-[12px] font-bold tracking-tight whitespace-nowrap">{tooltip.content}</span>
           </div>
         </div>
       )}

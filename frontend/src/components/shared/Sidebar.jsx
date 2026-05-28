@@ -19,9 +19,18 @@ export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollap
       {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
     </button>
 
-    <div className={`h-20 flex items-center border-b border-[#d7e8f6] px-6 transition-all duration-300 ${isCollapsed ? 'justify-center lg:px-0' : 'justify-start'}`}>
-      <div className="flex items-center gap-2 overflow-hidden min-w-max">
-        <div className="w-9 h-9 flex-shrink-0 bg-[#00a4e4] rounded-lg flex items-center justify-center text-white text-sm font-extrabold shadow-ktb">KTB</div>
+    {/* Old Text Logo - Saved for future use: 
+      <div className="w-9 h-9 flex-shrink-0 bg-[#00a4e4] rounded-lg flex items-center justify-center text-white text-sm font-extrabold shadow-ktb">KTB</div> 
+    */}
+    <div className={`h-20 shrink-0 flex items-center border-b border-[#d7e8f6] px-6 transition-all duration-300 overflow-hidden ${isCollapsed ? 'justify-center lg:px-0' : 'justify-start'}`}>
+      <div className="flex items-center gap-2 min-w-max">
+        <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
+          <img 
+            src="https://upload.wikimedia.org/wikipedia/en/f/f0/Krung_Thai_Bank_logo.svg" 
+            alt="KTB Logo" 
+            className="w-8 h-8 object-contain block"
+          />
+        </div>
         <span className={`text-2xl font-extrabold tracking-tight text-[#17335f] transition-all duration-300 origin-left ${isCollapsed ? 'opacity-0 w-0 scale-95 translate-x-[-10px] pointer-events-none' : 'opacity-100 w-auto scale-100 translate-x-0'}`}>
           Analytics
         </span>

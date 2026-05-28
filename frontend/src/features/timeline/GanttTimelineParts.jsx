@@ -177,29 +177,29 @@ export const GanttTooltip = ({ hoveredSegment }) => {
 
   return (
     <div
-      className="pointer-events-none absolute z-[200] w-[310px] rounded-2xl border border-[#d7e8f6] bg-white/95 backdrop-blur-md p-4 shadow-ktb animate-in fade-in zoom-in duration-150"
+      className="pointer-events-none absolute z-[200] w-[280px] rounded-xl border border-[#d7e8f6] bg-white/95 backdrop-blur-md p-3.5 shadow-ktb animate-in fade-in zoom-in duration-150"
       style={{
         left: hoveredSegment.x,
         top: hoveredSegment.y,
       }}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-2.5 h-2.5 rounded-full bg-[#00a4e4] shadow-[0_0_8px_rgba(0,164,228,0.5)]"></div>
-        <div className="text-[11px] font-bold text-[#17335f] uppercase tracking-tight truncate">
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="w-2 h-2 rounded-full bg-[#00a4e4] shadow-[0_0_6px_rgba(0,164,228,0.4)]"></div>
+        <div className="text-[13px] font-bold text-[#17335f] uppercase tracking-tight truncate">
           {toGanttSegmentTypeLabel(hoveredSegment.segmentType)}
         </div>
       </div>
-      <div className="space-y-2 text-[10px] font-semibold text-slate-500">
+      <div className="space-y-1.5 text-[11px] font-semibold text-slate-500">
         <div className="flex justify-between items-center pb-1 border-b border-slate-50">
           <span>Lane</span>
-          <span className="text-[#17335f]">{hoveredSegment.lane}</span>
+          <span className="text-[#17335f] text-[12px]">{hoveredSegment.lane}</span>
         </div>
         <div className="flex justify-between items-center pb-1 border-b border-slate-50">
           <span>Duration</span>
-          <span className="text-[#00a4e4] font-bold">{formatDuration(hoveredSegment.durationSeconds)}</span>
+          <span className="text-[#00a4e4] text-[14px] font-bold">{formatDuration(hoveredSegment.durationSeconds)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span>Time Window</span>
+          <span>Time</span>
           <span className="text-slate-600 font-medium">
             {formatTimeTick(hoveredSegment.start)} - {formatTimeTick(hoveredSegment.end)}
           </span>
