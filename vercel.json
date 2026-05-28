@@ -20,7 +20,7 @@
       "dest": "/frontend/src/$1"
     },
     {
-      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest)",
+      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest|.*\\.ttf)",
       "dest": "/$1"
     },
     {
