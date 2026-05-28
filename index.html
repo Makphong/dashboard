@@ -121,6 +121,73 @@
     </div>
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="text/babel" data-type="module" data-presets="react" src="./frontend/src/app.jsx?v=20260526-refactor-phase3-final"></script>
+    <script type="module">
+      const frontendBuildVersion = '20260528-app-restructure-2';
+      const moduleCache = new Map();
+      const relativeImportPattern = /(import\s+(?:[^'"]*?\s+from\s+)?|export\s+[^'"]*?\s+from\s+)(['"])(\.[^'"]+)\2/g;
+
+      function withBuildVersion(url) {
+        const parsedUrl = new URL(url, window.location.href);
+        if (parsedUrl.origin === window.location.origin && parsedUrl.pathname.includes('/frontend/src/')) {
+          parsedUrl.searchParams.set('v', frontendBuildVersion);
+        }
+        return parsedUrl.href;
+      }
+
+      async function loadJsxModule(url) {
+        const normalizedUrl = withBuildVersion(url);
+        if (moduleCache.has(normalizedUrl)) return moduleCache.get(normalizedUrl);
+
+        const modulePromise = (async () => {
+          const response = await fetch(normalizedUrl);
+          if (!response.ok) throw new Error(`Failed to load module ${normalizedUrl}: ${response.status}`);
+
+          let source = await response.text();
+          const dependencies = [];
+          source.replace(relativeImportPattern, (match, prefix, quote, specifier) => {
+            dependencies.push({
+              match,
+              replacementPrefix: prefix,
+              quote,
+              specifier,
+              url: withBuildVersion(new URL(specifier, normalizedUrl)),
+            });
+            return match;
+          });
+
+          for (const dependency of dependencies) {
+            const dependencyBlobUrl = await loadJsxModule(dependency.url);
+            source = source.replace(
+              dependency.match,
+              `${dependency.replacementPrefix}${dependency.quote}${dependencyBlobUrl}${dependency.quote}`
+            );
+          }
+
+          const transformed = Babel.transform(source, {
+            presets: ['react'],
+            sourceType: 'module',
+            filename: normalizedUrl,
+          }).code;
+          return URL.createObjectURL(new Blob([transformed], { type: 'text/javascript' }));
+        })();
+
+        moduleCache.set(normalizedUrl, modulePromise);
+        return modulePromise;
+      }
+
+      loadJsxModule(new URL('./frontend/src/app.jsx', window.location.href))
+        .then((entryUrl) => import(entryUrl))
+        .catch((error) => {
+          console.error(error);
+          document.getElementById('root').innerHTML = `
+            <div class="min-h-screen bg-slate-50 p-8 text-slate-900">
+              <div class="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
+                <h1 class="text-xl font-bold text-red-700">Frontend failed to load</h1>
+                <p class="mt-2 text-sm text-slate-600">${error.message}</p>
+              </div>
+            </div>
+          `;
+        });
+    </script>
   </body>
 </html>

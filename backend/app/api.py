@@ -312,7 +312,7 @@ def create_app() -> Flask:
         
         files_to_bundle = [
             "lib/constants.js", "lib/utils.js", "lib/api.js", "hooks/usePersistentState.js",
-            "hooks/useDashboardData.js",
+            "hooks/useDashboardData.js", "hooks/useAppController.js",
             "components/shared/KpiSubtext.jsx", "components/shared/Sidebar.jsx",
             "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
             "components/shared/EmptyState.jsx", 
@@ -322,7 +322,13 @@ def create_app() -> Flask:
             "features/charts/SystemParetoChart.jsx", "features/charts/SystemBottleneckTable.jsx",
             "features/charts/FlowDelayComparisonTable.jsx", "features/charts/DonutWorkloadChart.jsx",
             "features/charts/UserContributionStackChart.jsx", "features/charts/ReworkMatrixScatterChart.jsx",
-            "features/data-management/DataManagementView.jsx", "app.jsx"
+            "features/data-management/DataManagementView.jsx",
+            "features/dashboard/DashboardLayout.jsx", "features/dashboard/DashboardView.jsx",
+            "features/dashboard/views/SystemPerformanceView.jsx",
+            "features/dashboard/components/ExpandedVisualizationModal.jsx",
+            "features/dashboard/components/ExportConfirmModal.jsx",
+            "features/dashboard/components/SegmentDetailPopup.jsx",
+            "app.jsx"
         ]
         
         import re

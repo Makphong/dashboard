@@ -4,25 +4,28 @@ import { FilterBar } from './FilterBar.jsx';
 
 export function DashboardLayout({
   dashboard,
-  activeView,
-  setActiveView,
-  isSidebarCollapsed,
-  setIsSidebarCollapsed,
-  isMobileSidebarOpen,
-  setIsMobileSidebarOpen,
-  openDropdown,
-  setOpenDropdown,
-  userSearchText,
-  setUserSearchText,
-  segmentTypeSearchText,
-  setSegmentTypeSearchText,
-  documentFileSearch,
-  setDocumentFileSearch,
-  documentSheetSearch,
-  setDocumentSheetSearch,
-  errorMessage,
+  controller,
   children
 }) {
+  const {
+    activeView,
+    setActiveView,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    isMobileSidebarOpen,
+    setIsMobileSidebarOpen,
+    openDropdown,
+    setOpenDropdown,
+    userSearchText,
+    setUserSearchText,
+    segmentTypeSearchText,
+    setSegmentTypeSearchText,
+    documentFileSearch,
+    setDocumentFileSearch,
+    documentSheetSearch,
+    setDocumentSheetSearch,
+  } = controller;
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       <Sidebar
@@ -58,7 +61,7 @@ export function DashboardLayout({
         )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 relative">
-          {errorMessage && <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">{errorMessage}</div>}
+          {dashboard.errorMessage && <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">{dashboard.errorMessage}</div>}
           {children}
         </main>
       </div>

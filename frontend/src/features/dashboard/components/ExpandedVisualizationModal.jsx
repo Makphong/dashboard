@@ -4,12 +4,20 @@ import { GanttTimelineChart } from '../../timeline/GanttTimelineChart.jsx';
 import { DonutWorkloadChart } from '../../charts/DonutWorkloadChart.jsx';
 import { DurationBarChart } from '../../charts/DurationBarChart.jsx';
 import { ReworkMatrixScatterChart } from '../../charts/ReworkMatrixScatterChart.jsx';
+import { UserContributionStackChart } from '../../charts/UserContributionStackChart.jsx';
 import { formatDuration } from '../../../lib/utils.js';
 
 export function ExpandedVisualizationModal({ visualizationId, onClose, data }) {
   if (!visualizationId) return null;
 
-  const { ganttVisibleSegments, workloadVisibleRows, flowRows, matrixRows } = data;
+  const {
+    ganttVisibleSegments,
+    workloadVisibleRows,
+    flowRows,
+    contributionRows,
+    matrixRows,
+    showMatrixQuadrants,
+  } = data;
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
@@ -36,7 +44,8 @@ export function ExpandedVisualizationModal({ visualizationId, onClose, data }) {
               }))}
             />
           )}
-          {visualizationId === 'matrix' && <ReworkMatrixScatterChart rows={matrixRows} expanded />}
+          {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
+          {visualizationId === 'matrix' && <ReworkMatrixScatterChart rows={matrixRows} showQuadrants={showMatrixQuadrants} expanded />}
         </div>
       </div>
     </div>
