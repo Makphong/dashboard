@@ -258,7 +258,7 @@ export const ReworkMatrixScatterChart = React.memo(({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full h-auto bg-white block cursor-grab active:cursor-grabbing"
+        className="w-full h-auto bg-white block cursor-default"
         style={{ overflow: 'hidden', touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -298,6 +298,7 @@ export const ReworkMatrixScatterChart = React.memo(({
         {yTicks.map((tick) => (
           <line
             key={`h-${tick}`}
+            className="pointer-events-none"
             x1={margin.left}
             x2={width - margin.right}
             y1={y(tick)}
@@ -310,6 +311,7 @@ export const ReworkMatrixScatterChart = React.memo(({
         {xTicks.map((tick) => (
           <line
             key={`v-${tick}`}
+            className="pointer-events-none"
             y1={margin.top}
             y2={height - margin.bottom}
             x1={x(tick)}
@@ -348,12 +350,12 @@ export const ReworkMatrixScatterChart = React.memo(({
 
         {/* Axis Ticks */}
         {yTicks.map((tick) => (
-          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[11px]">
+          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[11px] pointer-events-none">
             {Math.round(tick * 1000) / 10}%
           </text>
         ))}
         {xTicks.map((tick) => (
-          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[11px]">
+          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[11px] pointer-events-none">
             {formatDuration(tick)}
           </text>
         ))}
@@ -431,10 +433,10 @@ export const ReworkMatrixScatterChart = React.memo(({
           </g>
         )}
 
-        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[12px] font-medium">
+        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[12px] font-medium pointer-events-none">
           Avg Time per Document
         </text>
-        <text transform={`translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[12px] font-medium">
+        <text transform={`translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[12px] font-medium pointer-events-none">
           Edit Rate
         </text>
       </svg>

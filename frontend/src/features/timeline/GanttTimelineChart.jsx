@@ -316,7 +316,7 @@ export const GanttTimelineChart = ({
               onMouseMove={onDragMove}
               onMouseUp={onDragEnd}
               onMouseLeave={() => { onDragEnd(); setHoveredSegment(null); }}
-              className="flex-1 overflow-x-auto no-scrollbar cursor-grab active:cursor-grabbing"
+              className="flex-1 overflow-x-auto no-scrollbar cursor-default"
             >
               <GanttBarsSvg
                 timelineSvgWidth={timelineSvgWidth}
