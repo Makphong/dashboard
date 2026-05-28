@@ -103,7 +103,7 @@ export const UserContributionStackChart = ({ rows = [] }) => {
         })}
       </div>
 
-      {/* Modern Floating Tooltip (Viewport Constrained) */}
+      {/* Floating tooltip (white theme) */}
       {tooltip.show && (
         <div 
           className="fixed pointer-events-none z-[9999]"
@@ -113,7 +113,7 @@ export const UserContributionStackChart = ({ rows = [] }) => {
             transform: 'translate(0, -100%)'
           }}
         >
-          <div className="bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-lg shadow-xl border border-white/10 flex items-center gap-2 animate-in fade-in zoom-in duration-150">
+          <div className="bg-white text-slate-800 px-3 py-1.5 rounded-lg shadow-lg border border-slate-200 flex items-center gap-2 animate-in fade-in zoom-in duration-150">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tooltip.color }}></div>
             <span className="text-[11px] font-bold tracking-wide whitespace-nowrap">{tooltip.content}</span>
           </div>
