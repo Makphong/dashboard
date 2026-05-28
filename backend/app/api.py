@@ -320,6 +320,9 @@ def create_app() -> Flask:
             "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
             "components/shared/EmptyState.jsx", 
             "features/dashboard/FilterBar.jsx",
+            "features/timeline/timelineUtils.js",
+            "features/timeline/ganttLayoutUtils.js",
+            "features/timeline/GanttTimelineParts.jsx",
             "features/timeline/GanttTimelineChart.jsx",
             "features/charts/DurationBarChart.jsx", "features/charts/SystemProcessingTrendChart.jsx",
             "features/charts/SystemParetoChart.jsx", "features/charts/SystemBottleneckTable.jsx",
@@ -365,7 +368,7 @@ def create_app() -> Flask:
         # Hardcoded Global Import Header (Ensures no duplicates and correct symbols)
         header = [
             "// AUTO-GENERATED FAIL-SAFE BUNDLE",
-            "import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';",
+            "import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';",
             "import { createRoot } from 'react-dom/client';",
             "import { createPortal } from 'react-dom';",
             "import { ",
