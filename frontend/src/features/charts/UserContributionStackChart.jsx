@@ -58,13 +58,13 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
 
   return (
     <div className="space-y-4 relative" ref={containerRef}>
-      <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 px-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1 text-xs text-slate-600 mb-1">
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_rgba(6,182,212,0.4)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#06B6D4]"></span>
           Review
         </div>
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shadow-[0_0_8px_rgba(245,158,11,0.4)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
           Edit
         </div>
       </div>

@@ -10,7 +10,7 @@ export const initialKpiData = [
   { id: 2, label: 'Contributing Users', value: '0', subtext: 'No user data', icon: Users, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
   { id: 3, label: 'Avg User Action', value: '-', subtext: 'Med - · - - -', icon: Timer, color: 'text-[#00a4e4]', bg: 'bg-[#e8f7fd]' },
   { id: 5, label: 'Edit Rate', value: '0.0%', subtext: '0 edit / 0 actions', icon: RefreshCw, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
-  { id: 6, label: 'Auto Closed Actions', value: '0', subtext: '0.0% of all actions', icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
+  { id: 6, label: 'Active System Time', value: '-', subtext: '0.0% of active time', icon: Clock, color: 'text-[#334155]', bg: 'bg-slate-100' },
 ];
 export const REOPEN_MARKER_TYPES = new Set(['REOPEN_MARKER', 'REOPEN_TO_REVIEW_HANDOFF_MARKER']);
 export const PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES = new Set(['IDLE_WAITING_FOR_SCHEDULED_REPROCESS']);

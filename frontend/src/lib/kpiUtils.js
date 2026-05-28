@@ -50,12 +50,12 @@ export function buildKpiData(kpis) {
     },
     {
       id: 6,
-      label: 'Auto Closed Actions',
-      value: String(kpis.autoClosedSessions || 0),
-      subtext: `${kpis.autoClosedRate?.toFixed(1) || '0.0'}% of all actions`,
-      icon: AlertTriangle,
-      color: 'text-red-600',
-      bg: 'bg-red-50',
+      label: 'Active System Time',
+      value: kpis.systemTimeDisplay || '-',
+      subtext: `${formatPercent(kpis.systemPercentOfActive || 0)} of active time`,
+      icon: Clock,
+      color: 'text-[#334155]',
+      bg: 'bg-slate-100',
     },
   ];
 }
@@ -66,6 +66,7 @@ export function buildKpisFromSegments(segments) {
   const coreUserSegments = userSegments.filter((segment) => CORE_WORK_SESSION_TYPES.has(String(segment.segmentType || '')));
   const idleSegments = safeSegments.filter((segment) => isIdleContextSegment(segment.segmentType));
   const processingEquivalentIdleSegments = safeSegments.filter((segment) => isProcessingEquivalentIdleSegment(segment.segmentType));
+  const systemSegments = safeSegments.filter((s) => String(s.segmentType || '').startsWith('SYSTEM_'));
 
   const effectiveDuration = (segment) => safeNumber(segment?.durationSeconds);
 
@@ -78,9 +79,24 @@ export function buildKpisFromSegments(segments) {
   ).size;
   const avgUserSessionSeconds = coreUserSegments.length > 0 ? coreActiveUserTimeSeconds / coreUserSegments.length : 0;
 
+  const uniqueDocuments = new Set(
+    safeSegments
+      .map((s) => s.documentId || s.fileName)
+      .filter(Boolean)
+  ).size;
+
   const idleWaitingSeconds = idleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
   const idleWaitingOccurrences = idleSegments.length;
-  const autoClosedSessions = coreUserSegments.filter((segment) => segment.autoTimeout || String(segment.segmentType || '') === 'USER_REVIEW_AUTO_TIMEOUT').length;
+  
+  const processingEquivalentSystemSeconds = processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
+  const coreSystemSeconds = systemSegments.reduce((sum, s) => sum + safeNumber(s.durationSeconds), 0);
+  const systemTimeSeconds = coreSystemSeconds + processingEquivalentSystemSeconds;
+
+  const avgSystemTimePerDoc = uniqueDocuments > 0 ? systemTimeSeconds / uniqueDocuments : 0;
+
+  const totalActiveSeconds = activeUserTimeSeconds + systemTimeSeconds;
+  const systemPercentOfActive = totalActiveSeconds > 0 ? (systemTimeSeconds / totalActiveSeconds) : 0;
+
   const editTimeSeconds = coreUserSegments
     .filter((segment) => {
       const type = String(segment.segmentType || '');
@@ -89,11 +105,9 @@ export function buildKpisFromSegments(segments) {
     .reduce((sum, segment) => sum + effectiveDuration(segment), 0);
   const reworkRate = activeUserTimeSeconds > 0 ? (editTimeSeconds / activeUserTimeSeconds) : 0;
 
-  const processingEquivalentSystemSeconds = processingEquivalentIdleSegments.reduce((sum, segment) => sum + safeNumber(segment.durationSeconds), 0);
-  const totalCycleSeconds = activeUserTimeSeconds + idleWaitingSeconds +
-    processingEquivalentSystemSeconds +
-    safeSegments.filter((s) => String(s.segmentType || '').startsWith('SYSTEM_')).reduce((sum, s) => sum + safeNumber(s.durationSeconds), 0);
+  const totalCycleSeconds = activeUserTimeSeconds + idleWaitingSeconds + systemTimeSeconds;
   const idlePercentOfCycle = totalCycleSeconds > 0 ? (idleWaitingSeconds / totalCycleSeconds) * 100 : 0;
+  const systemPercentOfCycle = totalCycleSeconds > 0 ? (systemTimeSeconds / totalCycleSeconds) * 100 : 0;
   const avgTimePerUser = contributingUsers > 0 ? activeUserTimeSeconds / contributingUsers : 0;
 
   const userTimeMap = {};
@@ -113,7 +127,6 @@ export function buildKpisFromSegments(segments) {
   const maxSessionSeconds = sessionDurations.length > 0 ? sessionDurations[sessionDurations.length - 1] : 0;
 
   const totalSessions = coreUserSegments.length;
-  const autoClosedRate = totalSessions > 0 ? (autoClosedSessions / totalSessions) * 100 : 0;
 
   const reworkSessions = coreUserSegments.filter((segment) => {
     const type = String(segment.segmentType || '');
@@ -124,6 +137,7 @@ export function buildKpisFromSegments(segments) {
     activeUserTimeSeconds,
     activeUserTimeDisplay: formatDuration(activeUserTimeSeconds),
     contributingUsers,
+    uniqueDocuments,
     avgUserSessionSeconds,
     avgUserSessionDisplay: formatDuration(avgUserSessionSeconds),
     idleWaitingSeconds,
@@ -131,7 +145,12 @@ export function buildKpisFromSegments(segments) {
     idleWaitingOccurrences,
     reworkRate,
     reworkRateDisplay: formatPercent(reworkRate),
-    autoClosedSessions,
+    systemTimeSeconds,
+    systemTimeDisplay: formatDuration(systemTimeSeconds),
+    avgSystemTimePerDoc,
+    avgSystemTimePerDocDisplay: formatDuration(avgSystemTimePerDoc),
+    systemPercentOfActive,
+    systemPercentOfCycle,
     avgTimePerUser,
     avgTimePerUserDisplay: formatDuration(avgTimePerUser),
     idlePercentOfCycle,
@@ -145,6 +164,5 @@ export function buildKpisFromSegments(segments) {
     reworkSessions,
     editTimeSeconds,
     totalSessions,
-    autoClosedRate,
   };
 }
