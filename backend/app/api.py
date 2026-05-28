@@ -18,7 +18,7 @@ MAX_UPLOAD_TOTAL_DECODED_BYTES = 25 * 1024 * 1024
 MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_FILES = 10
 UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
-ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest", "Krungthai.ttf"}
+ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest", "Krungthai.ttf", "Krungthai-Bold.ttf"}
 FRONTEND_STATIC_PREFIX = "frontend/src/"
 FRONTEND_STATIC_EXTENSIONS = {".js", ".jsx", ".mjs", ".css", ".json", ".map"}
 
