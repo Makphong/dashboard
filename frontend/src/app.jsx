@@ -15,31 +15,33 @@ function App() {
   const controller = useAppController(dashboard);
 
   return (
-    <DashboardLayout dashboard={dashboard} controller={controller}>
-      {controller.activeView === 'data-management' ? (
-        <DataManagementView
-          sources={dashboard.sources}
-          onUploadFiles={controller.handleUploadFiles}
-          onDeleteSource={controller.handleDeleteSource}
-          onConnectGSheet={controller.handleConnectGSheet}
-          onDisconnectGSheet={controller.handleDisconnectGSheet}
-          gsheetConnections={dashboard.gsheetConnections}
-          uploading={controller.uploading}
-          syncing={dashboard.syncing}
-        />
-      ) : controller.activeView === 'system-performance' ? (
-        <SystemPerformanceView segments={dashboard.ganttVisibleSegments} flowRows={dashboard.flowRows} />
-      ) : (
-        <DashboardView
-          dashboard={dashboard}
-          workloadVisibleRows={controller.workloadVisibleRows}
-          showMatrixQuadrants={controller.showMatrixQuadrants}
-          setShowMatrixQuadrants={controller.setShowMatrixQuadrants}
-          setSelectedGanttSegment={controller.setSelectedGanttSegment}
-          setExpandedVisualizationId={controller.setExpandedVisualizationId}
-          setShowExportConfirm={controller.setShowExportConfirm}
-        />
-      )}
+    <>
+      <DashboardLayout dashboard={dashboard} controller={controller}>
+        {controller.activeView === 'data-management' ? (
+          <DataManagementView
+            sources={dashboard.sources}
+            onUploadFiles={controller.handleUploadFiles}
+            onDeleteSource={controller.handleDeleteSource}
+            onConnectGSheet={controller.handleConnectGSheet}
+            onDisconnectGSheet={controller.handleDisconnectGSheet}
+            gsheetConnections={dashboard.gsheetConnections}
+            uploading={controller.uploading}
+            syncing={dashboard.syncing}
+          />
+        ) : controller.activeView === 'system-performance' ? (
+          <SystemPerformanceView segments={dashboard.ganttVisibleSegments} flowRows={dashboard.flowRows} />
+        ) : (
+          <DashboardView
+            dashboard={dashboard}
+            workloadVisibleRows={controller.workloadVisibleRows}
+            showMatrixQuadrants={controller.showMatrixQuadrants}
+            setShowMatrixQuadrants={controller.setShowMatrixQuadrants}
+            setSelectedGanttSegment={controller.setSelectedGanttSegment}
+            setExpandedVisualizationId={controller.setExpandedVisualizationId}
+            setShowExportConfirm={controller.setShowExportConfirm}
+          />
+        )}
+      </DashboardLayout>
 
       <SegmentDetailPopup
         segment={controller.selectedGanttSegment}
@@ -63,7 +65,7 @@ function App() {
         onConfirm={controller.confirmExportTimeline}
         count={dashboard.ganttVisibleSegments.length}
       />
-    </DashboardLayout>
+    </>
   );
 }
 

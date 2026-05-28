@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
   Users, Server, Database, User, X, ChevronLeft, ChevronRight, LayoutDashboard
 } from 'lucide-react';
@@ -7,7 +7,7 @@ const navItemClass = (isActive, isCollapsed) => `flex items-center gap-3 py-2.5 
   ${isCollapsed ? 'px-3.5' : 'px-3'}
   ${isActive ? 'bg-[#e8f7fd] text-[#3860be] border border-[#bfe8f8] shadow-ktb' : 'text-slate-600 hover:bg-[#eef8fd] border border-transparent'}`;
 
-export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, activeView, setActiveView }) => (
+export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, activeView, setActiveView }) => (
   <aside className={`fixed inset-y-0 left-0 z-[150] bg-white border-r border-[#d7e8f6] transition-all duration-300 ease-in-out flex flex-col
     ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
     lg:translate-x-0 ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} lg:static`}>
@@ -78,4 +78,4 @@ export const Sidebar = ({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollap
       </div>
     </div>
   </aside>
-);
+));

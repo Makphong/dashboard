@@ -5,7 +5,7 @@ import { safeNumber, formatDuration, formatPercent } from '../../lib/utils.js';
 
 const VIBRANT_PALETTE = ['#F43F5E', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4', '#D946EF', '#84CC16', '#F97316'];
 
-export const ReworkMatrixScatterChart = ({ 
+export const ReworkMatrixScatterChart = React.memo(({ 
   rows = [], 
   expanded = false, 
   showQuadrants = false 
@@ -440,4 +440,4 @@ export const ReworkMatrixScatterChart = ({
       </svg>
     </div>
   );
-};
+});

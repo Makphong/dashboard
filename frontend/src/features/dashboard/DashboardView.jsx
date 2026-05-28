@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
@@ -40,7 +40,7 @@ function getFlowChartRows(flowRows) {
   }));
 }
 
-export function DashboardView({
+export const DashboardView = React.memo(({
   dashboard,
   workloadVisibleRows,
   showMatrixQuadrants,
@@ -48,7 +48,7 @@ export function DashboardView({
   setSelectedGanttSegment,
   setExpandedVisualizationId,
   setShowExportConfirm
-}) {
+}) => {
   const {
     kpiData,
     ganttVisibleSegments,
@@ -244,4 +244,4 @@ export function DashboardView({
       </div>
     </div>
   );
-}
+});

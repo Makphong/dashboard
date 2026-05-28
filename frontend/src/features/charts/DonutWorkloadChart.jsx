@@ -13,7 +13,7 @@ const d3 = window.d3;
  * - Details-on-demand tooltip
  * - Interactive legend with cross-highlighting
  */
-export const DonutWorkloadChart = ({ rows, expanded = false }) => {
+export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
   const svgRef = useRef(null);
   const [hoveredUser, setHoveredUser] = useState(null);
   const [hoverSource, setHoverSource] = useState(null); // 'chart' | 'legend' | null
@@ -200,4 +200,4 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
       `}</style>
     </div>
   );
-};
+});

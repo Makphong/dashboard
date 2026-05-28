@@ -4,7 +4,7 @@ import { safeNumber, clampPercent, formatDuration, formatPercent } from '../../l
 /**
  * Top User Work Mix (Restored Original Styles with Interactive Tooltips)
  */
-export const UserContributionStackChart = ({ rows = [] }) => {
+export const UserContributionStackChart = React.memo(({ rows = [], expanded = false }) => {
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: '', color: '' });
   const containerRef = React.useRef(null);
 
@@ -121,5 +121,5 @@ export const UserContributionStackChart = ({ rows = [] }) => {
       )}
     </div>
   );
-};
+});
 ;

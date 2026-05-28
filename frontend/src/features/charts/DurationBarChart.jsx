@@ -2,7 +2,7 @@ import React from 'react';
 import { CHART_PALETTE } from '../../lib/constants.js';
 import { safeNumber, clampPercent } from '../../lib/utils.js';
 
-export const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
+export const DurationBarChart = React.memo(({ rows, maxVisibleRows = 0 }) => {
   const maxValue = rows.reduce((max, row) => Math.max(max, safeNumber(row.value)), 0) || 1;
   const rowSlotHeight = 66;
   const useScroll = maxVisibleRows > 0 && rows.length > maxVisibleRows;
@@ -40,4 +40,4 @@ export const DurationBarChart = ({ rows, maxVisibleRows = 0 }) => {
       })}
     </div>
   );
-};
+});
