@@ -79,7 +79,7 @@ export const SystemParetoChart = ({ rows, maxBars = 8 }) => {
             width={barWidth}
             height={Math.max(2, margin.top + innerHeight - yLeft(row.seconds))}
             rx="4"
-            fill="#3B82F6"
+            fill="#2563EB"
           >
             <title>{`${row.documentLabel} | ${formatDuration(row.seconds)} (${formatPercent(row.seconds / totalSeconds)})`}</title>
           </rect>
@@ -100,7 +100,7 @@ export const SystemParetoChart = ({ rows, maxBars = 8 }) => {
 
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-sm bg-blue-500"></span>
+          <span className="w-2.5 h-2.5 rounded-sm bg-[#2563EB]"></span>
           Document Delay
         </span>
         <span className="inline-flex items-center gap-1.5">

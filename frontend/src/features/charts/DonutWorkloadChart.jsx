@@ -143,7 +143,7 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
               <tspan x="0" dy="0.1em">{activeSegment ? formatDuration(activeSegment.value) : formatDuration(totalValue)}</tspan>
             </text>
             {activeSegment ? (
-              <text textAnchor="middle" className="fill-blue-600 font-bold" style={{ fontSize: expanded ? '18px' : '15px' }}>
+              <text textAnchor="middle" className="fill-[#2563EB] font-bold" style={{ fontSize: expanded ? '18px' : '15px' }}>
                 <tspan x="0" dy="1.6em">{formatPercent(activeSegment.value / totalValue)}</tspan>
               </text>
             ) : (
@@ -176,7 +176,7 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
               }}
               className={`
                 flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-300 cursor-default border
-                ${hoveredUser === d.user ? 'bg-blue-50 border-blue-100 shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-50'}
+                ${hoveredUser === d.user ? 'bg-[#EFF6FF] border-[#BFDBFE] shadow-sm' : 'bg-transparent border-transparent hover:bg-slate-50'}
                 ${isFaded ? 'opacity-20 pointer-events-none' : 'opacity-100'}
               `}
             >
@@ -184,7 +184,7 @@ export const DonutWorkloadChart = ({ rows, expanded = false }) => {
                 className="w-2.5 h-2.5 rounded-full shrink-0" 
                 style={{ backgroundColor: d.color, boxShadow: hoveredUser === d.user ? `0 0 10px ${d.color}` : 'none' }}
               />
-              <span className={`text-sm font-medium truncate flex-1 ${hoveredUser === d.user ? 'text-blue-700' : 'text-slate-500'}`}>
+              <span className={`text-sm font-medium truncate flex-1 ${hoveredUser === d.user ? 'text-[#1D4ED8]' : 'text-slate-500'}`}>
                 {d.user}
               </span>
             </div>

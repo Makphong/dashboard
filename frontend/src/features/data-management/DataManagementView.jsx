@@ -52,12 +52,12 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
 
       <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Data Management</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
           <p className="text-slate-500 mt-1">Upload Excel/CSV and consolidate all data into one central SQLite table with file and page names.</p>
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
+      <div className="bg-gradient-to-br from-[#00a4e4] to-[#3860be] rounded-2xl p-6 text-white shadow-lg flex items-center justify-between">
         <div>
           <div className="text-blue-100 font-medium mb-1">Central Table Rows</div>
           <div className="text-3xl font-extrabold">{totalRows.toLocaleString()} <span className="text-lg font-medium text-blue-200">Rows</span></div>
@@ -71,19 +71,19 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div
           onClick={() => !uploading && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-sm ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-slate-200 bg-white hover:bg-blue-50 hover:border-blue-300'}`}
+          className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center transition-all cursor-pointer group shadow-ktb ${uploading ? 'border-slate-200 bg-slate-50 cursor-not-allowed' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#00a4e4]'}`}
         >
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+          <div className="w-16 h-16 bg-[#e8f7fd] text-[#00a4e4] rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
             <UploadCloud className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Upload Excel / CSV</h3>
-          <button className="mt-6 h-12 px-6 bg-blue-600 text-white text-base font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 pointer-events-none">
+          <button className="mt-6 h-12 px-6 bg-[#00a4e4] text-white text-base font-semibold rounded-xl shadow-sm transition-colors flex items-center gap-2 pointer-events-none">
             <Plus className="w-4 h-4" /> {uploading ? 'Uploading...' : 'Select Files'}
           </button>
         </div>
 
-        <div className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center shadow-sm transition-all ${gsheetLoading ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-300'}`}>
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+        <div className={`border-2 border-dashed rounded-2xl p-8 min-h-[270px] flex flex-col items-center justify-center text-center shadow-ktb transition-all ${gsheetLoading ? 'border-[#bfe8f8] bg-[#e8f7fd]' : 'border-[#bfe8f8] bg-white hover:bg-[#e8f7fd] hover:border-[#3860be]'}`}>
+          <div className="w-16 h-16 bg-[#eef3ff] text-[#3860be] rounded-full flex items-center justify-center mb-4">
             <Link2 className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-bold text-slate-900">Google Sheet Connector</h3>
@@ -95,12 +95,12 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
               onChange={(e) => { setGsheetUrl(e.target.value); setGsheetError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && handleGSheetConnect()}
               disabled={gsheetLoading}
-              className="h-12 flex-1 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 disabled:bg-slate-50 disabled:text-slate-400"
+              className="h-12 flex-1 px-3 text-sm border border-[#d7e8f6] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00a4e4]/20 focus:border-[#00a4e4] disabled:bg-slate-50 disabled:text-slate-400"
             />
             <button
               onClick={handleGSheetConnect}
               disabled={gsheetLoading || !gsheetUrl.trim()}
-              className="h-12 px-5 bg-emerald-600 text-white text-base font-semibold rounded-lg shadow-sm hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="h-12 px-5 bg-[#3860be] text-white text-base font-semibold rounded-lg shadow-sm hover:bg-[#2f52a6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
               {gsheetLoading ? (
                 <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="31.4" strokeDashoffset="10" /></svg> Connecting...</>
@@ -115,10 +115,10 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
       </div>
 
       {gsheetConnections.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-emerald-50/50">
+        <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#d7e8f6] flex justify-between items-center bg-[#e8f7fd]">
             <div className="flex items-center gap-2">
-              <Link2 className="w-4 h-4 text-emerald-600" />
+              <Link2 className="w-4 h-4 text-[#3860be]" />
               <h2 className="text-base font-bold text-slate-900">Connected Google Sheets</h2>
             </div>
             {syncing && <span className="text-xs text-emerald-600 flex items-center gap-1"><svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="31.4" strokeDashoffset="10" /></svg> Syncing...</span>}
@@ -151,9 +151,9 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h2 className="text-lg font-bold text-slate-900">Connected Sources</h2>
+      <div className="bg-white rounded-2xl border border-[#d7e8f6] shadow-ktb overflow-hidden">
+        <div className="px-6 py-5 border-b border-[#d7e8f6] flex justify-between items-center bg-[#f6fbff]">
+          <h2 className="text-lg font-bold text-[#17335f]">Connected Sources</h2>
         </div>
         <div className="divide-y divide-slate-100">
           {sources.length === 0 ? (

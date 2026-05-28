@@ -54,13 +54,13 @@ export const ReworkMatrixScatterChart = ({
   const maxActive = prepared.reduce((max, row) => Math.max(max, row.totalActiveSeconds), 0) || 1;
   const activeRange = Math.max(0, maxActive - minActive);
 
-  const width = expanded ? 760 : 520;
-  const height = expanded ? 380 : 300;
-  const maxBubbleRadius = expanded ? 25 : 18;
+  const width = expanded ? 820 : 620;
+  const height = expanded ? 420 : 350;
+  const maxBubbleRadius = expanded ? 26 : 20;
 
   const margin = expanded
-    ? { top: 40, right: 50, bottom: 70, left: 80 }
-    : { top: 30, right: 40, bottom: 60, left: 70 };
+    ? { top: 30, right: 34, bottom: 58, left: 66 }
+    : { top: 24, right: 24, bottom: 48, left: 56 };
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -204,9 +204,57 @@ export const ReworkMatrixScatterChart = ({
   if (prepared.length === 0) return null;
 
   const hoveredData = hoveredUser ? prepared.find(p => p.user === hoveredUser) : null;
+  const occupiedLabelBoxes = [];
+  const getPointLabelPosition = (row, pointX, pointY, pointRadius, shortLabel) => {
+    const labelWidth = Math.max(46, shortLabel.length * 6.8);
+    const labelHeight = 14;
+    const candidates = [
+      { x: pointX, y: pointY - pointRadius - 9, anchor: 'middle' },
+      { x: pointX, y: pointY + pointRadius + 17, anchor: 'middle' },
+      { x: pointX + pointRadius + 9, y: pointY + 4, anchor: 'start' },
+      { x: pointX - pointRadius - 9, y: pointY + 4, anchor: 'end' },
+    ];
+
+    const boundsFor = (candidate) => {
+      const left = candidate.anchor === 'middle'
+        ? candidate.x - labelWidth / 2
+        : candidate.anchor === 'end'
+          ? candidate.x - labelWidth
+          : candidate.x;
+      return {
+        left,
+        right: left + labelWidth,
+        top: candidate.y - labelHeight,
+        bottom: candidate.y + 3,
+      };
+    };
+
+    const overlaps = (box) => occupiedLabelBoxes.some((used) => (
+      box.left < used.right + 3
+      && box.right > used.left - 3
+      && box.top < used.bottom + 2
+      && box.bottom > used.top - 2
+    ));
+
+    const inPlot = (box) => (
+      box.left >= margin.left + 2
+      && box.right <= width - margin.right - 2
+      && box.top >= margin.top + 2
+      && box.bottom <= height - margin.bottom - 2
+    );
+
+    const selected = candidates.find((candidate) => {
+      const box = boundsFor(candidate);
+      return inPlot(box) && !overlaps(box);
+    }) || candidates.find((candidate) => inPlot(boundsFor(candidate))) || candidates[0];
+
+    const selectedBox = boundsFor(selected);
+    occupiedLabelBoxes.push(selectedBox);
+    return selected;
+  };
 
   return (
-    <div className={`mt-2 overflow-hidden relative group ${expanded ? 'w-full max-w-[820px] mx-auto px-1' : ''}`}>
+    <div className={`mt-1 overflow-hidden relative group ${expanded ? 'w-full max-w-[900px] mx-auto px-1' : ''}`}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -291,21 +339,21 @@ export const ReworkMatrixScatterChart = ({
         {/* Quadrant Text Labels */}
         {showQuadrants && !isZoomed && (
           <g className="pointer-events-none select-none" opacity="0.85">
-            <text x={margin.left + 14} y={margin.top + 28} className="fill-amber-600/70 text-[11px] font-black italic tracking-tighter uppercase">FAST ITERATION</text>
-            <text x={width - margin.right - 14} y={margin.top + 28} textAnchor="end" className="fill-red-600/70 text-[11px] font-black italic tracking-tighter uppercase">HIGH COMPLEXITY</text>
-            <text x={margin.left + 14} y={height - margin.bottom - 12} className="fill-emerald-600/70 text-[11px] font-black italic tracking-tighter uppercase">PRECISION SPEED</text>
-            <text x={width - margin.right - 14} y={height - margin.bottom - 12} textAnchor="end" className="fill-blue-600/70 text-[11px] font-black italic tracking-tighter uppercase">CAREFUL ANALYSIS</text>
+            <text x={margin.left + 14} y={margin.top + 28} className="fill-amber-600/70 text-[12px] font-black italic uppercase">FAST ITERATION</text>
+            <text x={width - margin.right - 14} y={margin.top + 28} textAnchor="end" className="fill-red-600/70 text-[12px] font-black italic uppercase">HIGH COMPLEXITY</text>
+            <text x={margin.left + 14} y={height - margin.bottom - 12} className="fill-emerald-600/70 text-[12px] font-black italic uppercase">PRECISION SPEED</text>
+            <text x={width - margin.right - 14} y={height - margin.bottom - 12} textAnchor="end" className="fill-[#2563EB] opacity-70 text-[12px] font-black italic uppercase">CAREFUL ANALYSIS</text>
           </g>
         )}
 
         {/* Axis Ticks */}
         {yTicks.map((tick) => (
-          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[10px]">
+          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[11px]">
             {Math.round(tick * 1000) / 10}%
           </text>
         ))}
         {xTicks.map((tick) => (
-          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[10px]">
+          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[11px]">
             {formatDuration(tick)}
           </text>
         ))}
@@ -319,31 +367,9 @@ export const ReworkMatrixScatterChart = ({
             const shortUserLabel = row.user.length > 14 ? `${row.user.slice(0, 14)}...` : row.user;
             const isHovered = hoveredUser === row.user;
             
-            const labelX = Math.max(margin.left + 10, Math.min(width - margin.right - 10, px));
-            const qTopY = margin.top + 28;
-            const qBottomY = height - margin.bottom - 12;
-            const qTextWidth = 105; 
-            const isOverLeftText = px < margin.left + 14 + qTextWidth;
-            const isOverRightText = px > width - margin.right - 14 - qTextWidth;
-
-            let labelY = py - pointRadius - 8; 
-            if (showQuadrants && !isZoomed && (isOverLeftText || isOverRightText)) {
-              if (py < margin.top + 70) {
-                 const currentLabelTop = labelY;
-                 if (currentLabelTop < qTopY + 10 && currentLabelTop > qTopY - 20) {
-                    const canFlipBelow = (py + pointRadius + 24) < (height - margin.bottom - 40);
-                    labelY = canFlipBelow ? (py + pointRadius + 14) : (qTopY - 14);
-                 }
-              } else if (py > height - margin.bottom - 70) {
-                if (labelY > qBottomY - 16 && labelY < qBottomY + 10) {
-                   labelY = qBottomY - 20; 
-                }
-              }
-            } else if (labelY < margin.top + 12) {
-               labelY = py + pointRadius + 14;
-            }
-
             if (px + pointRadius < margin.left - 10 || px - pointRadius > width - margin.right + 10 || py + pointRadius < margin.top - 10 || py - pointRadius > height - margin.bottom + 10) return null;
+
+            const labelPosition = getPointLabelPosition(row, px, py, pointRadius, shortUserLabel);
             
             return (
               <g 
@@ -364,10 +390,10 @@ export const ReworkMatrixScatterChart = ({
                   className="transition-all duration-300 ease-out"
                 />
                 <text 
-                  x={labelX} 
-                  y={labelY} 
-                  textAnchor="middle" 
-                  className={`fill-black text-[10px] pointer-events-none transition-all duration-300 ${isHovered ? 'font-bold' : 'font-medium'} ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                  x={labelPosition.x}
+                  y={labelPosition.y}
+                  textAnchor={labelPosition.anchor}
+                  className={`fill-black text-[11px] pointer-events-none transition-all duration-300 ${isHovered ? 'font-bold' : 'font-semibold'} ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 >
                   {shortUserLabel}
                 </text>
@@ -392,23 +418,23 @@ export const ReworkMatrixScatterChart = ({
                 <g transform={`translate(${boxX}, ${boxY})`} className="drop-shadow-lg">
                   <rect width={tooltipW} height={tooltipH} rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
                   <rect width="4" height={tooltipH} rx="2" fill={VIBRANT_PALETTE[prepared.findIndex(p => p.user === hoveredUser) % VIBRANT_PALETTE.length]} />
-                  <text x="12" y="20" className="fill-black text-[11px] font-bold">{hoveredData.user}</text>
+                  <text x="12" y="20" className="fill-black text-[12px] font-bold">{hoveredData.user}</text>
                   <text x="12" y="42" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Avg Time</text>
-                  <text x="150" y="42" textAnchor="end" className="fill-black text-[10px] font-mono">{formatDuration(hoveredData.avgTimePerDocSeconds)}</text>
+                  <text x="150" y="42" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatDuration(hoveredData.avgTimePerDocSeconds)}</text>
                   <text x="12" y="58" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Edit Rate</text>
-                  <text x="150" y="58" textAnchor="end" className="fill-black text-[10px] font-mono">{formatPercent(hoveredData.reworkRate)}</text>
+                  <text x="150" y="58" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatPercent(hoveredData.reworkRate)}</text>
                   <text x="12" y="74" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Total Active</text>
-                  <text x="150" y="74" textAnchor="end" className="fill-black text-[10px] font-mono">{formatDuration(hoveredData.totalActiveSeconds)}</text>
+                  <text x="150" y="74" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatDuration(hoveredData.totalActiveSeconds)}</text>
                 </g>
               );
             })()}
           </g>
         )}
 
-        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[11px]">
+        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[12px] font-medium">
           Avg Time per Document
         </text>
-        <text transform={`translate(22 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[11px]">
+        <text transform={`translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[12px] font-medium">
           Edit Rate
         </text>
       </svg>

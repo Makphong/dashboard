@@ -16,8 +16,8 @@ export function buildKpiData(kpis) {
       value: kpis.activeUserTimeDisplay || '-',
       subtext: `Avg per user: ${kpis.avgTimePerUserDisplay || '-'}`,
       icon: Clock,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
+      color: 'text-[#00a4e4]',
+      bg: 'bg-[#e8f7fd]',
     },
     {
       id: 2,
@@ -27,8 +27,8 @@ export function buildKpiData(kpis) {
         ? `Top: ${kpis.topContributorName} (${kpis.topContributorDisplay})`
         : 'No user data',
       icon: Users,
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-50',
+      color: 'text-[#3860be]',
+      bg: 'bg-[#eef3ff]',
     },
     {
       id: 3,
@@ -36,8 +36,8 @@ export function buildKpiData(kpis) {
       value: kpis.avgUserSessionDisplay || '-',
       subtext: `Med ${kpis.medianSessionDisplay || '-'} · ${kpis.minSessionDisplay || '-'} - ${kpis.maxSessionDisplay || '-'}`,
       icon: Timer,
-      color: 'text-sky-600',
-      bg: 'bg-sky-50',
+      color: 'text-[#00a4e4]',
+      bg: 'bg-[#e8f7fd]',
     },
     {
       id: 5,
@@ -45,8 +45,8 @@ export function buildKpiData(kpis) {
       value: kpis.reworkRateDisplay || '0.0%',
       subtext: `${formatDuration(kpis.editTimeSeconds || 0)} edit / ${kpis.activeUserTimeDisplay || '0s'} active`,
       icon: RefreshCw,
-      color: 'text-violet-600',
-      bg: 'bg-violet-50',
+      color: 'text-[#3860be]',
+      bg: 'bg-[#eef3ff]',
     },
     {
       id: 6,

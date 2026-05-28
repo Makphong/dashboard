@@ -7,8 +7,61 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+      @font-face {
+        font-family: "Krungthai Fast Regular";
+        src: url("/Krungthai.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
       body {
-        font-family: "Segoe UI", "Noto Sans Thai", Tahoma, Arial, sans-serif;
+        --ktb-sky: #00a4e4;
+        --ktb-blue: #3860be;
+        --ktb-white: #ffffff;
+        --ktb-ink: #17335f;
+        --ktb-soft: #eef8fd;
+        --ktb-line: #d7e8f6;
+        font-family: "Krungthai Fast Regular", "Noto Sans Thai", "Segoe UI", Tahoma, Arial, sans-serif;
+        background:
+          linear-gradient(180deg, rgba(0, 164, 228, 0.045) 0%, rgba(255, 255, 255, 0) 220px),
+          #fbfdff;
+      }
+      .bg-blue-600 { background-color: var(--ktb-sky) !important; }
+      .hover\:bg-blue-700:hover { background-color: #078ec7 !important; }
+      .text-blue-600 { color: var(--ktb-sky) !important; }
+      .text-blue-700 { color: var(--ktb-blue) !important; }
+      .text-blue-500 { color: var(--ktb-sky) !important; }
+      .text-blue-400 { color: rgba(0, 164, 228, 0.72) !important; }
+      .bg-blue-50 { background-color: rgba(0, 164, 228, 0.09) !important; }
+      .hover\:bg-blue-50:hover { background-color: rgba(0, 164, 228, 0.10) !important; }
+      .border-blue-100 { border-color: rgba(0, 164, 228, 0.22) !important; }
+      .border-blue-200 { border-color: rgba(0, 164, 228, 0.36) !important; }
+      .border-blue-300 { border-color: rgba(0, 164, 228, 0.48) !important; }
+      .hover\:border-blue-200:hover { border-color: rgba(0, 164, 228, 0.36) !important; }
+      .hover\:border-blue-300:hover { border-color: rgba(0, 164, 228, 0.48) !important; }
+      .focus\:border-blue-500:focus { border-color: var(--ktb-sky) !important; }
+      .focus\:ring-blue-500\/20:focus { --tw-ring-color: rgba(0, 164, 228, 0.20) !important; }
+      .focus\:ring-blue-100:focus { --tw-ring-color: rgba(0, 164, 228, 0.16) !important; }
+      .accent-blue-600 { accent-color: var(--ktb-sky) !important; }
+      .from-blue-600 {
+        --tw-gradient-from: var(--ktb-sky) var(--tw-gradient-from-position) !important;
+        --tw-gradient-to: rgba(0, 164, 228, 0) var(--tw-gradient-to-position) !important;
+        --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+      }
+      .to-indigo-700 { --tw-gradient-to: var(--ktb-blue) var(--tw-gradient-to-position) !important; }
+      .from-blue-50 {
+        --tw-gradient-from: rgba(0, 164, 228, 0.11) var(--tw-gradient-from-position) !important;
+        --tw-gradient-to: rgba(0, 164, 228, 0) var(--tw-gradient-to-position) !important;
+        --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+      }
+      .to-indigo-50 { --tw-gradient-to: rgba(56, 96, 190, 0.10) var(--tw-gradient-to-position) !important; }
+      .shadow-ktb {
+        box-shadow: 0 10px 24px -22px rgba(56, 96, 190, 0.34), 0 1px 0 rgba(255, 255, 255, 0.72) inset;
+      }
+      .font-sans,
+      svg text,
+      svg tspan {
+        font-family: "Krungthai Fast Regular", "Noto Sans Thai", "Segoe UI", Tahoma, Arial, sans-serif !important;
       }
       * {
         scrollbar-width: none;
@@ -94,13 +147,13 @@
       }
     </script>
   </head>
-  <body class="bg-slate-100">
+  <body class="bg-[#fbfdff]">
     <div id="root">
       <!-- Instant Skeleton UI (Visible during Babel compilation) -->
-      <div class="flex h-screen bg-slate-50 overflow-hidden animate-pulse">
-        <div class="w-64 bg-white border-r border-slate-200 h-full hidden lg:block"></div>
+      <div class="flex h-screen bg-[#fbfdff] overflow-hidden animate-pulse">
+        <div class="w-64 bg-white border-r border-[#d7e8f6] h-full hidden lg:block"></div>
         <div class="flex-1 flex flex-col">
-          <div class="h-16 bg-white border-b border-slate-200 w-full"></div>
+          <div class="h-16 bg-white border-b border-[#d7e8f6] w-full"></div>
           <div class="p-8 space-y-8">
             <div class="h-10 bg-slate-200 rounded-lg w-1/4"></div>
             <div class="grid grid-cols-5 gap-4">
@@ -122,7 +175,7 @@
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="module">
-      const frontendBuildVersion = '20260528-app-restructure-2';
+      const frontendBuildVersion = '20260528-ktb-theme-1';
       const moduleCache = new Map();
       const relativeImportPattern = /(import\s+(?:[^'"]*?\s+from\s+)?|export\s+[^'"]*?\s+from\s+)(['"])(\.[^'"]+)\2/g;
 

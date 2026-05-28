@@ -12,7 +12,7 @@ import { formatDuration } from '../../lib/utils.js';
 function ToggleSetting({ checked, onChange, children, notice }) {
   return (
     <label className="flex items-center gap-3 cursor-pointer group relative">
-      <div className={`w-8 h-4 rounded-full transition-colors relative ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}>
+      <div className={`w-8 h-4 rounded-full transition-colors relative ${checked ? 'bg-[#00a4e4]' : 'bg-slate-200'}`}>
         <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${checked ? 'translate-x-4' : ''}`} />
       </div>
       <input type="checkbox" className="hidden" checked={checked} onChange={onChange} />
@@ -117,25 +117,25 @@ export function DashboardView({
     <div className="max-w-[1600px] mx-auto space-y-6">
       <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Dashboard Overview</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Dashboard Overview</h1>
           <p className="text-slate-500 mt-1">Real-time performance metrics and timeline analysis.</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiData.map((kpi) => (
-          <div key={kpi.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+          <div key={kpi.id} className="bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb">
             <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
             <div className="text-slate-500 text-sm font-semibold mb-1">{kpi.label}</div>
-            <div className="text-3xl font-extrabold text-slate-900">{kpi.value}</div>
+            <div className="text-3xl font-extrabold text-[#17335f]">{kpi.value}</div>
             <KpiSubtext text={kpi.subtext} />
           </div>
         ))}
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative group">
+      <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group">
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => setShowExportConfirm(true)} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><FileSpreadsheet className="w-4 h-4" /></button>
           <div className="relative" ref={timelineFilterRef}>
@@ -156,7 +156,7 @@ export function DashboardView({
           </div>
           <button onClick={() => setExpandedVisualizationId('gantt')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
         </div>
-        <h2 className="text-lg font-bold mb-6">Timeline by User</h2>
+        <h2 className="text-lg font-bold mb-6 text-[#17335f]">Timeline by User</h2>
         {ganttVisibleSegments.length === 0 ? <EmptyState icon={LayoutDashboard} title="No Data" /> : (
           <GanttTimelineChart
             segments={ganttVisibleSegments}
@@ -172,7 +172,7 @@ export function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
           <div className="absolute right-4 top-4 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="relative" ref={workloadFilterRef}>
               <button onClick={() => setShowWorkloadFilterMenu(!showWorkloadFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showWorkloadFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
@@ -188,15 +188,15 @@ export function DashboardView({
             </div>
             <button onClick={() => setExpandedVisualizationId('donut')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
           </div>
-          <h2 className="text-lg font-bold mb-4">Workload Share</h2>
+          <h2 className="text-lg font-bold mb-4 text-[#17335f]">Workload Share</h2>
           <div className="flex-1 min-h-0">
             {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : <DonutWorkloadChart rows={workloadVisibleRows} />}
           </div>
         </div>
 
-        <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
+        <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">Top User Work Mix</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Top User Work Mix</h2>
             <button onClick={() => setExpandedVisualizationId('contribution')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 min-h-0">
@@ -206,9 +206,9 @@ export function DashboardView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
+        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold">Step Delay Analysis</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Step Delay Analysis</h2>
             <button onClick={() => setExpandedVisualizationId('flow')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 min-h-0">
@@ -216,9 +216,9 @@ export function DashboardView({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col min-h-[400px] relative group">
+        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold">Quality vs Edit Matrix</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Quality vs Edit Matrix</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="relative" ref={matrixFilterRef}>
                 <button onClick={() => setShowMatrixFilterMenu(!showMatrixFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showMatrixFilterMenu ? 'text-blue-600 border-blue-200 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>

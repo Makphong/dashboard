@@ -85,14 +85,14 @@ export function FilterBar({
   const selectedSegmentTypeSet = new Set(selectedSegmentTypes);
 
   return (
-    <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 py-3 z-[80]">
+    <header className="shrink-0 bg-white/90 backdrop-blur-md border-b border-[#d7e8f6] px-4 md:px-8 py-3 z-[80]">
       <div className="max-w-[1600px] mx-auto flex items-center gap-2 md:gap-3">
         
         <div className="flex-1 flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-0.5">
           {/* Mobile Menu Trigger */}
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-slate-900 transition-colors shrink-0"
+            className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-[#3860be] transition-colors shrink-0"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -113,14 +113,14 @@ export function FilterBar({
                   <button
                     key={preset}
                     onClick={() => setDatePreset(preset)}
-                    className={`h-9 rounded-lg text-sm font-semibold transition-colors ${datePreset === preset ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                    className={`h-9 rounded-lg text-sm font-semibold transition-colors ${datePreset === preset ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
                   >
                     {preset === 'all' ? 'All Time' : (preset === '7d' ? 'Last 7 Days' : (preset === '30d' ? 'Last 30 Days' : 'Last 90 Days'))}
                   </button>
                 ))}
                 <button
                   onClick={() => setDatePreset('custom')}
-                  className={`h-9 rounded-lg text-sm font-semibold transition-colors col-span-2 ${datePreset === 'custom' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                  className={`h-9 rounded-lg text-sm font-semibold transition-colors col-span-2 ${datePreset === 'custom' ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
                 >
                   Custom Range
                 </button>
@@ -302,11 +302,11 @@ export function FilterBar({
         </div>
 
         {/* Refresh Button */}
-        <div className="shrink-0 flex items-center gap-4 pl-4 border-l border-slate-200">
+        <div className="shrink-0 flex items-center gap-4 pl-4 border-l border-[#d7e8f6]">
           <button
             onClick={() => refreshAll()}
             disabled={loading || syncing}
-            className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            className="h-10 px-4 rounded-xl border border-[#bfe8f8] bg-white text-sm font-semibold text-[#3860be] hover:bg-[#e8f7fd] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-ktb"
           >
             <RefreshCw className={`w-4 h-4 ${(loading || syncing) ? 'animate-spin' : ''}`} />
             {loading || syncing ? 'Refreshing...' : 'Refresh Data'}

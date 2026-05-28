@@ -43,7 +43,7 @@ export const UserContributionStackChart = ({ rows = [] }) => {
     <div className="space-y-3">
       <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-1 px-1">
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.2)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] shadow-[0_0_8px_rgba(37,99,235,0.2)]"></span>
           Review
         </div>
         <div className="inline-flex items-center gap-1.5">
@@ -80,7 +80,7 @@ export const UserContributionStackChart = ({ rows = [] }) => {
                     })}
                     onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                     onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-blue-600 cursor-pointer transition-opacity hover:opacity-80" 
+                    className="h-full bg-[#2563EB] cursor-pointer transition-opacity hover:opacity-80" 
                     style={{ width: `${reviewWidth}%` }}
                   />
                   <div 
@@ -93,7 +93,7 @@ export const UserContributionStackChart = ({ rows = [] }) => {
                     })}
                     onMouseMove={(e) => setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }))}
                     onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-emerald-500 cursor-pointer transition-opacity hover:opacity-80" 
+                    className="h-full bg-[#10B981] cursor-pointer transition-opacity hover:opacity-80" 
                     style={{ width: `${editWidth}%` }}
                   />
                 </div>

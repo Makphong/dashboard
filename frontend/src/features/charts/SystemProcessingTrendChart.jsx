@@ -57,7 +57,7 @@ export const SystemProcessingTrendChart = ({ rows }) => {
       </svg>
       <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>Average Time</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>Slow-Case Time (Worst 10%)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]"></span>Slow-Case Time (Worst 10%)</span>
       </div>
     </div>
   );

@@ -184,7 +184,7 @@ export const GanttTooltip = ({ hoveredSegment, containerRef }) => {
       }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+        <div className="w-2 h-2 rounded-full bg-[#2563EB]"></div>
         <div className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate">{toGanttSegmentTypeLabel(hoveredSegment.segmentType)}</div>
       </div>
       <div className="space-y-1 text-[10px] font-medium text-slate-500">

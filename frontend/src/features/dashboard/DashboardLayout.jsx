@@ -27,7 +27,7 @@ export function DashboardLayout({
   } = controller;
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="flex h-screen bg-[#fbfdff] font-sans text-slate-900 overflow-hidden">
       <Sidebar
         activeView={activeView}
         setActiveView={setActiveView}
@@ -55,7 +55,7 @@ export function DashboardLayout({
 
         {isMobileSidebarOpen && (
           <div 
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[140] lg:hidden"
+            className="fixed inset-0 bg-[#17335f]/40 backdrop-blur-sm z-[140] lg:hidden"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
         )}
