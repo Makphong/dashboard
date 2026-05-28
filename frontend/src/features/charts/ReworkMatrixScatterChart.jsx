@@ -11,10 +11,12 @@ export const ReworkMatrixScatterChart = React.memo(({
   showQuadrants = false 
 }) => {
   const svgRef = useRef(null);
+  const containerRef = useRef(null);
   const dragRef = useRef({ active: false, x: 0, y: 0, view: null });
   const panFrameRef = useRef(null);
   const pendingViewRef = useRef(null);
   const [hoveredUser, setHoveredUser] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
@@ -32,6 +34,7 @@ export const ReworkMatrixScatterChart = React.memo(({
         reworkRate: Math.max(0, Math.min(1, safeNumber(row.reworkRate))),
         autoClosedRate: Math.max(0, Math.min(1, safeNumber(row.autoClosedRate))),
         totalActiveSeconds: safeNumber(row.totalActiveSeconds),
+        color: VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length],
       }))
       .filter((row) => row.avgTimePerDocSeconds > 0 || row.reworkRate > 0 || row.totalActiveSeconds > 0),
     [sourceRows]
@@ -169,6 +172,17 @@ export const ReworkMatrixScatterChart = React.memo(({
     dragRef.current = { active: true, x: point.x, y: point.y, view: normalizedView };
   };
 
+  const updateTooltipPos = (e) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setTooltipPos({
+      x: Math.max(8, Math.min(x + 12, rect.width - 270)),
+      y: Math.max(8, Math.min(y + 12, rect.height - 150))
+    });
+  };
+
   const onPointerMove = (event) => {
     if (!dragRef.current.active) return;
     const point = getSvgPoint(event);
@@ -254,7 +268,7 @@ export const ReworkMatrixScatterChart = React.memo(({
   };
 
   return (
-    <div className={`mt-1 overflow-hidden relative group ${expanded ? 'w-full max-w-[900px] mx-auto px-1' : ''}`}>
+    <div className={`mt-1 overflow-hidden relative group ${expanded ? 'w-full max-w-[900px] mx-auto px-1' : ''}`} ref={containerRef}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -350,12 +364,12 @@ export const ReworkMatrixScatterChart = React.memo(({
 
         {/* Axis Ticks */}
         {yTicks.map((tick) => (
-          <text key={`yt-${tick}`} x={margin.left - 12} y={y(tick) + 4} textAnchor="end" className="fill-black text-[11px] pointer-events-none">
+          <text key={`yt-${tick}`} x={margin.left - 14} y={y(tick) + 5} textAnchor="end" className="fill-black text-[13px] font-medium pointer-events-none">
             {Math.round(tick * 1000) / 10}%
           </text>
         ))}
         {xTicks.map((tick) => (
-          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 18} textAnchor="middle" className="fill-black text-[11px] pointer-events-none">
+          <text key={`xt-${tick}`} x={x(tick)} y={height - margin.bottom + 22} textAnchor="middle" className="fill-black text-[13px] font-medium pointer-events-none">
             {formatDuration(tick)}
           </text>
         ))}
@@ -365,7 +379,7 @@ export const ReworkMatrixScatterChart = React.memo(({
             const px = x(row.avgTimePerDocSeconds);
             const py = y(row.reworkRate);
             const pointRadius = bubbleRadius(row.totalActiveSeconds);
-            const color = VIBRANT_PALETTE[idx % VIBRANT_PALETTE.length];
+            const color = row.color;
             const shortUserLabel = row.user.length > 14 ? `${row.user.slice(0, 14)}...` : row.user;
             const isHovered = hoveredUser === row.user;
             
@@ -377,7 +391,11 @@ export const ReworkMatrixScatterChart = React.memo(({
               <g 
                 key={row.user} 
                 className="cursor-pointer"
-                onMouseEnter={() => setHoveredUser(row.user)}
+                onMouseEnter={(e) => {
+                  setHoveredUser(row.user);
+                  updateTooltipPos(e);
+                }}
+                onMouseMove={(e) => updateTooltipPos(e)}
                 onMouseLeave={() => setHoveredUser(null)}
               >
                 <circle 
@@ -385,17 +403,17 @@ export const ReworkMatrixScatterChart = React.memo(({
                   cy={py} 
                   r={mounted ? (isHovered ? pointRadius * 1.15 : pointRadius) : 0} 
                   fill={color} 
-                  opacity={isHovered ? 1 : 0.85} 
+                  opacity={1} 
                   stroke="#ffffff" 
                   strokeWidth={isHovered ? 3 : 2}
                   filter={isHovered ? 'url(#glow)' : ''}
-                  className="transition-all duration-300 ease-out"
+                  className="transition-all duration-300 ease-out shadow-sm"
                 />
                 <text 
                   x={labelPosition.x}
                   y={labelPosition.y}
                   textAnchor={labelPosition.anchor}
-                  className={`fill-black text-[11px] pointer-events-none transition-all duration-300 ${isHovered ? 'font-bold' : 'font-semibold'} ${mounted ? 'opacity-100' : 'opacity-0'}`}
+                  className={`fill-black text-[12px] pointer-events-none transition-all duration-300 ${isHovered ? 'font-bold' : 'font-semibold'} ${mounted ? 'opacity-100' : 'opacity-0'}`}
                 >
                   {shortUserLabel}
                 </text>
@@ -404,42 +422,51 @@ export const ReworkMatrixScatterChart = React.memo(({
           })}
         </g>
 
-        {/* Custom Rich Tooltip */}
-        {hoveredData && (
-          <g className="pointer-events-none">
-            {(() => {
-              const tx = x(hoveredData.avgTimePerDocSeconds);
-              const ty = y(hoveredData.reworkRate);
-              const tr = bubbleRadius(hoveredData.totalActiveSeconds);
-              const tooltipW = 160;
-              const tooltipH = 85;
-              const boxX = Math.max(margin.left + 5, Math.min(width - margin.right - tooltipW - 5, tx + tr + 10));
-              const boxY = Math.max(margin.top + 5, Math.min(height - margin.bottom - tooltipH - 5, ty - tooltipH / 2));
-              
-              return (
-                <g transform={`translate(${boxX}, ${boxY})`} className="drop-shadow-lg">
-                  <rect width={tooltipW} height={tooltipH} rx="8" fill="white" stroke="#E2E8F0" strokeWidth="1" />
-                  <rect width="4" height={tooltipH} rx="2" fill={VIBRANT_PALETTE[prepared.findIndex(p => p.user === hoveredUser) % VIBRANT_PALETTE.length]} />
-                  <text x="12" y="20" className="fill-black text-[12px] font-bold">{hoveredData.user}</text>
-                  <text x="12" y="42" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Avg Time</text>
-                  <text x="150" y="42" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatDuration(hoveredData.avgTimePerDocSeconds)}</text>
-                  <text x="12" y="58" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Edit Rate</text>
-                  <text x="150" y="58" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatPercent(hoveredData.reworkRate)}</text>
-                  <text x="12" y="74" className="fill-slate-500 text-[9px] uppercase font-bold tracking-wider">Total Active</text>
-                  <text x="150" y="74" textAnchor="end" className="fill-black text-[11px] font-semibold">{formatDuration(hoveredData.totalActiveSeconds)}</text>
-                </g>
-              );
-            })()}
-          </g>
-        )}
-
-        <text x={margin.left + innerWidth / 2} y={height - 15} textAnchor="middle" className="fill-black text-[12px] font-medium pointer-events-none">
+        <text x={margin.left + innerWidth / 2} y={height - 8} textAnchor="middle" className="fill-black text-[14px] font-bold uppercase tracking-wide pointer-events-none">
           Avg Time per Document
         </text>
-        <text transform={`translate(16 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[12px] font-medium pointer-events-none">
+        <text transform={`translate(12 ${margin.top + innerHeight / 2}) rotate(-90)`} textAnchor="middle" className="fill-black text-[14px] font-bold uppercase tracking-wide pointer-events-none">
           Edit Rate
         </text>
       </svg>
+
+      {/* Modern Tooltip matching Timeline/WorkMix */}
+      {hoveredData && (
+        <div 
+          className="absolute pointer-events-none z-[200] w-[260px] rounded-xl border border-[#d7e8f6] bg-white/95 backdrop-blur-md p-4 shadow-ktb animate-in fade-in zoom-in duration-150"
+          style={{ 
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+          }}
+        >
+          <div className="flex items-center gap-2.5 mb-3">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ 
+                backgroundColor: hoveredData.color,
+                boxShadow: `0 0 10px ${hoveredData.color}66`
+              }}
+            />
+            <div className="text-[14px] font-bold text-[#17335f] uppercase tracking-tight truncate">
+              {hoveredData.user}
+            </div>
+          </div>
+          <div className="space-y-2 text-[12px] font-semibold text-slate-500">
+            <div className="flex justify-between items-center pb-1.5 border-b border-slate-50">
+              <span className="uppercase tracking-wider">Avg Time</span>
+              <span className="text-[#17335f] text-[13px]">{formatDuration(hoveredData.avgTimePerDocSeconds)}</span>
+            </div>
+            <div className="flex justify-between items-center pb-1.5 border-b border-slate-50">
+              <span className="uppercase tracking-wider">Edit Rate</span>
+              <span className="text-[#00a4e4] text-[14px] font-bold">{formatPercent(hoveredData.reworkRate)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="uppercase tracking-wider">Total Active</span>
+              <span className="text-slate-600 font-medium">{formatDuration(hoveredData.totalActiveSeconds)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

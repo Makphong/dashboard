@@ -115,8 +115,8 @@ export const GanttBarsSvg = ({
               <g
                 key={`${s.id}-${barIdx}`}
                 onClick={() => onPickSegment(s)}
-                onMouseEnter={(event) => onShowTooltip(event, s, lane)}
-                onMouseMove={(event) => onShowTooltip(event, s, lane)}
+                onMouseEnter={(event) => onShowTooltip(event, s, lane, color)}
+                onMouseMove={(event) => onShowTooltip(event, s, lane, color)}
                 onMouseLeave={onHideTooltip}
                 style={{ cursor: 'pointer' }}
               >
@@ -145,12 +145,16 @@ export const GanttBarsSvg = ({
               || (s.reopenMarkerList && s.reopenMarkerList.length > 0);
             if (!hasStars) return null;
 
+            const color = lane === 'Idle'
+              ? '#94A3B8'
+              : (GANTT_DRILL_GROUP_COLORS[s.drillGroup] || SEGMENT_COLORS[s.segmentType] || '#64748B');
+
             return (
               <g
                 key={`star-${s.id}-${barIdx}`}
                 onClick={() => onPickSegment(s)}
-                onMouseEnter={(event) => onShowTooltip(event, s, lane)}
-                onMouseMove={(event) => onShowTooltip(event, s, lane)}
+                onMouseEnter={(event) => onShowTooltip(event, s, lane, color)}
+                onMouseMove={(event) => onShowTooltip(event, s, lane, color)}
                 onMouseLeave={onHideTooltip}
                 style={{ cursor: 'pointer' }}
               >
@@ -184,7 +188,13 @@ export const GanttTooltip = ({ hoveredSegment }) => {
       }}
     >
       <div className="flex items-center gap-2 mb-2.5">
-        <div className="w-2 h-2 rounded-full bg-[#00a4e4] shadow-[0_0_6px_rgba(0,164,228,0.4)]"></div>
+        <div 
+          className="w-2.5 h-2.5 rounded-full" 
+          style={{ 
+            backgroundColor: hoveredSegment.color || '#00a4e4',
+            boxShadow: `0 0 10px ${(hoveredSegment.color || '#00a4e4')}66`
+          }}
+        />
         <div className="text-[13px] font-bold text-[#17335f] uppercase tracking-tight truncate">
           {toGanttSegmentTypeLabel(hoveredSegment.segmentType)}
         </div>

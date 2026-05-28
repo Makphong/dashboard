@@ -5,7 +5,9 @@ import { safeNumber, clampPercent, formatDuration, formatPercent } from '../../l
  * Top User Work Mix (Restored Original Styles with Interactive Tooltips)
  */
 export const UserContributionStackChart = React.memo(({ rows = [], expanded = false }) => {
-  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, content: '', color: '' });
+  const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, user: '', type: '', duration: '', percent: '', color: '' });
+  const [hoveredUser, setHoveredUser] = useState(null);
+  const [hoveredType, setHoveredType] = useState(null); // 'review' | 'edit' | null
   const containerRef = React.useRef(null);
 
   const prepared = useMemo(() => {
@@ -39,14 +41,17 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
   const useScroll = prepared.length > maxVisibleRows;
   const wrapperStyle = useScroll ? { maxHeight: `${maxVisibleRows * rowSlotHeight}px` } : undefined;
 
-  const handleMouseMove = (e, content, color) => {
+  const handleMouseMove = (e, user, type, duration, percent, color) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     setTooltip({
       show: true,
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
-      content,
+      user,
+      type,
+      duration,
+      percent,
       color
     });
   };
@@ -55,11 +60,11 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
     <div className="space-y-4 relative" ref={containerRef}>
       <div className="flex flex-wrap gap-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 px-1">
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#00a4e4] shadow-[0_0_8px_rgba(0,164,228,0.4)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#06B6D4] shadow-[0_0_8px_rgba(6,182,212,0.4)]"></span>
           Review
         </div>
         <div className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shadow-[0_0_8px_rgba(245,158,11,0.4)]"></span>
           Edit
         </div>
       </div>
@@ -73,9 +78,13 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
           const totalWidth = clampPercent(Math.max((row.total / currentMax) * 100, 12));
           const reviewWidth = row.total > 0 ? clampPercent((row.review / row.total) * 100) : 0;
           const editWidth = row.total > 0 ? clampPercent((row.edit / row.total) * 100) : 0;
+          const isUserDimmed = hoveredUser && hoveredUser !== row.user;
 
           return (
-            <div key={row.user} className="py-2.5 transition-all group border-b border-slate-50 last:border-0 hover:bg-slate-50/50 rounded-xl px-2 -mx-2">
+            <div 
+              key={row.user} 
+              className={`py-2.5 transition-all duration-300 group border-b border-slate-50 last:border-0 hover:bg-slate-50/50 rounded-xl px-2 -mx-2 ${isUserDimmed ? 'opacity-30 grayscale-[0.3]' : 'opacity-100'}`}
+            >
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="font-bold text-[#17335f] truncate">{row.user}</span>
                 <span className="text-[11px] font-bold text-slate-400">{formatDuration(row.total)}</span>
@@ -83,17 +92,33 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
               <div className="h-2.5 w-full rounded-full bg-slate-100/80 overflow-hidden shadow-inner">
                 <div className="h-full rounded-full overflow-hidden flex shadow-sm" style={{ width: `${totalWidth}%` }}>
                   <div 
-                    onMouseEnter={(e) => handleMouseMove(e, `Review: ${formatDuration(row.review)} (${formatPercent(row.review / (row.total || 1))})`, '#00a4e4')}
-                    onMouseMove={(e) => handleMouseMove(e, `Review: ${formatDuration(row.review)} (${formatPercent(row.review / (row.total || 1))})`, '#00a4e4')}
-                    onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-[#00a4e4] cursor-pointer transition-all hover:brightness-110" 
+                    onMouseEnter={(e) => {
+                      handleMouseMove(e, row.user, 'Review', formatDuration(row.review), formatPercent(row.review / (row.total || 1)), '#06B6D4');
+                      setHoveredUser(row.user);
+                      setHoveredType('review');
+                    }}
+                    onMouseMove={(e) => handleMouseMove(e, row.user, 'Review', formatDuration(row.review), formatPercent(row.review / (row.total || 1)), '#06B6D4')}
+                    onMouseLeave={() => {
+                      setTooltip(prev => ({ ...prev, show: false }));
+                      setHoveredUser(null);
+                      setHoveredType(null);
+                    }}
+                    className={`h-full bg-[#06B6D4] cursor-pointer transition-all duration-300 hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'edit' ? 'opacity-20' : 'opacity-100'}`} 
                     style={{ width: `${reviewWidth}%` }}
                   />
                   <div 
-                    onMouseEnter={(e) => handleMouseMove(e, `Edit: ${formatDuration(row.edit)} (${formatPercent(row.edit / (row.total || 1))})`, '#10B981')}
-                    onMouseMove={(e) => handleMouseMove(e, `Edit: ${formatDuration(row.edit)} (${formatPercent(row.edit / (row.total || 1))})`, '#10B981')}
-                    onMouseLeave={() => setTooltip(prev => ({ ...prev, show: false }))}
-                    className="h-full bg-emerald-500 cursor-pointer transition-all hover:brightness-110" 
+                    onMouseEnter={(e) => {
+                      handleMouseMove(e, row.user, 'Edit', formatDuration(row.edit), formatPercent(row.edit / (row.total || 1)), '#F59E0B');
+                      setHoveredUser(row.user);
+                      setHoveredType('edit');
+                    }}
+                    onMouseMove={(e) => handleMouseMove(e, row.user, 'Edit', formatDuration(row.edit), formatPercent(row.edit / (row.total || 1)), '#F59E0B')}
+                    onMouseLeave={() => {
+                      setTooltip(prev => ({ ...prev, show: false }));
+                      setHoveredUser(null);
+                      setHoveredType(null);
+                    }}
+                    className={`h-full bg-[#F59E0B] cursor-pointer transition-all duration-300 hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'review' ? 'opacity-20' : 'opacity-100'}`} 
                     style={{ width: `${editWidth}%` }}
                   />
                 </div>
@@ -103,23 +128,44 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
         })}
       </div>
 
-      {/* Floating tooltip (absolute theme) */}
+      {/* Modern Tooltip matching Timeline/Matrix */}
       {tooltip.show && (
         <div 
-          className="absolute pointer-events-none z-[200] animate-in fade-in zoom-in duration-150"
+          className="absolute pointer-events-none z-[200] w-[210px] rounded-xl border border-[#d7e8f6] bg-white/95 backdrop-blur-md p-3.5 shadow-ktb animate-in fade-in zoom-in duration-150"
           style={{ 
-            left: Math.max(0, Math.min(tooltip.x + 10, (containerRef.current?.clientWidth || 0) - 190)), 
-            top: tooltip.y - 10,
+            left: Math.max(0, Math.min(tooltip.x + 12, (containerRef.current?.clientWidth || 0) - 220)), 
+            top: tooltip.y - 12,
             transform: 'translateY(-100%)'
           }}
         >
-          <div className="bg-white/95 backdrop-blur-md text-[#17335f] px-3 py-1.5 rounded-xl shadow-ktb border border-[#d7e8f6] flex items-center gap-2 min-w-[170px]">
-            <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: tooltip.color }}></div>
-            <span className="text-[12px] font-bold tracking-tight whitespace-nowrap">{tooltip.content}</span>
+          <div className="flex items-center gap-2 mb-2.5">
+            <div 
+              className="w-2.5 h-2.5 rounded-full" 
+              style={{ 
+                backgroundColor: tooltip.color,
+                boxShadow: `0 0 10px ${tooltip.color}66`
+              }}
+            />
+            <div className="text-[13px] font-bold text-[#17335f] uppercase tracking-tight truncate">
+              {tooltip.user}
+            </div>
+          </div>
+          <div className="space-y-1.5 text-[11px] font-semibold text-slate-500">
+            <div className="flex justify-between items-center pb-1 border-b border-slate-50">
+              <span className="uppercase tracking-wider">Type</span>
+              <span className="text-[#17335f] text-[12px]">{tooltip.type}</span>
+            </div>
+            <div className="flex justify-between items-center pb-1 border-b border-slate-50">
+              <span className="uppercase tracking-wider">Duration</span>
+              <span className="text-[#00a4e4] text-[13px] font-bold">{tooltip.duration}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="uppercase tracking-wider">Portion</span>
+              <span className="text-slate-600 font-medium">{tooltip.percent}</span>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 });
-;

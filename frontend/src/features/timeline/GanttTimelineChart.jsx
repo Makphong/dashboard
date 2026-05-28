@@ -259,7 +259,7 @@ export const GanttTimelineChart = ({
     if (typeof onSelectSegment === 'function') onSelectSegment(segment);
   };
 
-  const showTooltip = (event, segment, lane) => {
+  const showTooltip = (event, segment, lane, color) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -269,6 +269,7 @@ export const GanttTimelineChart = ({
       x: Math.max(8, Math.min(x + 12, rect.width - 318)),
       y: Math.max(8, Math.min(y + 12, rect.height - 132)),
       lane,
+      color,
       groupLabel: GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup,
       segmentType: segment.segmentType,
       start: segment.start,
