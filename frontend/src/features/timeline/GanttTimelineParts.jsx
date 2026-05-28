@@ -172,25 +172,38 @@ export const GanttBarsSvg = ({
   </svg>
 );
 
-export const GanttTooltip = ({ hoveredSegment, containerRef }) => {
+export const GanttTooltip = ({ hoveredSegment }) => {
   if (!hoveredSegment) return null;
 
   return (
     <div
-      className="pointer-events-none fixed z-[200] w-[310px] rounded-xl border border-slate-200 bg-white/95 backdrop-blur-sm p-4 shadow-2xl animate-in fade-in zoom-in duration-150"
+      className="pointer-events-none absolute z-[200] w-[310px] rounded-2xl border border-[#d7e8f6] bg-white/95 backdrop-blur-md p-4 shadow-ktb animate-in fade-in zoom-in duration-150"
       style={{
-        left: hoveredSegment.x + (containerRef.current?.getBoundingClientRect().left || 0),
-        top: hoveredSegment.y + (containerRef.current?.getBoundingClientRect().top || 0),
+        left: hoveredSegment.x,
+        top: hoveredSegment.y,
       }}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-2 h-2 rounded-full bg-[#2563EB]"></div>
-        <div className="text-xs font-bold text-slate-800 uppercase tracking-tight truncate">{toGanttSegmentTypeLabel(hoveredSegment.segmentType)}</div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-2.5 h-2.5 rounded-full bg-[#00a4e4] shadow-[0_0_8px_rgba(0,164,228,0.5)]"></div>
+        <div className="text-[11px] font-bold text-[#17335f] uppercase tracking-tight truncate">
+          {toGanttSegmentTypeLabel(hoveredSegment.segmentType)}
+        </div>
       </div>
-      <div className="space-y-1 text-[10px] font-medium text-slate-500">
-        <div className="flex justify-between"><span>Lane</span><span className="text-slate-800">{hoveredSegment.lane}</span></div>
-        <div className="flex justify-between"><span>Duration</span><span className="text-slate-800">{formatDuration(hoveredSegment.durationSeconds)}</span></div>
-        <div className="flex justify-between"><span>Time</span><span className="text-slate-800">{formatTimeTick(hoveredSegment.start)} - {formatTimeTick(hoveredSegment.end)}</span></div>
+      <div className="space-y-2 text-[10px] font-semibold text-slate-500">
+        <div className="flex justify-between items-center pb-1 border-b border-slate-50">
+          <span>Lane</span>
+          <span className="text-[#17335f]">{hoveredSegment.lane}</span>
+        </div>
+        <div className="flex justify-between items-center pb-1 border-b border-slate-50">
+          <span>Duration</span>
+          <span className="text-[#00a4e4] font-bold">{formatDuration(hoveredSegment.durationSeconds)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span>Time Window</span>
+          <span className="text-slate-600 font-medium">
+            {formatTimeTick(hoveredSegment.start)} - {formatTimeTick(hoveredSegment.end)}
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -262,9 +262,12 @@ export const GanttTimelineChart = ({
   const showTooltip = (event, segment, lane) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
     setHoveredSegment({
-      x: Math.max(8, Math.min(event.clientX - rect.left + 12, rect.width - 318)),
-      y: Math.max(8, Math.min(event.clientY - rect.top + 12, rect.height - 132)),
+      x: Math.max(8, Math.min(x + 12, rect.width - 318)),
+      y: Math.max(8, Math.min(y + 12, rect.height - 132)),
       lane,
       groupLabel: GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup,
       segmentType: segment.segmentType,
