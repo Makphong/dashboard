@@ -36,6 +36,10 @@ function App() {
             workloadVisibleRows={controller.workloadVisibleRows}
             showMatrixQuadrants={controller.showMatrixQuadrants}
             setShowMatrixQuadrants={controller.setShowMatrixQuadrants}
+            showProcessBreakdownIdle={controller.showProcessBreakdownIdle}
+            setShowProcessBreakdownIdle={controller.setShowProcessBreakdownIdle}
+            showProcessBreakdownLabels={controller.showProcessBreakdownLabels}
+            setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
             setSelectedGanttSegment={controller.setSelectedGanttSegment}
             setExpandedVisualizationId={controller.setExpandedVisualizationId}
             setShowExportConfirm={controller.setShowExportConfirm}
@@ -52,6 +56,10 @@ function App() {
         onClose={() => controller.setExpandedVisualizationId('')}
         data={{
           ganttVisibleSegments: dashboard.ganttVisibleSegments,
+          processBreakdownSegments: dashboard.filteredBaseSegments,
+          selectedSegmentTypes: dashboard.selectedSegmentTypes,
+          showProcessBreakdownIdle: controller.showProcessBreakdownIdle,
+          showProcessBreakdownLabels: controller.showProcessBreakdownLabels,
           workloadVisibleRows: controller.workloadVisibleRows,
           contributionRows: dashboard.contributionRows,
           matrixRows: dashboard.matrixRows,

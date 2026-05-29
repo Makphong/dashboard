@@ -9,6 +9,7 @@ import { UserContributionStackChart } from '../charts/UserContributionStackChart
 import { GanttTimelineChart } from '../timeline/GanttTimelineChart.jsx';
 import { ProcessTimeBreakdownChart } from '../charts/ProcessTimeBreakdownChart.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
+import { toDrillGroup } from '../../lib/segmentUtils.js';
 
 function ToggleSetting({ checked, onChange, children, notice }) {
   return (
@@ -32,6 +33,10 @@ export const DashboardView = React.memo(({
   workloadVisibleRows,
   showMatrixQuadrants,
   setShowMatrixQuadrants,
+  showProcessBreakdownIdle,
+  setShowProcessBreakdownIdle,
+  showProcessBreakdownLabels,
+  setShowProcessBreakdownLabels,
   setSelectedGanttSegment,
   setExpandedVisualizationId,
   setShowExportConfirm
@@ -39,6 +44,8 @@ export const DashboardView = React.memo(({
   const {
     kpiData,
     ganttVisibleSegments,
+    filteredBaseSegments,
+    selectedSegmentTypes,
     contributionRows,
     matrixRows,
     showIdle,
@@ -50,25 +57,35 @@ export const DashboardView = React.memo(({
   } = dashboard;
 
   const processBreakdownData = React.useMemo(() => {
-    const totals = { Uploading: 0, Processing: 0, Review: 0, Edit: 0, Idle: 0 };
-    ganttVisibleSegments.forEach(s => {
-      const type = String(s.segmentType || '');
+    const totals = { Uploading: 0, Processing: 0, Reprocess: 0, Review: 0, Edit: 0, Idle: 0 };
+    filteredBaseSegments.forEach(s => {
+      const segmentType = String(s.segmentType || '');
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
+        if (!segmentType.startsWith('SYSTEM_')) return;
+      }
+      const drillGroup = toDrillGroup(s.segmentType);
+      if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
-      if (type.includes('UPLOAD')) totals.Uploading += duration;
-      else if (type.includes('SYSTEM')) totals.Processing += duration;
-      else if (type.includes('REVIEW')) totals.Review += duration;
-      else if (type.includes('EDIT')) totals.Edit += duration;
+      if (drillGroup === 'Uploading') totals.Uploading += duration;
+      else if (drillGroup === 'Processing') totals.Processing += duration;
+      else if (drillGroup === 'Reprocessing') totals.Reprocess += duration;
+      else if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') totals.Review += duration;
+      else if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') totals.Edit += duration;
+      else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
-    return Object.entries(totals).map(([label, seconds]) => ({
-      label,
-      seconds,
-      color: GANTT_DRILL_GROUP_COLORS[label] || '#94A3B8'
-    }));
-  }, [ganttVisibleSegments]);
+    return Object.entries(totals)
+      .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
+      .map(([label, seconds]) => ({
+        label,
+        seconds,
+        color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
+      }));
+  }, [filteredBaseSegments, selectedSegmentTypes, showProcessBreakdownIdle]);
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
+  const [showProcessFilterMenu, setShowProcessFilterMenu] = useState(false);
   const [showMatrixFilterMenu, setShowMatrixFilterMenu] = useState(false);
   const [ganttSingleLaneMode, setGanttSingleLaneMode] = usePersistentState('filter_ganttSingleLaneMode', false);
   const [showSystemLane, setShowSystemLane] = usePersistentState('filter_showSystemLane', true);
@@ -79,12 +96,14 @@ export const DashboardView = React.memo(({
 
   const timelineFilterRef = useRef(null);
   const workloadFilterRef = useRef(null);
+  const processFilterRef = useRef(null);
   const matrixFilterRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (timelineFilterRef.current && !timelineFilterRef.current.contains(event.target)) setShowTimelineFilterMenu(false);
       if (workloadFilterRef.current && !workloadFilterRef.current.contains(event.target)) setShowWorkloadFilterMenu(false);
+      if (processFilterRef.current && !processFilterRef.current.contains(event.target)) setShowProcessFilterMenu(false);
       if (matrixFilterRef.current && !matrixFilterRef.current.contains(event.target)) setShowMatrixFilterMenu(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -210,13 +229,27 @@ export const DashboardView = React.memo(({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
+        <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4 ${showProcessFilterMenu ? 'z-[120]' : 'z-10'}`}>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-[#17335f]">Process Time Breakdown</h2>
-            <button onClick={() => setExpandedVisualizationId('process-breakdown')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="relative" ref={processFilterRef}>
+                <button onClick={() => setShowProcessFilterMenu(!showProcessFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showProcessFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
+                {showProcessFilterMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter">
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Process Settings</div>
+                    <div className="space-y-3">
+                      <ToggleSetting checked={showProcessBreakdownIdle} onChange={() => setShowProcessBreakdownIdle(!showProcessBreakdownIdle)}>Show Idle Time</ToggleSetting>
+                      <ToggleSetting checked={showProcessBreakdownLabels} onChange={() => setShowProcessBreakdownLabels(!showProcessBreakdownLabels)}>Show Bar Labels</ToggleSetting>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setExpandedVisualizationId('process-breakdown')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
+            </div>
           </div>
           <div className="flex-1 min-h-0">
-            {ganttVisibleSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={processBreakdownData} />}
+            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
           </div>
         </div>
 

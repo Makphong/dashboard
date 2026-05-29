@@ -372,6 +372,7 @@ def create_app() -> Flask:
             "import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';",
             "import { createRoot } from 'react-dom/client';",
             "import { createPortal } from 'react-dom';",
+            "import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, ResponsiveContainer } from 'recharts';",
             "import { ",
             "  Users, Server, Clock, Timer, RefreshCw, AlertTriangle, Star, Search, ",
             "  Calendar, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight, Database, ",

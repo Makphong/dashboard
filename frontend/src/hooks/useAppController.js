@@ -31,6 +31,8 @@ export function useAppController(dashboard) {
   const [documentFileSearch, setDocumentFileSearch] = useState('');
   const [documentSheetSearch, setDocumentSheetSearch] = useState('');
   const [showMatrixQuadrants, setShowMatrixQuadrants] = usePersistentState('filter_showMatrixQuadrants', false);
+  const [showProcessBreakdownIdle, setShowProcessBreakdownIdle] = usePersistentState('filter_showProcessBreakdownIdle', true);
+  const [showProcessBreakdownLabels, setShowProcessBreakdownLabels] = usePersistentState('filter_showProcessBreakdownLabels', true);
 
   const workloadVisibleRows = useMemo(() => {
     const filtered = workloadContributors.filter((row) => showWorkloadSystem || row.user !== 'System');
@@ -140,6 +142,10 @@ export function useAppController(dashboard) {
     setDocumentSheetSearch,
     showMatrixQuadrants,
     setShowMatrixQuadrants,
+    showProcessBreakdownIdle,
+    setShowProcessBreakdownIdle,
+    showProcessBreakdownLabels,
+    setShowProcessBreakdownLabels,
     workloadVisibleRows,
     handleUploadFiles,
     handleDeleteSource,
