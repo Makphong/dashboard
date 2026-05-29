@@ -146,19 +146,12 @@ export const DashboardView = React.memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpiData.map((kpi, idx) => (
-          <div key={kpi.id} className={`relative bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}>
-            {kpi.id === 5 && (
-              /* Krungthai mascot sitting on top of the Edit Rate card (second to last) */
-              <div className="absolute bottom-full right-2 w-28 h-28 pointer-events-none select-none z-0">
-                <img 
-                  src="https://i.postimg.cc/zvnXJcPC/d-sin-th-y-ngmi-di-t-ngch-x-(1).png" 
-                  className="w-full h-full object-contain object-bottom opacity-100 brightness-[1.15]"
-                  alt="Krungthai mascot"
-                />
-              </div>
-            )}
+          <div 
+            key={kpi.id} 
+            className={`relative bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}
+          >
             <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4 relative z-10`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
@@ -170,6 +163,7 @@ export const DashboardView = React.memo(({
           </div>
         ))}
       </div>
+
 
       <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2 ${showTimelineFilterMenu ? 'z-[120]' : 'z-10'}`}>
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -183,7 +177,6 @@ export const DashboardView = React.memo(({
                   <ToggleSetting checked={ganttSingleLaneMode} onChange={() => setGanttSingleLaneMode(!ganttSingleLaneMode)}>Merge User Lanes</ToggleSetting>
                   <ToggleSetting checked={showSystemLane} onChange={toggleSystemLane}>Show System Lane</ToggleSetting>
                   <ToggleSetting checked={showIdle} onChange={toggleIdleGaps}>Show Idle Gaps</ToggleSetting>
-                  <ToggleSetting checked={showStarMarkers} onChange={() => setShowStarMarkers(!showStarMarkers)}>Show Event Markers</ToggleSetting>
                   <ToggleSetting checked={ganttCollapseGaps} onChange={toggleCollapseGaps} notice={timelineNotice}>Collapse Time Gaps</ToggleSetting>
                   <ToggleSetting checked={showGanttLegend} onChange={() => setShowGanttLegend(!showGanttLegend)}>Show Legend</ToggleSetting>
                 </div>
@@ -207,7 +200,7 @@ export const DashboardView = React.memo(({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="absolute right-4 top-4 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="relative" ref={workloadFilterRef}>
@@ -241,7 +234,7 @@ export const DashboardView = React.memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4 ${showProcessFilterMenu ? 'z-[120]' : 'z-10'}`}>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-[#17335f]">Process Time Breakdown</h2>

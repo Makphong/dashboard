@@ -20,13 +20,7 @@ export const GanttLegend = ({ items }) => (
   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 py-1 text-xs text-slate-600">
     {items.map((item) => (
       <span key={item.key} className="inline-flex items-center gap-1.5">
-        {item.isStar || item.key === 'EditAndComplete' ? (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={item.color}>
-            <polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9" />
-          </svg>
-        ) : (
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
-        )}
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
         {item.label}
       </span>
     ))}
@@ -128,51 +122,6 @@ export const GanttBarsSvg = ({
       );
     })}
 
-    {showStarMarkers && visibleLanes.map((lane) => {
-      const laneIdx = lanes.indexOf(lane);
-      const y = rowTopPadding + laneIdx * rowSlotHeight;
-      const positionedBars = laneToPositionedBars[lane] || [];
-      const leftBound = scrollState.left - 500;
-      const rightBound = scrollState.left + scrollState.viewW + 500;
-
-      return (
-        <g key={`stars-${lane}`}>
-          {positionedBars.map((positioned, barIdx) => {
-            const { s, x, w } = positioned;
-            if (x + w < leftBound || x > rightBound) return null;
-            const hasStars = (s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout)
-              || toCompleteMarkerType(s)
-              || (s.reopenMarkerList && s.reopenMarkerList.length > 0);
-            if (!hasStars) return null;
-
-            const color = lane === 'Idle'
-              ? '#94A3B8'
-              : (GANTT_DRILL_GROUP_COLORS[s.drillGroup] || SEGMENT_COLORS[s.segmentType] || '#64748B');
-
-            return (
-              <g
-                key={`star-${s.id}-${barIdx}`}
-                onClick={() => onPickSegment(s)}
-                onMouseEnter={(event) => onShowTooltip(event, s, lane, color)}
-                onMouseMove={(event) => onShowTooltip(event, s, lane, color)}
-                onMouseLeave={onHideTooltip}
-                style={{ cursor: 'pointer' }}
-              >
-                {(s.segmentType === 'USER_REVIEW_AUTO_TIMEOUT' || s.autoTimeout) && (
-                  <polygon points={buildAsteriskPoints(x + w - 2, y + rowHeight / 2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill="#EF4444" />
-                )}
-                {toCompleteMarkerType(s) && (
-                  <polygon points={buildAsteriskPoints(x + w + 4, y + rowHeight / 2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill={COMPLETE_MARKER_COLOR} />
-                )}
-                {s.reopenMarkerList && s.reopenMarkerList.length > 0 && (
-                  <polygon points={buildAsteriskPoints(x + 2, y + rowHeight / 2, MARKER_STAR_OUTER_RADIUS, MARKER_STAR_INNER_RADIUS)} fill="#A855F7" />
-                )}
-              </g>
-            );
-          })}
-        </g>
-      );
-    })}
   </svg>
 );
 

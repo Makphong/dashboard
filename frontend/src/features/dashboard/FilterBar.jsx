@@ -198,10 +198,7 @@ export function FilterBar({
               {/* File List */}
               <div className="w-1/2 flex flex-col">
                 <div className="p-3 border-b border-slate-50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source Files</div>
-                    <button onClick={() => setSelectedFiles([])} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">Clear</button>
-                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source Files</div>
                   <DropdownSearch value={documentFileSearch} onChange={setDocumentFileSearch} placeholder="Search files..." />
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
@@ -291,10 +288,7 @@ export function FilterBar({
             active={selectedUsers.length > 0}
           >
             <div className="p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Select Users</div>
-                <button onClick={() => setSelectedUsers([])} className="text-[11px] font-semibold text-slate-400">Clear</button>
-              </div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Select Users</div>
               <DropdownSearch value={userSearchText} onChange={setUserSearchText} placeholder="Search user..." />
               <div className="max-h-64 overflow-y-auto space-y-1 pr-1 no-scrollbar">
                 {filteredUserOptions.map((userName) => (
@@ -325,10 +319,7 @@ export function FilterBar({
             panelClassName="w-[380px] max-w-[92vw]"
           >
             <div className="p-3 space-y-3">
-               <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Segment Type</div>
-                <button onClick={() => setSelectedSegmentTypes([])} className="text-[11px] font-semibold text-slate-400">Clear</button>
-              </div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Segment Type</div>
               <DropdownSearch value={segmentTypeSearchText} onChange={setSegmentTypeSearchText} placeholder="Search segment..." />
               <div className="max-h-64 overflow-y-auto space-y-1 pr-1 no-scrollbar">
                 {filteredSegmentTypeOptions.map((option) => (
