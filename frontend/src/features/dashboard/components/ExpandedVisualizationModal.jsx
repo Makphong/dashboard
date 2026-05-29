@@ -1,11 +1,11 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { GanttTimelineChart } from '../../timeline/GanttTimelineChart.jsx';
-import { DonutWorkloadChart } from '../charts/DonutWorkloadChart.jsx';
-import { DurationBarChart } from '../charts/DurationBarChart.jsx';
-import { ReworkMatrixScatterChart } from '../charts/ReworkMatrixScatterChart.jsx';
-import { UserContributionStackChart } from '../charts/UserContributionStackChart.jsx';
-import { formatDuration } from '../../../lib/utils.js';
+import { DonutWorkloadChart } from '../../charts/DonutWorkloadChart.jsx';
+import { ReworkMatrixScatterChart } from '../../charts/ReworkMatrixScatterChart.jsx';
+import { UserContributionStackChart } from '../../charts/UserContributionStackChart.jsx';
+import { ProcessTimeBreakdownChart } from '../../charts/ProcessTimeBreakdownChart.jsx';
+import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
 
 export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose, data }) => {
   if (!visualizationId) return null;
@@ -13,11 +13,28 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   const {
     ganttVisibleSegments,
     workloadVisibleRows,
-    flowRows,
     contributionRows,
     matrixRows,
     showMatrixQuadrants,
   } = data;
+
+  const processBreakdownData = React.useMemo(() => {
+    const totals = { Uploading: 0, Processing: 0, Review: 0, Edit: 0, Idle: 0 };
+    ganttVisibleSegments.forEach(s => {
+      const type = String(s.segmentType || '');
+      const duration = Number(s.durationSeconds) || 0;
+      if (type.includes('UPLOAD')) totals.Uploading += duration;
+      else if (type.includes('SYSTEM')) totals.Processing += duration;
+      else if (type.includes('REVIEW')) totals.Review += duration;
+      else if (type.includes('EDIT')) totals.Edit += duration;
+      else totals.Idle += duration;
+    });
+    return Object.entries(totals).map(([label, seconds]) => ({
+      label,
+      seconds,
+      color: GANTT_DRILL_GROUP_COLORS[label] || '#94A3B8'
+    }));
+  }, [ganttVisibleSegments]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 md:p-8 viz-overlay-enter" onClick={onClose}>
@@ -35,21 +52,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         <div className="flex-1 overflow-auto p-6 md:p-10 no-scrollbar">
           {visualizationId === 'gantt' && <GanttTimelineChart segments={ganttVisibleSegments} expanded />}
           {visualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
-          {visualizationId === 'flow' && (
-            <DurationBarChart
-              rows={flowRows.map((row) => ({
-                id: row.transitionKey,
-                label: row.transitionLabel,
-                value: row.avgSeconds,
-                minValue: row.minSeconds,
-                maxValue: row.maxSeconds,
-                valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
-                meta: row.count > 0
-                  ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
-                  : 'Min - | Max -',
-              }))}
-            />
-          )}
+          {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart data={processBreakdownData} />}
           {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
           {visualizationId === 'matrix' && <ReworkMatrixScatterChart rows={matrixRows} showQuadrants={showMatrixQuadrants} expanded />}
         </div>

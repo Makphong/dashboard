@@ -53,7 +53,6 @@ function App() {
         data={{
           ganttVisibleSegments: dashboard.ganttVisibleSegments,
           workloadVisibleRows: controller.workloadVisibleRows,
-          flowRows: dashboard.flowRows,
           contributionRows: dashboard.contributionRows,
           matrixRows: dashboard.matrixRows,
           showMatrixQuadrants: controller.showMatrixQuadrants,

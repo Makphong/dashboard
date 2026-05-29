@@ -328,6 +328,7 @@ def create_app() -> Flask:
             "features/charts/SystemParetoChart.jsx", "features/charts/SystemBottleneckTable.jsx",
             "features/charts/FlowDelayComparisonTable.jsx", "features/charts/DonutWorkloadChart.jsx",
             "features/charts/UserContributionStackChart.jsx", "features/charts/ReworkMatrixScatterChart.jsx",
+            "features/charts/ProcessTimeBreakdownChart.jsx",
             "features/data-management/DataManagementView.jsx",
             "features/dashboard/DashboardLayout.jsx", "features/dashboard/DashboardView.jsx",
             "features/dashboard/views/SystemPerformanceView.jsx",

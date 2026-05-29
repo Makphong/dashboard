@@ -1,14 +1,14 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
-import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users } from 'lucide-react';
+import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { DonutWorkloadChart } from '../charts/DonutWorkloadChart.jsx';
-import { DurationBarChart } from '../charts/DurationBarChart.jsx';
 import { ReworkMatrixScatterChart } from '../charts/ReworkMatrixScatterChart.jsx';
 import { UserContributionStackChart } from '../charts/UserContributionStackChart.jsx';
 import { GanttTimelineChart } from '../timeline/GanttTimelineChart.jsx';
-import { formatDuration } from '../../lib/utils.js';
+import { ProcessTimeBreakdownChart } from '../charts/ProcessTimeBreakdownChart.jsx';
+import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 
 function ToggleSetting({ checked, onChange, children, notice }) {
   return (
@@ -27,20 +27,6 @@ function ToggleSetting({ checked, onChange, children, notice }) {
   );
 }
 
-function getFlowChartRows(flowRows) {
-  return flowRows.map((row) => ({
-    id: row.transitionKey,
-    label: row.transitionLabel,
-    value: row.avgSeconds,
-    minValue: row.minSeconds,
-    maxValue: row.maxSeconds,
-    valueLabel: row.count > 0 ? `${formatDuration(row.avgSeconds)} avg` : 'no data',
-    meta: row.count > 0
-      ? `Min ${formatDuration(row.minSeconds)} | Max ${formatDuration(row.maxSeconds)}`
-      : 'Min - | Max -',
-  }));
-}
-
 export const DashboardView = React.memo(({
   dashboard,
   workloadVisibleRows,
@@ -53,7 +39,6 @@ export const DashboardView = React.memo(({
   const {
     kpiData,
     ganttVisibleSegments,
-    flowRows,
     contributionRows,
     matrixRows,
     showIdle,
@@ -63,6 +48,24 @@ export const DashboardView = React.memo(({
     showWorkloadSystem,
     setShowWorkloadSystem,
   } = dashboard;
+
+  const processBreakdownData = React.useMemo(() => {
+    const totals = { Uploading: 0, Processing: 0, Review: 0, Edit: 0, Idle: 0 };
+    ganttVisibleSegments.forEach(s => {
+      const type = String(s.segmentType || '');
+      const duration = Number(s.durationSeconds) || 0;
+      if (type.includes('UPLOAD')) totals.Uploading += duration;
+      else if (type.includes('SYSTEM')) totals.Processing += duration;
+      else if (type.includes('REVIEW')) totals.Review += duration;
+      else if (type.includes('EDIT')) totals.Edit += duration;
+      else totals.Idle += duration;
+    });
+    return Object.entries(totals).map(([label, seconds]) => ({
+      label,
+      seconds,
+      color: GANTT_DRILL_GROUP_COLORS[label] || '#94A3B8'
+    }));
+  }, [ganttVisibleSegments]);
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
@@ -136,7 +139,7 @@ export const DashboardView = React.memo(({
         ))}
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2">
+      <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2 ${showTimelineFilterMenu ? 'z-[120]' : 'z-10'}`}>
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => setShowExportConfirm(true)} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><FileSpreadsheet className="w-4 h-4" /></button>
           <div className="relative" ref={timelineFilterRef}>
@@ -209,11 +212,11 @@ export const DashboardView = React.memo(({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-[#17335f]">Step Delay Analysis</h2>
-            <button onClick={() => setExpandedVisualizationId('flow')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
+            <h2 className="text-lg font-bold text-[#17335f]">Process Time Breakdown</h2>
+            <button onClick={() => setExpandedVisualizationId('process-breakdown')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 min-h-0">
-            {flowRows.length === 0 ? <EmptyState icon={RefreshCw} title="No Data" /> : <DurationBarChart rows={getFlowChartRows(flowRows)} />}
+            {ganttVisibleSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={processBreakdownData} />}
           </div>
         </div>
 
