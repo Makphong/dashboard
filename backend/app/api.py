@@ -450,7 +450,7 @@ def create_app() -> Flask:
         if "." in Path(filename).name:
             return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
 
-        return send_from_directory(PROJECT_ROOT, "index.html")
+        return send_from_directory(PROJECT_ROOT / "frontend" / "public", "index.html")
 
     return app
 
