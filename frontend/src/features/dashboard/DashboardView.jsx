@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
+import { usePersistentState } from '../../hooks/usePersistentState.js';
 import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
@@ -66,11 +67,11 @@ export const DashboardView = React.memo(({
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
   const [showMatrixFilterMenu, setShowMatrixFilterMenu] = useState(false);
-  const [ganttSingleLaneMode, setGanttSingleLaneMode] = useState(false);
-  const [showSystemLane, setShowSystemLane] = useState(true);
-  const [showStarMarkers, setShowStarMarkers] = useState(true);
-  const [ganttCollapseGaps, setGanttCollapseGaps] = useState(false);
-  const [showGanttLegend, setShowGanttLegend] = useState(true);
+  const [ganttSingleLaneMode, setGanttSingleLaneMode] = usePersistentState('filter_ganttSingleLaneMode', false);
+  const [showSystemLane, setShowSystemLane] = usePersistentState('filter_showSystemLane', true);
+  const [showStarMarkers, setShowStarMarkers] = usePersistentState('filter_showStarMarkers', true);
+  const [ganttCollapseGaps, setGanttCollapseGaps] = usePersistentState('filter_ganttCollapseGaps', false);
+  const [showGanttLegend, setShowGanttLegend] = usePersistentState('filter_showGanttLegend', true);
   const [timelineNotice, setTimelineNotice] = useState('');
 
   const timelineFilterRef = useRef(null);

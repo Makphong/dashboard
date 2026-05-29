@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { usePersistentState } from './usePersistentState.js';
 import { requestJson } from '../lib/api.js';
 import {
   downloadExcelTable,
@@ -29,7 +30,7 @@ export function useAppController(dashboard) {
   const [segmentTypeSearchText, setSegmentTypeSearchText] = useState('');
   const [documentFileSearch, setDocumentFileSearch] = useState('');
   const [documentSheetSearch, setDocumentSheetSearch] = useState('');
-  const [showMatrixQuadrants, setShowMatrixQuadrants] = useState(false);
+  const [showMatrixQuadrants, setShowMatrixQuadrants] = usePersistentState('filter_showMatrixQuadrants', false);
 
   const workloadVisibleRows = useMemo(() => {
     const filtered = workloadContributors.filter((row) => showWorkloadSystem || row.user !== 'System');
