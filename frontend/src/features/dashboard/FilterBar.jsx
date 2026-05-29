@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { FilterPopover } from '../../components/shared/FilterPopover.jsx';
 import { DropdownSearch } from '../../components/shared/DropdownSearch.jsx';
-import { extractFileNameFromSheetKey, buildSheetKey } from '../../lib/utils.js';
+import { extractFileNameFromSheetKey, buildSheetKey, toSegmentTypeLabel } from '../../lib/utils.js';
 
 export function FilterBar({
   dashboard,
@@ -75,9 +75,13 @@ export function FilterBar({
     userName.toLowerCase().includes(userSearchText.trim().toLowerCase())
   );
 
-  const filteredSegmentTypeOptions = segmentTypeOptions.map(val => ({ label: val, value: val })).filter((option) => 
-    option.label.toLowerCase().includes(segmentTypeSearchText.trim().toLowerCase())
-  );
+  const filteredSegmentTypeOptions = segmentTypeOptions.map((value) => ({
+    label: toSegmentTypeLabel(value),
+    value,
+  })).filter((option) => {
+    const searchText = segmentTypeSearchText.trim().toLowerCase();
+    return option.label.toLowerCase().includes(searchText) || option.value.toLowerCase().includes(searchText);
+  });
 
   const selectedFileSet = new Set(selectedFiles);
   const selectedSheetSet = new Set(selectedSheets);
@@ -269,7 +273,7 @@ export function FilterBar({
           <FilterPopover
             id="segment-type"
             title="Segment"
-            summary={selectedSegmentTypes.length === 0 ? 'Segment Type' : `${selectedSegmentTypes.length} Types`}
+            summary={selectedSegmentTypes.length === 0 ? 'Segment Type' : (selectedSegmentTypes.length === 1 ? toSegmentTypeLabel(selectedSegmentTypes[0]) : `${selectedSegmentTypes.length} Types`)}
             openDropdown={openDropdown}
             setOpenDropdown={setOpenDropdown}
             icon={LayoutDashboard}
