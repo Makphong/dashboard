@@ -4,6 +4,7 @@ import base64
 import binascii
 import hmac
 import os
+import re
 from http import HTTPStatus
 from pathlib import Path, PurePosixPath
 
@@ -187,6 +188,7 @@ def _validate_upload_payload(
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
     core.init_db()
+    frontend_bundle_cache = {"signature": None, "content": None}
 
     max_upload_request_body_bytes = _int_env(
         "DASHBOARD_MAX_UPLOAD_REQUEST_BODY_BYTES", MAX_UPLOAD_REQUEST_BODY_BYTES
@@ -309,7 +311,7 @@ def create_app() -> Flask:
     def serve_app_jsx():
         # Fail-Safe Auto-bundler for Phase 3 (No Node.js)
         src_dir = PROJECT_ROOT / "frontend" / "src"
-        
+
         files_to_bundle = [
             "lib/constants.js",
             "lib/numberUtils.js", "lib/durationFormatters.js", "lib/dateFormatters.js",
@@ -337,8 +339,26 @@ def create_app() -> Flask:
             "features/dashboard/components/SegmentDetailPopup.jsx",
             "app.jsx"
         ]
-        
-        import re
+
+        bundle_signature = []
+        for rel_path in files_to_bundle:
+            file_path = src_dir / rel_path
+            if not file_path.exists():
+                bundle_signature.append((rel_path, None, None))
+                continue
+            stat = file_path.stat()
+            bundle_signature.append((rel_path, stat.st_mtime_ns, stat.st_size))
+        bundle_signature = tuple(bundle_signature)
+
+        if (
+            frontend_bundle_cache["signature"] == bundle_signature
+            and frontend_bundle_cache["content"] is not None
+        ):
+            return frontend_bundle_cache["content"], 200, {
+                "Content-Type": "application/javascript",
+                "X-Frontend-Bundle-Cache": "hit",
+            }
+
         # Match any import statement including multi-line
         import_pattern = re.compile(r'^import\s+.*?\s+from\s+[\'"].*?[\'"];?', re.DOTALL | re.MULTILINE)
         
@@ -382,8 +402,13 @@ def create_app() -> Flask:
             "\n"
         ]
         
-        final_content = header + bundle_body
-        return "\n".join(final_content), 200, {"Content-Type": "application/javascript"}
+        final_content = "\n".join(header + bundle_body)
+        frontend_bundle_cache["signature"] = bundle_signature
+        frontend_bundle_cache["content"] = final_content
+        return final_content, 200, {
+            "Content-Type": "application/javascript",
+            "X-Frontend-Bundle-Cache": "miss",
+        }
 
     @app.get("/frontend/src/<path:filename>")
     def web_frontend_src(filename: str):

@@ -374,36 +374,52 @@ export function useDashboardData() {
     return Array.from(laneDurationMap.entries()).map(([user, totalSeconds]) => ({ user, totalSeconds })).sort((a, b) => b.totalSeconds - a.totalSeconds);
   }, [filteredBaseSegments, showWorkloadIdle, normalizedSelectedSegmentTypes]);
 
-  const refreshAll = async (options = {}) => {
-    setLoading(true);
+  const loadDashboardPayload = async (options = {}) => {
+    const [sourcesRes, performanceRes, healthRes, debugRes, connectionsRes] = await Promise.all([
+      requestJson('/api/sources'),
+      requestJson('/api/user-performance'),
+      requestJson('/api/health').catch(e => ({ __error: e.message })),
+      options.includeDebug ? requestJson('/api/debug').catch(e => ({ __error: e.message })) : Promise.resolve(null),
+      requestJson('/api/gsheet/connections').catch(() => ({ connections: [] })),
+    ]);
+
+    setSources(sourcesRes.sources || []);
+    setPerformance(performanceRes || null);
+    setGsheetConnections(connectionsRes.connections || []);
+    setHealthInfo(healthRes?.__error ? null : healthRes);
+    if (healthRes?.__error) setBackendWarning(`Health error: ${healthRes.__error}`);
+    if (debugRes) setDebugInfo(debugRes.__error ? null : debugRes);
+  };
+
+  const syncGSheet = async () => {
+    setSyncing(true);
     try {
-      setSyncing(true);
-      const syncRes = await requestJson('/api/gsheet/sync', { method: 'POST' }).catch(() => ({}));
-      setSyncing(false);
-      
-      const [sourcesRes, performanceRes, healthRes, debugRes, connectionsRes] = await Promise.all([
-        requestJson('/api/sources'),
-        requestJson('/api/user-performance'),
-        requestJson('/api/health').catch(e => ({ __error: e.message })),
-        options.includeDebug ? requestJson('/api/debug').catch(e => ({ __error: e.message })) : Promise.resolve(null),
-        requestJson('/api/gsheet/connections').catch(() => ({ connections: [] })),
-      ]);
-      
-      setSources(sourcesRes.sources || []);
-      setPerformance(performanceRes || null);
-      setGsheetConnections(connectionsRes.connections || []);
-      setHealthInfo(healthRes?.__error ? null : healthRes);
-      if (healthRes?.__error) setBackendWarning(`Health error: ${healthRes.__error}`);
-      if (debugRes) setDebugInfo(debugRes.__error ? null : debugRes);
-    } catch (error) {
-      setErrorMessage(error.message || 'Refresh failed');
+      await requestJson('/api/gsheet/sync', { method: 'POST' });
     } finally {
-      setLoading(false);
       setSyncing(false);
     }
   };
 
-  useEffect(() => { refreshAll(); }, []);
+  const refreshAll = async (options = {}) => {
+    setLoading(true);
+    try {
+      if (options.syncFirst !== false) await syncGSheet();
+      await loadDashboardPayload(options);
+
+      if (options.backgroundSync) {
+        syncGSheet()
+          .then(() => loadDashboardPayload(options))
+          .catch((error) => setBackendWarning(`Background sync error: ${error.message || 'Sync failed'}`));
+      }
+    } catch (error) {
+      setErrorMessage(error.message || 'Refresh failed');
+    } finally {
+      setLoading(false);
+      if (!options.backgroundSync) setSyncing(false);
+    }
+  };
+
+  useEffect(() => { refreshAll({ syncFirst: false, backgroundSync: true }); }, []);
 
   return {
     sources, gsheetConnections, performance, healthInfo, debugInfo,
