@@ -41,4 +41,4 @@ Stop-ExistingPythonOnPort -TargetPort $Port
 
 Write-Host "Starting Dashboard server on http://localhost:$Port" -ForegroundColor Green
 Write-Host "Tip: open http://localhost:$Port/api/health to verify backend version" -ForegroundColor DarkGray
-python .\app.py --port $Port
+python .\scripts\app.py --port $Port

@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, ResponsiveContainer } from 'recharts';
+import { formatDuration } from '../../lib/utils.js';
 
 const STACK_KEYS = [
   { key: 'vat', label: 'Value-Added', color: '#22C55E' },
@@ -11,28 +12,11 @@ const STACK_KEYS = [
 
 function formatMinutes(seconds) {
   const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
-  if (safeSeconds < 60) return `${safeSeconds} sec`;
-  if (safeSeconds < 3600) return `${Math.round(safeSeconds / 60)} min`;
-  if (safeSeconds < 86400) return `${Math.round(safeSeconds / 3600)} hr`;
-  if (safeSeconds < 2592000) return `${Math.round(safeSeconds / 86400)} day`;
-  return `${Math.round(safeSeconds / 2592000)} mo`;
-}
-
-function formatDurationNumber(seconds) {
-  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
-  const units = [
-    { label: 'mo', seconds: 2592000 },
-    { label: 'd', seconds: 86400 },
-    { label: 'h', seconds: 3600 },
-    { label: 'm', seconds: 60 },
-    { label: 's', seconds: 1 },
-  ];
-  const primaryUnit = units.find((unit) => safeSeconds >= unit.seconds) || units[units.length - 1];
-  const primaryValue = Math.floor(safeSeconds / primaryUnit.seconds);
-  const remainder = safeSeconds - (primaryValue * primaryUnit.seconds);
-  const secondaryUnit = units.find((unit) => unit.seconds < primaryUnit.seconds && remainder >= unit.seconds);
-  if (!secondaryUnit) return `${primaryValue}${primaryUnit.label}`;
-  return `${primaryValue}${primaryUnit.label} ${Math.floor(remainder / secondaryUnit.seconds)}${secondaryUnit.label}`;
+  if (safeSeconds < 60) return `${safeSeconds}s`;
+  if (safeSeconds < 3600) return `${Math.round(safeSeconds / 60)}m`;
+  if (safeSeconds < 86400) return `${Math.round(safeSeconds / 3600)}h`;
+  if (safeSeconds < 2592000) return `${Math.round(safeSeconds / 86400)}d`;
+  return `${Math.round(safeSeconds / 2592000)}mo`;
 }
 
 function normalizeChartData(data) {
@@ -76,7 +60,7 @@ function DurationBarLabel({ x, y, width, value, index, chartData }) {
       fill={row.color || '#334155'}
       className="text-[11px] font-bold"
     >
-      {formatDurationNumber(value)}
+      {formatDuration(value)}
     </text>
   );
 }
@@ -94,7 +78,7 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="name" />
           <YAxis tickFormatter={formatMinutes} />
-          <Tooltip formatter={(value) => formatMinutes(value)} />
+          <Tooltip formatter={(value) => formatDuration(value)} />
           {hasStackShape && <Legend />}
           {hasStackShape ? (
             stackKeys.map(({ key, label, color }) => (

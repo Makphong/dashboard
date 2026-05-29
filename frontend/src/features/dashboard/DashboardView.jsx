@@ -148,13 +148,25 @@ export const DashboardView = React.memo(({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiData.map((kpi, idx) => (
-          <div key={kpi.id} className={`bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}>
-            <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4`}>
+          <div key={kpi.id} className={`relative bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}>
+            {kpi.id === 6 && (
+              /* Krungthai mascot sitting on top of the System Time card */
+              <div className="absolute bottom-full right-2 w-28 h-28 pointer-events-none select-none z-0">
+                <img 
+                  src="https://i.postimg.cc/zvnXJcPC/d-sin-th-y-ngmi-di-t-ngch-x-(1).png" 
+                  className="w-full h-full object-contain object-bottom opacity-100 brightness-[1.15]"
+                  alt="Krungthai mascot"
+                />
+              </div>
+            )}
+            <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4 relative z-10`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
-            <div className="text-slate-500 text-sm font-semibold mb-1">{kpi.label}</div>
-            <div className="text-3xl font-extrabold text-[#17335f]">{kpi.value}</div>
-            <KpiSubtext text={kpi.subtext} />
+            <div className="text-slate-500 text-sm font-semibold mb-1 relative z-10">{kpi.label}</div>
+            <div className="text-3xl font-extrabold text-[#17335f] relative z-10">{kpi.value}</div>
+            <div className="relative z-10">
+              <KpiSubtext text={kpi.subtext} />
+            </div>
           </div>
         ))}
       </div>

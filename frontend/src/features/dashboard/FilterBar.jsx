@@ -8,7 +8,8 @@ import {
   Search,
   ChevronRight,
   Database,
-  Menu
+  Menu,
+  Pin
 } from 'lucide-react';
 import { FilterPopover } from '../../components/shared/FilterPopover.jsx';
 import { DropdownSearch } from '../../components/shared/DropdownSearch.jsx';
@@ -34,12 +35,17 @@ export function FilterBar({
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
     selectedUsers, setSelectedUsers, selectedSegmentTypes, setSelectedSegmentTypes,
     selectedSystemStages, setSelectedSystemStages,
+    pinnedFiles, setPinnedFiles, pinnedSheets, setPinnedSheets,
     activeDocumentFile, setActiveDocumentFile,
     documentTree, userOptions, segmentTypeOptions, systemStageOptions
   } = dashboard;
 
   const toggleSelectedValue = (setter, value) => {
     setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
+  };
+
+  const togglePin = (setter, value) => {
+    setter((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [value, ...prev]));
   };
 
   const toggleFileSelection = (fileName, currentlyChecked = false) => {
@@ -62,13 +68,32 @@ export function FilterBar({
     }
   };
 
-  const filteredDocumentTree = documentTree.filter((item) => 
-    item.fileName.toLowerCase().includes(documentFileSearch.trim().toLowerCase())
-  );
+  const pinnedFileSet = new Set(pinnedFiles);
+  const pinnedSheetSet = new Set(pinnedSheets);
+
+  const filteredDocumentTree = documentTree
+    .filter((item) => item.fileName.toLowerCase().includes(documentFileSearch.trim().toLowerCase()))
+    .sort((a, b) => {
+      const aPinned = pinnedFileSet.has(a.fileName);
+      const bPinned = pinnedFileSet.has(b.fileName);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
 
   const activeDocumentEntry = documentTree.find((item) => item.fileName === activeDocumentFile) || null;
   const filteredSheetsForActiveFile = activeDocumentEntry 
-    ? activeDocumentEntry.sheets.filter((sheet) => sheet.toLowerCase().includes(documentSheetSearch.trim().toLowerCase()))
+    ? activeDocumentEntry.sheets
+        .filter((sheet) => sheet.toLowerCase().includes(documentSheetSearch.trim().toLowerCase()))
+        .sort((a, b) => {
+          const aKey = buildSheetKey(activeDocumentFile, a);
+          const bKey = buildSheetKey(activeDocumentFile, b);
+          const aPinned = pinnedSheetSet.has(aKey);
+          const bPinned = pinnedSheetSet.has(bKey);
+          if (aPinned && !bPinned) return -1;
+          if (!aPinned && bPinned) return 1;
+          return 0;
+        })
     : [];
 
   const filteredUserOptions = userOptions.filter((userName) => 
@@ -180,25 +205,36 @@ export function FilterBar({
                   <DropdownSearch value={documentFileSearch} onChange={setDocumentFileSearch} placeholder="Search files..." />
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
-                  {filteredDocumentTree.map((item) => (
-                    <div
-                      key={item.fileName}
-                      onClick={() => setActiveDocumentFile(item.fileName)}
-                      className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${activeDocumentFile === item.fileName ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedFileSet.has(item.fileName)}
-                        onChange={(e) => { e.stopPropagation(); toggleFileSelection(item.fileName, selectedFileSet.has(item.fileName)); }}
-                        className="h-4 w-4 accent-blue-600 rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-medium truncate ${activeDocumentFile === item.fileName ? 'text-blue-700' : 'text-slate-700'}`}>{item.fileName}</div>
-                        <div className="text-[10px] text-slate-400 font-medium">{item.sheets.length} sheets</div>
+                  {filteredDocumentTree.map((item) => {
+                    const isPinned = pinnedFileSet.has(item.fileName);
+                    return (
+                      <div
+                        key={item.fileName}
+                        onClick={() => setActiveDocumentFile(item.fileName)}
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${activeDocumentFile === item.fileName ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedFileSet.has(item.fileName)}
+                          onChange={(e) => { e.stopPropagation(); toggleFileSelection(item.fileName, selectedFileSet.has(item.fileName)); }}
+                          className="h-4 w-4 accent-blue-600 rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${activeDocumentFile === item.fileName ? 'text-blue-700' : 'text-slate-700'}`}>{item.fileName}</div>
+                          <div className="text-[10px] text-slate-400 font-medium">{item.sheets.length} sheets</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePin(setPinnedFiles, item.fileName); }}
+                            className={`p-1 rounded-md transition-all ${isPinned ? 'text-blue-500 opacity-100 bg-blue-50' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-500 hover:bg-slate-100'}`}
+                          >
+                            <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-current' : ''}`} />
+                          </button>
+                          <ChevronRight className={`w-4 h-4 transition-transform ${activeDocumentFile === item.fileName ? 'text-blue-400 translate-x-0.5' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />
+                        </div>
                       </div>
-                      <ChevronRight className={`w-4 h-4 transition-transform ${activeDocumentFile === item.fileName ? 'text-blue-400 translate-x-0.5' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               {/* Sheet List */}
@@ -219,16 +255,23 @@ export function FilterBar({
                     filteredSheetsForActiveFile.map((sheet) => {
                       const sheetKey = buildSheetKey(activeDocumentFile, sheet);
                       const isChecked = selectedSheetSet.has(sheetKey);
+                      const isPinned = pinnedSheetSet.has(sheetKey);
                       return (
-                        <label key={sheet} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all">
+                        <div key={sheet} className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all">
                           <input
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => toggleSheetSelection(activeDocumentFile, sheet)}
                             className="h-4 w-4 accent-blue-600 rounded"
                           />
-                          <span className="text-sm font-medium text-slate-700 truncate">{sheet}</span>
-                        </label>
+                          <span className="flex-1 text-sm font-medium text-slate-700 truncate">{sheet}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); togglePin(setPinnedSheets, sheetKey); }}
+                            className={`p-1 rounded-md transition-all ${isPinned ? 'text-blue-500 opacity-100 bg-blue-50' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-500 hover:bg-slate-100'}`}
+                          >
+                            <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-current' : ''}`} />
+                          </button>
+                        </div>
                       );
                     })
                   )}

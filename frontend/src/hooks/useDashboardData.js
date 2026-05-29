@@ -40,6 +40,8 @@ export function useDashboardData() {
   const [showIdle, setShowIdle] = usePersistentState('filter_showIdle', false);
   const [showWorkloadIdle, setShowWorkloadIdle] = usePersistentState('filter_showWorkloadIdle', false);
   const [showWorkloadSystem, setShowWorkloadSystem] = usePersistentState('filter_showWorkloadSystem', false);
+  const [pinnedFiles, setPinnedFiles] = usePersistentState('filter_pinnedFiles', []);
+  const [pinnedSheets, setPinnedSheets] = usePersistentState('filter_pinnedSheets', []);
   const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
   
@@ -428,6 +430,7 @@ export function useDashboardData() {
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
     selectedUsers, setSelectedUsers, selectedSegmentTypes: normalizedSelectedSegmentTypes, setSelectedSegmentTypes,
     showIdle, setShowIdle, showWorkloadIdle, setShowWorkloadIdle, showWorkloadSystem, setShowWorkloadSystem,
+    pinnedFiles, setPinnedFiles, pinnedSheets, setPinnedSheets,
     activeDocumentFile, setActiveDocumentFile,
     documentTree, userOptions, segmentTypeOptions,
     ganttVisibleSegments, kpiData, filteredBaseSegments,

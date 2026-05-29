@@ -20,16 +20,20 @@
       "dest": "/frontend/src/$1"
     },
     {
-      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest|.*\\.ttf)",
-      "dest": "/$1"
+      "src": "/fonts/(.*\\.ttf)",
+      "dest": "/frontend/public/fonts/$1"
+    },
+    {
+      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest)",
+      "dest": "/frontend/public/$1"
     },
     {
       "src": "/",
-      "dest": "/index.html"
+      "dest": "/frontend/public/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/frontend/public/index.html"
     }
   ]
 }

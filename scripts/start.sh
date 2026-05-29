@@ -37,4 +37,4 @@ stop_existing_python_on_port $PORT
 echo "Starting Dashboard server on http://localhost:$PORT"
 echo "Tip: open http://localhost:$PORT/api/health to verify backend version"
 
-python3 app.py --port $PORT
+python3 scripts/app.py --port $PORT

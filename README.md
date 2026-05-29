@@ -7,10 +7,10 @@
 |- api/                # Vercel function entrypoint
 |- backend/            # Python backend source
 |- docs/               # Documentation (.md files)
-|- frontend/           # React frontend source
-|- scripts/            # Startup scripts (start.sh, etc.)
-|- app.py              # Main entry point
-|- index.html          # Web entry
+|- frontend/
+|  |- public/          # Static assets (index.html, fonts)
+|  `- src/             # React frontend source
+|- scripts/            # Startup scripts and app entry point
 |- requirements.txt    # Dependencies
 `- vercel.json         # Vercel config
 ```
@@ -20,8 +20,10 @@
 1. Install dependencies:
    `pip install -r requirements.txt`
 2. Start server:
-   `python app.py --port 8000` 
-   (or use `./scripts/start.sh`)
+   `bash scripts/start.sh` (Linux/macOS)
+   or `.\scripts\start.ps1` (Windows)
+   
+   (Alternatively: `python scripts/app.py --port 8000`)
 3. Open:
    `http://localhost:8000/`
 

@@ -4,21 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard (No Node.js)</title>
-    <link rel="preload" href="/Krungthai.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="/Krungthai-Bold.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="/fonts/Krungthai.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="/fonts/Krungthai-Bold.ttf" as="font" type="font/ttf" crossorigin>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
       @font-face {
         font-family: "Krungthai Fast Regular";
-        src: url("/Krungthai.ttf") format("truetype");
+        src: url("/fonts/Krungthai.ttf") format("truetype");
         font-weight: 400;
         font-style: normal;
         font-display: block;
       }
       @font-face {
         font-family: "Krungthai Fast Bold";
-        src: url("/Krungthai-Bold.ttf") format("truetype");
+        src: url("/fonts/Krungthai-Bold.ttf") format("truetype");
         font-weight: 700;
         font-style: normal;
         font-display: block;
@@ -284,7 +284,7 @@
         return modulePromise;
       }
 
-      loadJsxModule(new URL('./frontend/src/app.jsx', window.location.href))
+      loadJsxModule(new URL('/frontend/src/app.jsx', window.location.href))
         .then((entryUrl) => import(entryUrl))
         .catch((error) => {
           console.error(error);

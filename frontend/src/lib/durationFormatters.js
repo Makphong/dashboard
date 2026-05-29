@@ -1,35 +1,47 @@
 export function formatDuration(seconds) {
   const safe = Math.max(0, Math.round(Number(seconds) || 0));
+  if (safe === 0) return '0s';
+
   const MINUTE = 60;
   const HOUR = 60 * MINUTE;
   const DAY = 24 * HOUR;
-  const MONTH = 24 * DAY;
-  const YEAR = 12 * MONTH;
+  const MONTH = 30 * DAY;
+  const YEAR = 365 * DAY;
 
-  if (safe > YEAR) {
-    const years = Math.floor(safe / YEAR);
-    const months = Math.floor((safe % YEAR) / MONTH);
-    return `${years}y ${months}mo`;
+  const parts = [];
+  let remaining = safe;
+
+  if (remaining >= YEAR) {
+    const years = Math.floor(remaining / YEAR);
+    parts.push(`${years}y`);
+    remaining %= YEAR;
+  }
+  if (remaining >= MONTH) {
+    const months = Math.floor(remaining / MONTH);
+    parts.push(`${months}mo`);
+    remaining %= MONTH;
+  }
+  if (remaining >= DAY) {
+    const days = Math.floor(remaining / DAY);
+    parts.push(`${days}d`);
+    remaining %= DAY;
+  }
+  if (remaining >= HOUR) {
+    const hours = Math.floor(remaining / HOUR);
+    parts.push(`${hours}h`);
+    remaining %= HOUR;
+  }
+  if (remaining >= MINUTE) {
+    const minutes = Math.floor(remaining / MINUTE);
+    parts.push(`${minutes}m`);
+    remaining %= MINUTE;
+  }
+  if (remaining > 0 || parts.length === 0) {
+    parts.push(`${remaining}s`);
   }
 
-  if (safe > MONTH) {
-    const months = Math.floor(safe / MONTH);
-    const days = Math.floor((safe % MONTH) / DAY);
-    return `${months}mo ${days}d`;
-  }
-
-  if (safe > DAY) {
-    const days = Math.floor(safe / DAY);
-    const hours = Math.floor((safe % DAY) / HOUR);
-    return `${days}d ${hours}h`;
-  }
-
-  const h = Math.floor(safe / HOUR);
-  const m = Math.floor((safe % HOUR) / MINUTE);
-  const s = safe % MINUTE;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  // Return up to 3 units for a good balance of detail and readability
+  return parts.slice(0, 3).join(' ');
 }
 
 export function formatPercent(value) {

@@ -19,8 +19,9 @@ MAX_UPLOAD_TOTAL_DECODED_BYTES = 25 * 1024 * 1024
 MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024
 MAX_UPLOAD_FILES = 10
 UPLOAD_ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
-ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest", "Krungthai.ttf", "Krungthai-Bold.ttf"}
+ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest"}
 FRONTEND_STATIC_PREFIX = "frontend/src/"
+FRONTEND_PUBLIC_PREFIX = "frontend/public/"
 FRONTEND_STATIC_EXTENSIONS = {".js", ".jsx", ".mjs", ".css", ".json", ".map"}
 
 
@@ -98,21 +99,36 @@ def _is_allowed_static_path(normalized_path: str) -> bool:
     if normalized_path.startswith(FRONTEND_STATIC_PREFIX):
         suffix = Path(normalized_path).suffix.lower()
         return suffix in FRONTEND_STATIC_EXTENSIONS
+    if normalized_path.startswith(FRONTEND_PUBLIC_PREFIX):
+        return True
     return False
 
 
 def _resolve_static_file(url_path: str) -> Path | None:
     normalized_path = _normalize_relative_url_path(url_path)
-    if not normalized_path or not _is_allowed_static_path(normalized_path):
+    if not normalized_path:
         return None
 
-    candidate = (PROJECT_ROOT / normalized_path).resolve()
+    # 1. Check direct paths (including src and root allowlist)
+    if _is_allowed_static_path(normalized_path):
+        candidate = (PROJECT_ROOT / normalized_path).resolve()
+        try:
+            candidate.relative_to(PROJECT_ROOT)
+            if candidate.is_file():
+                return candidate
+        except ValueError:
+            pass
+
+    # 2. Check frontend/public fallback
+    public_candidate = (PROJECT_ROOT / "frontend" / "public" / normalized_path).resolve()
     try:
-        candidate.relative_to(PROJECT_ROOT)
+        public_candidate.relative_to(PROJECT_ROOT / "frontend" / "public")
+        if public_candidate.is_file():
+            return public_candidate
     except ValueError:
-        return None
+        pass
 
-    return candidate if candidate.is_file() else None
+    return None
 
 
 def _serve_static_file(url_path: str):
@@ -305,7 +321,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def web_index():
-        return send_from_directory(PROJECT_ROOT, "index.html")
+        return send_from_directory(PROJECT_ROOT / "frontend" / "public", "index.html")
 
     @app.get("/frontend/src/app.jsx")
     def serve_app_jsx():
@@ -316,7 +332,11 @@ def create_app() -> Flask:
             "lib/constants.js",
             "lib/numberUtils.js", "lib/durationFormatters.js", "lib/dateFormatters.js",
             "lib/excelExport.js", "lib/segmentUtils.js", "lib/kpiUtils.js",
-            "lib/api.js", "hooks/usePersistentState.js",
+            "lib/api.js", 
+            "hooks/dashboard/utils/dataParsers.js",
+            "hooks/dashboard/hooks/useDashboardFilters.js",
+            "hooks/dashboard/hooks/useDashboardMetrics.js",
+            "hooks/usePersistentState.js",
             "hooks/useDashboardData.js", "hooks/useAppController.js",
             "components/shared/KpiSubtext.jsx", "components/shared/Sidebar.jsx",
             "components/shared/FilterPopover.jsx", "components/shared/DropdownSearch.jsx",
@@ -397,7 +417,7 @@ def create_app() -> Flask:
             "  Users, Server, Clock, Timer, RefreshCw, AlertTriangle, Star, Search, ",
             "  Calendar, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight, Database, ",
             "  UploadCloud, Link2, FileText, FileSpreadsheet, Trash2, CheckCircle2, ",
-            "  Plus, Maximize2, SlidersHorizontal, Eye, EyeOff, ChevronDown, User",
+            "  Plus, Maximize2, SlidersHorizontal, Eye, EyeOff, ChevronDown, User, Pin",
             "} from 'lucide-react';",
             "\n"
         ]
