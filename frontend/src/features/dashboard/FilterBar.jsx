@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { FilterPopover } from '../../components/shared/FilterPopover.jsx';
 import { DropdownSearch } from '../../components/shared/DropdownSearch.jsx';
-import { extractFileNameFromSheetKey, buildSheetKey, toSegmentTypeLabel } from '../../lib/utils.js';
+import { extractFileNameFromSheetKey, buildSheetKey } from '../../lib/utils.js';
 
 export function FilterBar({
   dashboard,
@@ -76,7 +76,7 @@ export function FilterBar({
   );
 
   const filteredSegmentTypeOptions = segmentTypeOptions.map((value) => ({
-    label: toSegmentTypeLabel(value),
+    label: value,
     value,
   })).filter((option) => {
     const searchText = segmentTypeSearchText.trim().toLowerCase();
@@ -273,7 +273,7 @@ export function FilterBar({
           <FilterPopover
             id="segment-type"
             title="Segment"
-            summary={selectedSegmentTypes.length === 0 ? 'Segment Type' : (selectedSegmentTypes.length === 1 ? toSegmentTypeLabel(selectedSegmentTypes[0]) : `${selectedSegmentTypes.length} Types`)}
+            summary={selectedSegmentTypes.length === 0 ? 'Segment Type' : (selectedSegmentTypes.length === 1 ? selectedSegmentTypes[0] : `${selectedSegmentTypes.length} Types`)}
             openDropdown={openDropdown}
             setOpenDropdown={setOpenDropdown}
             icon={LayoutDashboard}

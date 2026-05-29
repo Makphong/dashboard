@@ -6,6 +6,7 @@ import {
   safeNumber,
   isUserContextSegment,
   isIdleContextSegment,
+  toDrillGroup,
   buildSheetKey,
   buildKpisFromSegments,
   buildKpiData
@@ -43,6 +44,11 @@ export function useDashboardData() {
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
   
   const didInitDocumentDefaultRef = useRef(false);
+  const segmentGroupOptions = useMemo(() => ['Uploading', 'Processing', 'Reprocess', 'Review', 'Edit', 'Idle'], []);
+  const normalizedSelectedSegmentTypes = useMemo(() => {
+    const allowedGroups = new Set(segmentGroupOptions);
+    return selectedSegmentTypes.filter((value) => allowedGroups.has(value));
+  }, [selectedSegmentTypes, segmentGroupOptions]);
 
   const segments = performance?.segments || [];
 
@@ -149,8 +155,8 @@ export function useDashboardData() {
   );
 
   const segmentTypeOptions = useMemo(
-    () => Array.from(new Set(parsedSegments.map((segment) => segment.segmentType))).sort((a, b) => a.localeCompare(b)),
-    [parsedSegments]
+    () => segmentGroupOptions,
+    [segmentGroupOptions]
   );
 
   const dateRangeBounds = useMemo(() => {
@@ -195,14 +201,16 @@ export function useDashboardData() {
     let filtered = filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!showIdle && isIdleContextSegment(segmentType)) return false;
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
-        return segmentType.startsWith('SYSTEM_');
-      }
+      const drillGroup = toDrillGroup(segmentType);
+      const segmentGroup = drillGroup === 'Reprocessing'
+        ? 'Reprocess'
+        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      if (normalizedSelectedSegmentTypes.length > 0 && !normalizedSelectedSegmentTypes.includes(segmentGroup)) return false;
       return true;
     });
 
     return filtered;
-  }, [filteredBaseSegments, showIdle, selectedSegmentTypes]);
+  }, [filteredBaseSegments, showIdle, normalizedSelectedSegmentTypes]);
 
   const kpiData = useMemo(() => {
     const kpis = ganttVisibleSegments.length > 0 ? buildKpisFromSegments(ganttVisibleSegments) : null;
@@ -352,9 +360,11 @@ export function useDashboardData() {
       if (isIdle && !showWorkloadIdle) return;
       
       // Respect segment type selection
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
-        if (!segmentType.startsWith('SYSTEM_')) return;
-      }
+      const drillGroup = toDrillGroup(segmentType);
+      const segmentGroup = drillGroup === 'Reprocessing'
+        ? 'Reprocess'
+        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      if (normalizedSelectedSegmentTypes.length > 0 && !normalizedSelectedSegmentTypes.includes(segmentGroup)) return;
       
       let lane = toTimelineLane(segmentType, segment.userName);
       if (segmentType.startsWith('SYSTEM_')) lane = 'System';
@@ -362,7 +372,7 @@ export function useDashboardData() {
       laneDurationMap.set(lane, (laneDurationMap.get(lane) || 0) + durationSeconds);
     });
     return Array.from(laneDurationMap.entries()).map(([user, totalSeconds]) => ({ user, totalSeconds })).sort((a, b) => b.totalSeconds - a.totalSeconds);
-  }, [filteredBaseSegments, showWorkloadIdle, selectedSegmentTypes]);
+  }, [filteredBaseSegments, showWorkloadIdle, normalizedSelectedSegmentTypes]);
 
   const refreshAll = async (options = {}) => {
     setLoading(true);
@@ -400,7 +410,7 @@ export function useDashboardData() {
     loading, syncing, errorMessage, backendWarning, debugFetchError,
     datePreset, setDatePreset, dateStart, setDateStart, dateEnd, setDateEnd,
     selectedFiles, setSelectedFiles, selectedSheets, setSelectedSheets,
-    selectedUsers, setSelectedUsers, selectedSegmentTypes, setSelectedSegmentTypes,
+    selectedUsers, setSelectedUsers, selectedSegmentTypes: normalizedSelectedSegmentTypes, setSelectedSegmentTypes,
     showIdle, setShowIdle, showWorkloadIdle, setShowWorkloadIdle, showWorkloadSystem, setShowWorkloadSystem,
     activeDocumentFile, setActiveDocumentFile,
     documentTree, userOptions, segmentTypeOptions,

@@ -60,10 +60,11 @@ export const DashboardView = React.memo(({
     const totals = { Uploading: 0, Processing: 0, Reprocess: 0, Review: 0, Edit: 0, Idle: 0 };
     filteredBaseSegments.forEach(s => {
       const segmentType = String(s.segmentType || '');
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
-        if (!segmentType.startsWith('SYSTEM_')) return;
-      }
       const drillGroup = toDrillGroup(s.segmentType);
+      const segmentGroup = drillGroup === 'Reprocessing'
+        ? 'Reprocess'
+        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
       if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
       if (drillGroup === 'Uploading') totals.Uploading += duration;

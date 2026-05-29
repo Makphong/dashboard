@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isUserContextSegment, isIdleContextSegment } from '../../../lib/utils.js';
+import { isUserContextSegment, isIdleContextSegment, toDrillGroup } from '../../../lib/utils.js';
 
 export function useDashboardFilters(parsedSegments, filters) {
   const {
@@ -40,9 +40,11 @@ export function useDashboardFilters(parsedSegments, filters) {
     return filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!showIdle && isIdleContextSegment(segmentType)) return false;
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentType)) {
-        return segmentType.startsWith('SYSTEM_');
-      }
+      const drillGroup = toDrillGroup(segmentType);
+      const segmentGroup = drillGroup === 'Reprocessing'
+        ? 'Reprocess'
+        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return false;
       return true;
     });
   }, [filteredBaseSegments, showIdle, selectedSegmentTypes]);
