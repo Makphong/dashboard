@@ -40,8 +40,8 @@ export function formatDuration(seconds) {
     parts.push(`${remaining}s`);
   }
 
-  // Return up to 3 units for a good balance of detail and readability
-  return parts.slice(0, 3).join(' ');
+  // Return up to 2 units for a good balance of detail and readability
+  return parts.slice(0, 2).join(' ');
 }
 
 export function formatPercent(value) {

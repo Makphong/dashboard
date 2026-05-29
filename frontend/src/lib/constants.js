@@ -6,11 +6,12 @@ export const API_BASE = '';
 export const FRONTEND_BUILD_VERSION = '2026-05-25-system-professional-18';
 // ... rest of exports ...
 export const initialKpiData = [
+  { id: 7, label: 'Total time', value: '-', subtext: 'Upload to Action', icon: Timer, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
   { id: 1, label: 'Active User Time', value: '-', subtext: 'Avg per user: -', icon: Clock, color: 'text-[#00a4e4]', bg: 'bg-[#e8f7fd]' },
-  { id: 2, label: 'Contributing Users', value: '0', subtext: 'No user data', icon: Users, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
+  { id: 6, label: 'Active System Time', value: '-', subtext: '0.0% of active time', icon: Clock, color: 'text-[#334155]', bg: 'bg-slate-100' },
   { id: 3, label: 'Avg User Action', value: '-', subtext: 'Med - · - - -', icon: Timer, color: 'text-[#00a4e4]', bg: 'bg-[#e8f7fd]' },
   { id: 5, label: 'Edit Rate', value: '0.0%', subtext: '0 edit / 0 actions', icon: RefreshCw, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
-  { id: 6, label: 'Active System Time', value: '-', subtext: '0.0% of active time', icon: Clock, color: 'text-[#334155]', bg: 'bg-slate-100' },
+  { id: 2, label: 'Contributing Users', value: '0', subtext: 'No user data', icon: Users, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
 ];
 export const REOPEN_MARKER_TYPES = new Set(['REOPEN_MARKER', 'REOPEN_TO_REVIEW_HANDOFF_MARKER']);
 export const PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES = new Set(['IDLE_WAITING_FOR_SCHEDULED_REPROCESS']);

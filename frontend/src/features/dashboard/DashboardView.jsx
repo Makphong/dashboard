@@ -146,11 +146,11 @@ export const DashboardView = React.memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {kpiData.map((kpi, idx) => (
           <div key={kpi.id} className={`relative bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}>
-            {kpi.id === 6 && (
-              /* Krungthai mascot sitting on top of the System Time card */
+            {kpi.id === 5 && (
+              /* Krungthai mascot sitting on top of the Edit Rate card (second to last) */
               <div className="absolute bottom-full right-2 w-28 h-28 pointer-events-none select-none z-0">
                 <img 
                   src="https://i.postimg.cc/zvnXJcPC/d-sin-th-y-ngmi-di-t-ngch-x-(1).png" 

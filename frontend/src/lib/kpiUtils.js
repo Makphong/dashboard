@@ -11,6 +11,15 @@ export function buildKpiData(kpis) {
   if (!kpis) return initialKpiData;
   return [
     {
+      id: 7,
+      label: 'Total time',
+      value: kpis.totalLeadTimeDisplay || '-',
+      subtext: `Upload to last action`,
+      icon: Timer,
+      color: 'text-[#3860be]',
+      bg: 'bg-[#eef3ff]',
+    },
+    {
       id: 1,
       label: 'Active User Time',
       value: kpis.activeUserTimeDisplay || '-',
@@ -20,15 +29,13 @@ export function buildKpiData(kpis) {
       bg: 'bg-[#e8f7fd]',
     },
     {
-      id: 2,
-      label: 'Contributing Users',
-      value: String(kpis.contributingUsers || 0),
-      subtext: kpis.topContributorName
-        ? `Top: ${kpis.topContributorName} (${kpis.topContributorDisplay})`
-        : 'No user data',
-      icon: Users,
-      color: 'text-[#3860be]',
-      bg: 'bg-[#eef3ff]',
+      id: 6,
+      label: 'Active System Time',
+      value: kpis.systemTimeDisplay || '-',
+      subtext: `${formatPercent(kpis.systemPercentOfActive || 0)} of active time`,
+      icon: Clock,
+      color: 'text-[#334155]',
+      bg: 'bg-slate-100',
     },
     {
       id: 3,
@@ -49,13 +56,15 @@ export function buildKpiData(kpis) {
       bg: 'bg-[#eef3ff]',
     },
     {
-      id: 6,
-      label: 'Active System Time',
-      value: kpis.systemTimeDisplay || '-',
-      subtext: `${formatPercent(kpis.systemPercentOfActive || 0)} of active time`,
-      icon: Clock,
-      color: 'text-[#334155]',
-      bg: 'bg-slate-100',
+      id: 2,
+      label: 'Contributing Users',
+      value: String(kpis.contributingUsers || 0),
+      subtext: kpis.topContributorName
+        ? `${kpis.topContributorName} (${kpis.topContributorDisplay})`
+        : 'No user data',
+      icon: Users,
+      color: 'text-[#3860be]',
+      bg: 'bg-[#eef3ff]',
     },
   ];
 }
@@ -133,6 +142,20 @@ export function buildKpisFromSegments(segments) {
     return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
   }).length;
 
+  const segmentsBySheet = new Map();
+  safeSegments.forEach(s => {
+    if (!s.sheetKey) return;
+    if (!segmentsBySheet.has(s.sheetKey)) segmentsBySheet.set(s.sheetKey, []);
+    segmentsBySheet.get(s.sheetKey).push(s);
+  });
+
+  let totalLeadTimeSeconds = 0;
+  segmentsBySheet.forEach(sheetSegments => {
+    const minStart = Math.min(...sheetSegments.map(s => s.startTs));
+    const maxEnd = Math.max(...sheetSegments.map(s => s.endTs));
+    totalLeadTimeSeconds += (maxEnd - minStart) / 1000;
+  });
+
   return {
     activeUserTimeSeconds,
     activeUserTimeDisplay: formatDuration(activeUserTimeSeconds),
@@ -164,5 +187,7 @@ export function buildKpisFromSegments(segments) {
     reworkSessions,
     editTimeSeconds,
     totalSessions,
+    totalLeadTimeSeconds,
+    totalLeadTimeDisplay: formatDuration(totalLeadTimeSeconds),
   };
 }
