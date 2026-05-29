@@ -24,7 +24,7 @@ export function useAppController(dashboard) {
   const [selectedGanttSegment, setSelectedGanttSegment] = useState(null);
   const [showExportConfirm, setShowExportConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentState('sidebar_collapsed', false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [userSearchText, setUserSearchText] = useState('');
   const [segmentTypeSearchText, setSegmentTypeSearchText] = useState('');
