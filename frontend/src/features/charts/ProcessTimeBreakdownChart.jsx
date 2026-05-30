@@ -30,6 +30,7 @@ function normalizeChartData(data) {
   }));
 
   return rows.map((row, index) => ({
+    ...row,
     id: row.key || row.id || row.label || `segment_${index}`,
     name: row.label || row.name || `Segment ${index + 1}`,
     seconds: Number(row.seconds) || 0,

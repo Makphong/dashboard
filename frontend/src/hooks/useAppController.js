@@ -33,6 +33,7 @@ export function useAppController(dashboard) {
   const [showMatrixQuadrants, setShowMatrixQuadrants] = usePersistentState('filter_showMatrixQuadrants', false);
   const [showProcessBreakdownIdle, setShowProcessBreakdownIdle] = usePersistentState('filter_showProcessBreakdownIdle', true);
   const [showProcessBreakdownLabels, setShowProcessBreakdownLabels] = usePersistentState('filter_showProcessBreakdownLabels', true);
+  const [mergeReviewAndEdit, setMergeReviewAndEdit] = usePersistentState('chart_mergeReviewAndEdit', true);
 
   const workloadVisibleRows = useMemo(() => {
     const filtered = workloadContributors.filter((row) => showWorkloadSystem || row.user !== 'System');
@@ -146,6 +147,8 @@ export function useAppController(dashboard) {
     setShowProcessBreakdownIdle,
     showProcessBreakdownLabels,
     setShowProcessBreakdownLabels,
+    mergeReviewAndEdit,
+    setMergeReviewAndEdit,
     workloadVisibleRows,
     handleUploadFiles,
     handleDeleteSource,

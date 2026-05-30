@@ -40,6 +40,8 @@ function App() {
             setShowProcessBreakdownIdle={controller.setShowProcessBreakdownIdle}
             showProcessBreakdownLabels={controller.showProcessBreakdownLabels}
             setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
+            mergeReviewAndEdit={controller.mergeReviewAndEdit}
+            setMergeReviewAndEdit={controller.setMergeReviewAndEdit}
             setSelectedGanttSegment={controller.setSelectedGanttSegment}
             setExpandedVisualizationId={controller.setExpandedVisualizationId}
             setShowExportConfirm={controller.setShowExportConfirm}
@@ -64,6 +66,7 @@ function App() {
           contributionRows: dashboard.contributionRows,
           matrixRows: dashboard.matrixRows,
           showMatrixQuadrants: controller.showMatrixQuadrants,
+          mergeReviewAndEdit: controller.mergeReviewAndEdit,
         }}
       />
       <ExportConfirmModal

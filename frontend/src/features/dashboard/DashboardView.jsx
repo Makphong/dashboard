@@ -37,6 +37,8 @@ export const DashboardView = React.memo(({
   setShowProcessBreakdownIdle,
   showProcessBreakdownLabels,
   setShowProcessBreakdownLabels,
+  mergeReviewAndEdit,
+  setMergeReviewAndEdit,
   setSelectedGanttSegment,
   setExpandedVisualizationId,
   setShowExportConfirm
@@ -75,13 +77,28 @@ export const DashboardView = React.memo(({
       else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
-    const items = Object.entries(totals)
-      .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
-      .map(([label, seconds]) => ({
-        label,
-        seconds,
-        color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
-      }));
+
+    let items = [];
+    if (mergeReviewAndEdit) {
+      const mergedReviewEdit = totals.Review + totals.Edit;
+      items = [
+        { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
+        { label: 'Processing', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
+        { label: 'Reprocess', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+        { label: 'Review And Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
+      ];
+      if (showProcessBreakdownIdle) {
+        items.push({ label: 'Idle', seconds: totals.Idle, color: GANTT_DRILL_GROUP_COLORS.Idle });
+      }
+    } else {
+      items = Object.entries(totals)
+        .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
+        .map(([label, seconds]) => ({
+          label,
+          seconds,
+          color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
+        }));
+    }
 
     const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit + totals.Idle;
     if (completeSeconds > 0) {
@@ -92,12 +109,60 @@ export const DashboardView = React.memo(({
       });
     }
     return items;
-  }, [filteredBaseSegments, selectedSegmentTypes, showProcessBreakdownIdle]);
+  }, [filteredBaseSegments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit]);
+
+  const transitionTimeData = React.useMemo(() => {
+    const groups = new Map();
+    filteredBaseSegments.forEach(s => {
+      if (!groups.has(s.sheetKey)) groups.set(s.sheetKey, []);
+      groups.get(s.sheetKey).push(s);
+    });
+
+    let idleAfterProcess = 0, countAfterProcess = 0;
+    let idleAfterReprocess = 0, countAfterReprocess = 0;
+    let idleBetweenActions = 0, countBetweenActions = 0;
+
+    groups.forEach(segments => {
+      const sorted = [...segments].sort((a, b) => a.startTs - b.startTs);
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+
+        const prevDrill = toDrillGroup(prev.segmentType);
+        const currDrill = toDrillGroup(curr.segmentType);
+
+        if (currDrill === 'Idle') {
+          const duration = Number(curr.durationSeconds) || 0;
+          if (prevDrill === 'Processing') {
+            idleAfterProcess += duration;
+            countAfterProcess++;
+          } else if (prevDrill === 'Reprocessing') {
+            idleAfterReprocess += duration;
+            countAfterReprocess++;
+          } else if (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading') {
+            const hasFutureAction = sorted.slice(i + 1).some(s => {
+              const dg = toDrillGroup(s.segmentType);
+              return dg === 'Review' || dg === 'Edit';
+            });
+            if (hasFutureAction) {
+              idleBetweenActions += duration;
+              countBetweenActions++;
+            }
+          }
+        }
+      }
+    });
+
+    return [
+      { label: 'After Processing', seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0, totalSeconds: idleAfterProcess, color: '#3b82f6' },
+      { label: 'After Reprocessing', seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0, totalSeconds: idleAfterReprocess, color: '#6366f1' },
+      { label: 'Between Review And Edit', seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0, totalSeconds: idleBetweenActions, color: '#f59e0b' }
+    ];
+  }, [filteredBaseSegments]);
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
   const [showProcessFilterMenu, setShowProcessFilterMenu] = useState(false);
-  const [showMatrixFilterMenu, setShowMatrixFilterMenu] = useState(false);
   const [ganttSingleLaneMode, setGanttSingleLaneMode] = usePersistentState('filter_ganttSingleLaneMode', false);
   const [showSystemLane, setShowSystemLane] = usePersistentState('filter_showSystemLane', true);
   const [showStarMarkers, setShowStarMarkers] = usePersistentState('filter_showStarMarkers', true);
@@ -115,7 +180,6 @@ export const DashboardView = React.memo(({
       if (timelineFilterRef.current && !timelineFilterRef.current.contains(event.target)) setShowTimelineFilterMenu(false);
       if (workloadFilterRef.current && !workloadFilterRef.current.contains(event.target)) setShowWorkloadFilterMenu(false);
       if (processFilterRef.current && !processFilterRef.current.contains(event.target)) setShowProcessFilterMenu(false);
-      if (matrixFilterRef.current && !matrixFilterRef.current.contains(event.target)) setShowMatrixFilterMenu(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -243,7 +307,7 @@ export const DashboardView = React.memo(({
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter">
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Process Settings</div>
                     <div className="space-y-3">
-                      <ToggleSetting checked={showProcessBreakdownIdle} onChange={() => setShowProcessBreakdownIdle(!showProcessBreakdownIdle)}>Show Idle Time</ToggleSetting>
+                      <ToggleSetting checked={mergeReviewAndEdit} onChange={() => setMergeReviewAndEdit(!mergeReviewAndEdit)}>Merge Review & Edit</ToggleSetting>
                       <ToggleSetting checked={showProcessBreakdownLabels} onChange={() => setShowProcessBreakdownLabels(!showProcessBreakdownLabels)}>Show Bar Labels</ToggleSetting>
                     </div>
                   </div>
@@ -259,27 +323,13 @@ export const DashboardView = React.memo(({
 
         <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-[#17335f]">Quality vs Edit Matrix</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Average Transition Time</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="relative" ref={matrixFilterRef}>
-                <button onClick={() => setShowMatrixFilterMenu(!showMatrixFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showMatrixFilterMenu ? 'text-blue-600 border-blue-200 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
-                {showMatrixFilterMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter" onMouseLeave={() => setShowMatrixFilterMenu(false)}>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Chart Controls</div>
-                    <div className="space-y-3">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={showMatrixQuadrants} onChange={() => setShowMatrixQuadrants(!showMatrixQuadrants)} />
-                        <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Show Quadrant Labels</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-              </div>
               <button onClick={() => setExpandedVisualizationId('matrix')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {matrixRows.length === 0 ? <EmptyState icon={Search} title="No Data" /> : <ReworkMatrixScatterChart rows={matrixRows} showQuadrants={showMatrixQuadrants} />}
+            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
           </div>
         </div>
       </div>
