@@ -198,37 +198,41 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         </div>
       </div>
 
-      {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
+      {itemToDelete && createPortal(
+        <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 confirm-overlay-enter" onClick={() => setItemToDelete(null)}>
+          <div 
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden confirm-panel-enter"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-10 text-center">
+              <div className="w-24 h-24 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 confirm-check-enter">
+                <Trash2 className="w-12 h-12 text-red-500" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Source</h3>
-              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-                Remove data from <span className="font-semibold text-slate-800">{itemToDelete.name}</span> ?
+              <h3 className="text-3xl font-black text-[#17335f] mb-4">Delete Data Source?</h3>
+              <p className="text-lg text-slate-500 mb-10 leading-relaxed px-4">
+                You are about to remove <span className="font-bold text-red-600 underline decoration-2 underline-offset-4">{itemToDelete.name}</span> and all its associated records. This action cannot be undone.
               </p>
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setItemToDelete(null)}
-                  className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+                  className="flex-1 py-5 px-8 bg-slate-100 hover:bg-slate-200 text-slate-700 text-lg font-bold rounded-2xl transition-all active:scale-95"
                 >
-                  Cancel
+                  Keep Data
                 </button>
                 <button
                   onClick={async () => {
                     await onDeleteSource(itemToDelete.sourceId);
                     setItemToDelete(null);
                   }}
-                  className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors"
+                  className="flex-1 py-5 px-8 bg-red-600 hover:bg-red-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-red-200 transition-all active:scale-95"
                 >
-                  Delete
+                  Yes, Delete
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
     </>
