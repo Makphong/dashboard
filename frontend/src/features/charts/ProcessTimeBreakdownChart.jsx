@@ -50,16 +50,16 @@ function getStackKeys(data) {
   }));
 }
 
-function DurationBarLabel({ x, y, width, value, index, chartData }) {
+function DurationBarLabel({ x, y, width, height, value, index, chartData }) {
   const row = chartData[index] || {};
   if (!value) return null;
   return (
     <text
-      x={x + width / 2}
-      y={Math.max(12, y - 8)}
-      textAnchor="middle"
-      fill={row.color || '#334155'}
-      className="text-[11px] font-bold"
+      x={x + width + 10}
+      y={y + height / 2 + 5}
+      textAnchor="start"
+      fill={row.color || '#475569'}
+      className="text-[12px] font-bold"
     >
       {formatDuration(value)}
     </text>
@@ -73,28 +73,42 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
   const stackKeys = React.useMemo(() => getStackKeys(data), [data]);
   
   return (
-    <div className="h-full min-h-[300px] w-full">
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 34, right: 10, left: -25, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+    <div className="h-full min-h-[320px] w-full">
+      <ResponsiveContainer width="100%" height={320}>
+        <BarChart 
+          data={chartData} 
+          layout="vertical"
+          margin={{ top: 20, right: 80, left: 10, bottom: 20 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
           <XAxis 
-            dataKey="name" 
-            interval={0} 
-            tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }}
-          />
-          <YAxis 
+            type="number"
             tickFormatter={formatMinutes} 
             tick={{ fontSize: 12, fill: '#64748b' }}
-            width={80}
+            axisLine={{ stroke: '#e2e8f0' }}
+            tickLine={false}
           />
-          <Tooltip formatter={(value) => formatDuration(value)} />
-          {hasStackShape && <Legend />}
+          <YAxis 
+            dataKey="name" 
+            type="category"
+            interval={0} 
+            width={130}
+            tick={{ fontSize: 12, fontWeight: 600, fill: '#1e293b' }}
+            axisLine={{ stroke: '#e2e8f0' }}
+            tickLine={false}
+          />
+          <Tooltip 
+            formatter={(value) => formatDuration(value)} 
+            cursor={{ fill: '#f8fafc' }}
+            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+          />
+          {hasStackShape && <Legend wrapperStyle={{ paddingTop: '20px' }} />}
           {hasStackShape ? (
             stackKeys.map(({ key, label, color }) => (
               <Bar key={key} dataKey={key} stackId="process" fill={color} name={label} />
             ))
           ) : (
-            <Bar dataKey="seconds" name="Duration" radius={[8, 8, 0, 0]}>
+            <Bar dataKey="seconds" name="Duration" radius={[0, 6, 6, 0]} barSize={32}>
               {showLabels && <LabelList content={(props) => <DurationBarLabel {...props} chartData={chartData} />} />}
               {chartData.map((entry) => (
                 <Cell key={entry.id} fill={entry.color} />
