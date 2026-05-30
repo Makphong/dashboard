@@ -82,15 +82,14 @@
       svg tspan.font-extrabold,
       svg tspan.font-black {
         font-family: "Krungthai Fast Bold", "Krungthai Fast Regular", "Noto Sans Thai", "Segoe UI", Tahoma, Arial, sans-serif !important;
-        font-weight: 1300 !important;
+        font-weight: 700 !important;
       }
       h1.font-extrabold,
       h2.font-bold,
       h3.font-bold,
       .text-3xl.font-extrabold,
       .text-2xl.font-bold {
-        -webkit-text-stroke: 0.5px currentColor;
-        text-shadow: 0 0 0.04px currentColor;
+        /* Removed stroke and shadow that caused overlapping artifacts */
       }
       * {
         scrollbar-width: none;

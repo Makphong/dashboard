@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle
 } from 'lucide-react';
@@ -6,6 +7,7 @@ import { toDisplayDate } from '../../lib/utils.js';
 
 export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectGSheet, onDisconnectGSheet, gsheetConnections, uploading, syncing }) => {
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [gsheetToDisconnect, setGsheetToDisconnect] = useState(null);
   const fileInputRef = useRef(null);
   const [gsheetUrl, setGsheetUrl] = useState('');
   const [gsheetLoading, setGsheetLoading] = useState(false);
@@ -29,6 +31,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
     }
   };
 
+  const fileSources = sources.filter(s => s.type !== 'gsheet' && s.type !== '.gsheet');
   const totalRows = sources.reduce((sum, s) => sum + (Number(s.rows) || 0), 0);
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
 
@@ -141,7 +144,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   </div>
                 </div>
                 <button
-                  onClick={() => onDisconnectGSheet(conn.connectionId)}
+                  onClick={() => setGsheetToDisconnect(conn)}
                   className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex-shrink-0"
                 >
                   Disconnect
@@ -157,7 +160,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
           <h2 className="text-lg font-bold text-[#17335f]">Connected Sources</h2>
         </div>
         <div className="divide-y divide-slate-100">
-          {sources.length === 0 ? (
+          {fileSources.length === 0 ? (
             <div className="p-8 text-center text-slate-500 bg-slate-50/30">
               <div className="w-16 h-16 mx-auto mb-3 bg-slate-100 rounded-full flex items-center justify-center">
                 <FileText className="w-6 h-6 text-slate-400" />
@@ -165,7 +168,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
               No uploaded files yet
             </div>
           ) : (
-            sources.map((source) => (
+            fileSources.map((source) => (
               <div key={source.sourceId} className="p-4 px-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-100 text-green-600">
@@ -227,6 +230,43 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   className="flex-1 py-5 px-8 bg-red-600 hover:bg-red-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-red-200 transition-all active:scale-95"
                 >
                   Yes, Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {gsheetToDisconnect && createPortal(
+        <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 confirm-overlay-enter" onClick={() => setGsheetToDisconnect(null)}>
+          <div 
+            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden confirm-panel-enter"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-10 text-center">
+              <div className="w-24 h-24 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 confirm-check-enter">
+                <Trash2 className="w-12 h-12 text-red-500" />
+              </div>
+              <h3 className="text-3xl font-black text-[#17335f] mb-4">Disconnect Google Sheet?</h3>
+              <p className="text-lg text-slate-500 mb-10 leading-relaxed px-4">
+                You are about to disconnect <span className="font-bold text-red-600 underline decoration-2 underline-offset-4">{gsheetToDisconnect.label}</span>. This will stop syncing and remove its data from the central table.
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setGsheetToDisconnect(null)}
+                  className="flex-1 py-5 px-8 bg-slate-100 hover:bg-slate-200 text-slate-700 text-lg font-bold rounded-2xl transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await onDisconnectGSheet(gsheetToDisconnect.connectionId);
+                    setGsheetToDisconnect(null);
+                  }}
+                  className="flex-1 py-5 px-8 bg-red-600 hover:bg-red-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-red-200 transition-all active:scale-95"
+                >
+                  Yes, Disconnect
                 </button>
               </div>
             </div>
