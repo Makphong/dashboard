@@ -186,7 +186,7 @@ export function FilterBar({
           <FilterPopover
             id="document-file"
             title="Documents"
-            summary={selectedFiles.length === 0 && selectedSheets.length === 0 ? 'All Documents' : (selectedSheets.length > 0 ? `${selectedSheets.length} Sheets` : `${selectedFiles.length} Files`)}
+            summary={selectedFiles.length === 0 && selectedSheets.length === 0 ? 'Select Document' : (selectedSheets.length > 0 ? `${selectedSheets.length} Sheets` : `${selectedFiles.length} Files`)}
             openDropdown={openDropdown}
             setOpenDropdown={setOpenDropdown}
             icon={FileText}

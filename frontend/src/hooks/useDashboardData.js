@@ -176,6 +176,12 @@ export function useDashboardData() {
     const sheetSet = new Set(selectedSheets);
     const userSet = new Set(selectedUsers);
     
+    // If no files or sheets are selected, return empty by default
+    // This addresses the user's concern about why data shows up without selecting a sheet.
+    if (fileSet.size === 0 && sheetSet.size === 0) {
+      return [];
+    }
+    
     return parsedSegments.filter((segment) => {
       if (segment.endTs < dateRangeBounds.minTs || segment.startTs > dateRangeBounds.maxTs) return false;
       if (sheetSet.size > 0) {
@@ -190,6 +196,25 @@ export function useDashboardData() {
       return true;
     });
   }, [parsedSegments, dateRangeBounds, selectedFiles, selectedSheets, selectedUsers]);
+
+  // Auto-initialize selection if empty and sources are available
+  useEffect(() => {
+    if (!loading && sources.length > 0 && selectedFiles.length === 0 && selectedSheets.length === 0 && !isFilterInitialized) {
+      const firstSource = sources[0];
+      const fileName = firstSource.fileName || firstSource.name;
+      if (fileName) {
+        if (firstSource.pages && firstSource.pages.length > 0) {
+          // If it's a Google Sheet or has pages, select only the first page
+          const firstPage = firstSource.pages[0];
+          setSelectedSheets([buildSheetKey(fileName, firstPage)]);
+        } else {
+          // Otherwise select the file
+          setSelectedFiles([fileName]);
+        }
+        setIsFilterInitialized(true);
+      }
+    }
+  }, [loading, sources, selectedFiles, selectedSheets, isFilterInitialized, setSelectedFiles, setSelectedSheets, setIsFilterInitialized]);
 
   const ganttVisibleSegments = useMemo(() => {
     let filtered = filteredBaseSegments.filter((segment) => {
