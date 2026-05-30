@@ -40,7 +40,7 @@ def format_percent(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
-_USER_PERFORMANCE_CACHE_SIGNATURE: tuple[int, int] | None = None
+_USER_PERFORMANCE_CACHE_SIGNATURE: tuple[int, int, str] | None = None
 _USER_PERFORMANCE_CACHE_VALUE: dict | None = None
 
 def empty_user_performance_response() -> dict:
@@ -82,16 +82,17 @@ def empty_user_performance_response() -> dict:
 def compute_user_performance() -> dict:
     global _USER_PERFORMANCE_CACHE_SIGNATURE, _USER_PERFORMANCE_CACHE_VALUE
     signature = current_unified_rows_signature()
+    cache_signature = (signature[0], signature[1], ALGORITHM_VERSION)
     if (
         _USER_PERFORMANCE_CACHE_VALUE is not None
-        and _USER_PERFORMANCE_CACHE_SIGNATURE == signature
+        and _USER_PERFORMANCE_CACHE_SIGNATURE == cache_signature
     ):
         return _USER_PERFORMANCE_CACHE_VALUE
 
     events = fetch_normalized_events(signature=signature)
     if not events:
         empty = empty_user_performance_response()
-        _USER_PERFORMANCE_CACHE_SIGNATURE = signature
+        _USER_PERFORMANCE_CACHE_SIGNATURE = cache_signature
         _USER_PERFORMANCE_CACHE_VALUE = empty
         return empty
 
@@ -307,7 +308,7 @@ def compute_user_performance() -> dict:
     matrix_rows.sort(key=lambda item: item["totalActiveSeconds"], reverse=True)
 
     response_segments = []
-    for segment in all_segments[:1200]:
+    for segment in all_segments:
         clean = {
             key: value for key, value in segment.items() if not key.startswith("__")
         }
@@ -343,7 +344,7 @@ def compute_user_performance() -> dict:
         "matrix": matrix_rows,
         "segments": response_segments,
     }
-    _USER_PERFORMANCE_CACHE_SIGNATURE = signature
+    _USER_PERFORMANCE_CACHE_SIGNATURE = cache_signature
     _USER_PERFORMANCE_CACHE_VALUE = result
     return result
 
