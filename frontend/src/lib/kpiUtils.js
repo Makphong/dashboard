@@ -38,6 +38,15 @@ export function buildKpiData(kpis) {
       bg: 'bg-slate-100',
     },
     {
+      id: 8,
+      label: 'Idle Time',
+      value: kpis.idleWaitingDisplay || '-',
+      subtext: '',
+      icon: Clock,
+      color: 'text-[#94A3B8]',
+      bg: 'bg-slate-50',
+    },
+    {
       id: 2,
       label: 'Contributing Users',
       value: String(kpis.contributingUsers || 0),

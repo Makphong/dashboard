@@ -277,66 +277,6 @@ export function FilterBar({
             </div>
           </FilterPopover>
 
-          {/* User Filter */}
-          <FilterPopover
-            id="user-filter"
-            title="Users"
-            summary={selectedUsers.length === 0 ? 'All Users' : `${selectedUsers.length} Users`}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-            icon={Users}
-            active={selectedUsers.length > 0}
-          >
-            <div className="p-3 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Select Users</div>
-              <DropdownSearch value={userSearchText} onChange={setUserSearchText} placeholder="Search user..." />
-              <div className="max-h-64 overflow-y-auto space-y-1 pr-1 no-scrollbar">
-                {filteredUserOptions.map((userName) => (
-                  <label key={userName} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedUserSet.has(userName)}
-                      onChange={() => toggleSelectedValue(setSelectedUsers, userName)}
-                      className="h-4 w-4 accent-blue-600 rounded"
-                    />
-                    <span className="text-sm text-slate-700 truncate">{userName}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </FilterPopover>
-
-          {/* Segment Filter */}
-          <FilterPopover
-            id="segment-type"
-            title="Segment"
-            summary={selectedSegmentTypes.length === 0 ? 'Segment Type' : (selectedSegmentTypes.length === 1 ? selectedSegmentTypes[0] : `${selectedSegmentTypes.length} Types`)}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-            icon={LayoutDashboard}
-            active={selectedSegmentTypes.length > 0}
-            minWidthClass="min-w-[210px]"
-            panelClassName="w-[380px] max-w-[92vw]"
-          >
-            <div className="p-3 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Segment Type</div>
-              <DropdownSearch value={segmentTypeSearchText} onChange={setSegmentTypeSearchText} placeholder="Search segment..." />
-              <div className="max-h-64 overflow-y-auto space-y-1 pr-1 no-scrollbar">
-                {filteredSegmentTypeOptions.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white hover:bg-slate-50 px-2.5 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedSegmentTypeSet.has(option.value)}
-                      onChange={() => toggleSelectedValue(setSelectedSegmentTypes, option.value)}
-                      className="h-4 w-4 accent-blue-600 rounded"
-                    />
-                    <div className="min-w-0 text-sm font-medium text-slate-700 truncate">{option.label}</div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </FilterPopover>
-
         </div>
 
         {/* Refresh Button */}

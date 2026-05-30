@@ -9,6 +9,7 @@ export const initialKpiData = [
   { id: 7, label: 'Total time', value: '-', subtext: '', icon: Timer, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
   { id: 1, label: 'User Time', value: '-', subtext: '', icon: Clock, color: 'text-[#00a4e4]', bg: 'bg-[#e8f7fd]' },
   { id: 6, label: 'System Time', value: '-', subtext: '', icon: Clock, color: 'text-[#334155]', bg: 'bg-slate-100' },
+  { id: 8, label: 'Idle Time', value: '-', subtext: '', icon: Clock, color: 'text-[#94A3B8]', bg: 'bg-slate-50' },
   { id: 2, label: 'Contributing Users', value: '0', subtext: '', icon: Users, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },
 ];
 export const REOPEN_MARKER_TYPES = new Set(['REOPEN_MARKER', 'REOPEN_TO_REVIEW_HANDOFF_MARKER']);

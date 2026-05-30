@@ -75,13 +75,23 @@ export const DashboardView = React.memo(({
       else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
-    return Object.entries(totals)
+    const items = Object.entries(totals)
       .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
       .map(([label, seconds]) => ({
         label,
         seconds,
         color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
       }));
+
+    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit + totals.Idle;
+    if (completeSeconds > 0) {
+      items.push({
+        label: 'Complete',
+        seconds: completeSeconds,
+        color: '#16A34A'
+      });
+    }
+    return items;
   }, [filteredBaseSegments, selectedSegmentTypes, showProcessBreakdownIdle]);
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
@@ -146,7 +156,7 @@ export const DashboardView = React.memo(({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {kpiData.map((kpi, idx) => (
           <div 
             key={kpi.id} 
@@ -185,7 +195,7 @@ export const DashboardView = React.memo(({
           </div>
           <button onClick={() => setExpandedVisualizationId('gantt')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
         </div>
-        <h2 className="text-lg font-bold mb-6 text-[#17335f]">Timeline by User</h2>
+        <h2 className="text-lg font-bold mb-6 text-[#17335f]">Timeline</h2>
         {ganttVisibleSegments.length === 0 ? <EmptyState icon={LayoutDashboard} title="No Data" /> : (
           <GanttTimelineChart
             segments={ganttVisibleSegments}
@@ -203,21 +213,9 @@ export const DashboardView = React.memo(({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="absolute right-4 top-4 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="relative" ref={workloadFilterRef}>
-              <button onClick={() => setShowWorkloadFilterMenu(!showWorkloadFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showWorkloadFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
-              {showWorkloadFilterMenu && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 z-[110] dropdown-slide-enter">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Workload Settings</div>
-                  <div className="space-y-3">
-                    <ToggleSetting checked={showWorkloadIdle} onChange={() => setShowWorkloadIdle(!showWorkloadIdle)}>Show Idle Time</ToggleSetting>
-                    <ToggleSetting checked={showWorkloadSystem} onChange={() => setShowWorkloadSystem(!showWorkloadSystem)}>Show System Time</ToggleSetting>
-                  </div>
-                </div>
-              )}
-            </div>
             <button onClick={() => setExpandedVisualizationId('donut')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
           </div>
-          <h2 className="text-lg font-bold mb-4 text-[#17335f]">Workload Share</h2>
+          <h2 className="text-lg font-bold mb-4 text-[#17335f]">User Share</h2>
           <div className="flex-1 min-h-0">
             {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : <DonutWorkloadChart rows={workloadVisibleRows} />}
           </div>
@@ -225,7 +223,7 @@ export const DashboardView = React.memo(({
 
         <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-[#17335f]">Top User Work Mix</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">User Breakdown</h2>
             <button onClick={() => setExpandedVisualizationId('contribution')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white opacity-0 group-hover:opacity-100 transition-opacity"><Maximize2 className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 min-h-0">
@@ -237,7 +235,7 @@ export const DashboardView = React.memo(({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4 ${showProcessFilterMenu ? 'z-[120]' : 'z-10'}`}>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-[#17335f]">Process Time Breakdown</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Time Breakdown</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="relative" ref={processFilterRef}>
                 <button onClick={() => setShowProcessFilterMenu(!showProcessFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showProcessFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>

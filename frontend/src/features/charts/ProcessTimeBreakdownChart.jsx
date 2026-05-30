@@ -74,10 +74,18 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
   return (
     <div className="h-full min-h-[300px] w-full">
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ top: 34, right: 30, left: 20, bottom: 5 }}>
+        <BarChart data={chartData} margin={{ top: 34, right: 10, left: -25, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" />
-          <YAxis tickFormatter={formatMinutes} />
+          <XAxis 
+            dataKey="name" 
+            interval={0} 
+            tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }}
+          />
+          <YAxis 
+            tickFormatter={formatMinutes} 
+            tick={{ fontSize: 12, fill: '#64748b' }}
+            width={80}
+          />
           <Tooltip formatter={(value) => formatDuration(value)} />
           {hasStackShape && <Legend />}
           {hasStackShape ? (

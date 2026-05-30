@@ -133,7 +133,6 @@ export function useDashboardData() {
       const selectedFileNames = new Set(selectedFiles);
       const useSheetFilter = selectedSheetKeys.size > 0;
       const names = new Set();
-      let hasSystemSegment = false;
 
       for (const seg of parsedSegments) {
         if (seg.endTs < minTs || seg.startTs > maxTs) continue;
@@ -143,14 +142,11 @@ export function useDashboardData() {
           continue;
         }
 
-        const st = String(seg.segmentType || '');
-        if (st.startsWith('USER_') && seg.userName) {
-          names.add(seg.userName);
-        } else if (st.startsWith('SYSTEM_') || st.startsWith('IDLE_')) {
-          hasSystemSegment = true;
+        const lane = toTimelineLane(seg.segmentType, seg.userName);
+        if (lane !== 'Idle' && lane !== 'Unknown User') {
+          names.add(lane);
         }
       }
-      if (hasSystemSegment) names.add('System');
       return Array.from(names).sort((a, b) => a.localeCompare(b));
     },
     [parsedSegments, selectedSheets, selectedFiles, datePreset, dateStart, dateEnd]
@@ -188,12 +184,8 @@ export function useDashboardData() {
         return false;
       }
       if (userSet.size > 0) {
-        const isUserSegment = isUserContextSegment(String(segment.segmentType || ''), segment.userName);
-        if (isUserSegment) {
-          if (!userSet.has(segment.userName)) return false;
-        } else {
-          if (!userSet.has('System')) return false;
-        }
+        const lane = toTimelineLane(segment.segmentType, segment.userName);
+        if (!userSet.has(lane)) return false;
       }
       return true;
     });

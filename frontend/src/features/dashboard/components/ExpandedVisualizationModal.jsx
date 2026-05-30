@@ -43,13 +43,23 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
-    return Object.entries(totals)
+    const items = Object.entries(totals)
       .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
       .map(([label, seconds]) => ({
         label,
         seconds,
         color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
       }));
+
+    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit + totals.Idle;
+    if (completeSeconds > 0) {
+      items.push({
+        label: 'Complete',
+        seconds: completeSeconds,
+        color: '#16A34A'
+      });
+    }
+    return items;
   }, [ganttVisibleSegments, processBreakdownSegments, selectedSegmentTypes, showProcessBreakdownIdle]);
 
   return (

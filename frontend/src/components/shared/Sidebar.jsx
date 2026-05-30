@@ -66,16 +66,5 @@ export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, t
       </nav>
     </div>
 
-    <div className="p-4 border-t border-[#d7e8f6]">
-      <div className={`flex items-center gap-3 px-3 py-2 transition-all duration-300 ${isCollapsed ? 'justify-center lg:px-0' : 'justify-start'}`}>
-        <div className="w-8 h-8 rounded-full bg-[#e8f7fd] flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm border border-[#bfe8f8]">
-          <User className="w-5 h-5 text-[#3860be]" />
-        </div>
-        <div className={`transition-all duration-300 whitespace-nowrap overflow-hidden origin-left ${isCollapsed ? 'opacity-0 w-0 translate-x-[-10px] pointer-events-none' : 'opacity-100 w-auto translate-x-0'}`}>
-          <div className="text-sm font-semibold text-slate-900 truncate">Executive User</div>
-          <div className="text-xs text-slate-500 truncate">Operation Lead</div>
-        </div>
-      </div>
-    </div>
   </aside>
 ));
