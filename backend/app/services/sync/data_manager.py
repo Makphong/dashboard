@@ -64,29 +64,57 @@ def _fetch_url_bytes(url: str, timeout: int = 60) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
-
 def _discover_gsheet_gids(spreadsheet_id: str) -> list[tuple[str, int]]:
     try:
         html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit?usp=sharing"
         html_bytes = _fetch_url_bytes(html_url, timeout=30)
         html_text = html_bytes.decode("utf-8", errors="replace")
         sheets: list[tuple[str, int]] = []
+
+        # High-priority pattern: escaped JSON in script tags (modern Google Sheets)
+        # Matches [index, 0, \"gid\", [{\"1\":[[0,0,\"name\"]]]
+        for m in re.finditer(r'\[\d+,0,\\"(\d+)\\",\[\{\\"1\\":\[\[0,0,\\"([^"]+)\\"\]', html_text):
+            sheets.append((m.group(2), int(m.group(1))))
+        
+        # Variation: \"gid\",[{\"1\":[[0,0,\"name\"
+        for m in re.finditer(r'\\"(\d+)\\",\[\{\\"1\\":\[\[0,0,\\"([^"]+)\\"\]', html_text):
+            sheets.append((m.group(2), int(m.group(1))))
+
+        # Pattern: [gid, 0, \"name\"] (but only if gid != 0 or it's clearly a long ID)
+        for m in re.finditer(r'\[(\d{5,}),0,\\"([^"]+)\\"\]', html_text):
+            sheets.append((m.group(2), int(m.group(1))))
+
+        # Pattern: {"title":"...","sheetId":...}
+        for m in re.finditer(r'\{[^}]*"title"\s*:\s*"([^"]+)"[^}]*"sheetId"\s*:\s*(\d+)', html_text):
+            sheets.append((m.group(1), int(m.group(2))))
+        for m in re.finditer(r'\{[^}]*"sheetId"\s*:\s*(\d+)[^}]*"title"\s*:\s*"([^"]+)"', html_text):
+            sheets.append((m.group(2), int(m.group(1))))
+
+        # Pattern: {"name":"...","id":...}
         for m in re.finditer(r'\{[^}]*"name"\s*:\s*"([^"]+)"[^}]*"id"\s*:\s*(\d+)', html_text):
             sheets.append((m.group(1), int(m.group(2))))
-        if not sheets:
-            for m in re.finditer(r'\{[^}]*"id"\s*:\s*(\d+)[^}]*"name"\s*:\s*"([^"]+)"', html_text):
-                sheets.append((m.group(2), int(m.group(1))))
+        for m in re.finditer(r'\{[^}]*"id"\s*:\s*(\d+)[^}]*"name"\s*:\s*"([^"]+)"', html_text):
+            sheets.append((m.group(2), int(m.group(1))))
+
         if sheets:
             seen = set()
             unique = []
             for name, gid in sheets:
+                if name.lower() in ["en_us", "en_gb", "true", "false", "null"]: continue
                 if gid not in seen:
                     seen.add(gid)
                     unique.append((name, gid))
-            return unique
-    except Exception:
-        pass
+            
+            # Temporary log for debugging in workspace
+            with open("/tmp/gsheet_discovery.log", "a") as f:
+                f.write(f"{dt.datetime.now().isoformat()} - Found {len(unique)} sheets for {spreadsheet_id}\n")
+            
+            if unique: return unique
+    except Exception as e:
+        with open("/tmp/gsheet_discovery.log", "a") as f:
+            f.write(f"{dt.datetime.now().isoformat()} - Error for {spreadsheet_id}: {str(e)}\n")
     return [("Sheet1", 0)]
+
 
 def _download_gsheet_pages(spreadsheet_id: str, preferred_gid: int | None = None) -> list[tuple[str, list[dict]]]:
     all_pages: list[tuple[str, list[dict]]] = []
@@ -179,7 +207,7 @@ def sync_all_gsheets() -> list[dict]:
         spreadsheet_id = row["spreadsheet_id"]
         connection_id = row["connection_id"]
         try:
-            preferred_gid = _extract_gsheet_gid(str(row.get("url") or ""))
+            preferred_gid = _extract_gsheet_gid(str(row["url"] or ""))
             all_pages = _download_gsheet_pages(spreadsheet_id, preferred_gid=preferred_gid)
             if not all_pages:
                 results.append({"connection_id": connection_id, "status": "no_data"})
