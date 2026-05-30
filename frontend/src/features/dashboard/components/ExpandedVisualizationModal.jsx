@@ -54,12 +54,9 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         { label: 'Reprocess', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
         { label: 'Review And Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
       ];
-      if (showProcessBreakdownIdle) {
-        items.push({ label: 'Idle', seconds: totals.Idle, color: GANTT_DRILL_GROUP_COLORS.Idle });
-      }
     } else {
       items = Object.entries(totals)
-        .filter(([label]) => showProcessBreakdownIdle || label !== 'Idle')
+        .filter(([label]) => label !== 'Idle')
         .map(([label, seconds]) => ({
           label,
           seconds,
@@ -67,7 +64,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         }));
     }
 
-    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit + totals.Idle;
+    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit;
     if (completeSeconds > 0) {
       items.push({
         label: 'Complete',
@@ -76,7 +73,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       });
     }
     return items;
-  }, [ganttVisibleSegments, processBreakdownSegments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit]);
+  }, [ganttVisibleSegments, processBreakdownSegments, selectedSegmentTypes, mergeReviewAndEdit]);
 
   const transitionTimeData = React.useMemo(() => {
     const sourceSegments = processBreakdownSegments || ganttVisibleSegments;
