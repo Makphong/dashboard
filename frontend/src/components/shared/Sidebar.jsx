@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 
 const navItemClass = (isActive, isCollapsed) => `flex items-center rounded-xl font-semibold transition-all duration-300 group
-  ${isCollapsed ? 'justify-center px-0 py-3' : 'justify-start px-3 py-2.5 gap-3'}
+  ${isCollapsed ? 'justify-center px-2 py-3' : 'justify-start px-3 py-2.5 gap-3'}
   ${isActive ? 'bg-[#e8f7fd] text-[#3860be] border border-[#bfe8f8] shadow-ktb' : 'text-slate-600 hover:bg-[#eef8fd] border border-transparent'}`;
 
 export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, toggleCollapse, activeView, setActiveView }) => (
@@ -28,9 +28,11 @@ export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, t
             className="w-8 h-8 object-contain block"
           />
         </div>
-        <span className={`text-2xl font-extrabold tracking-tight text-[#17335f] transition-all duration-300 origin-left ${isCollapsed ? 'opacity-0 w-0 scale-95 translate-x-[-10px] pointer-events-none' : 'opacity-100 w-auto scale-100 translate-x-0'}`}>
-          Analytics
-        </span>
+        {!isCollapsed && (
+          <span className="text-2xl font-extrabold tracking-tight text-[#17335f] transition-opacity duration-300 opacity-100">
+            Analytics
+          </span>
+        )}
       </div>
       <button className="ml-auto lg:hidden" onClick={() => setMobileOpen(false)}>
         <X className="w-5 h-5 text-slate-500" />
@@ -38,28 +40,30 @@ export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, t
     </div>
 
     <div className="p-4 flex-1 overflow-y-auto no-scrollbar overflow-x-hidden">
-      <div className={`text-xs font-semibold text-[#3860be]/70 uppercase tracking-wider mb-4 px-3 transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'opacity-0 h-0 mb-0 invisible' : 'opacity-100 h-auto visible'}`}>
+      <div className={`text-[10px] font-bold text-[#3860be]/70 uppercase tracking-widest transition-all duration-300 overflow-hidden
+        ${isCollapsed ? 'max-h-0 opacity-0 mb-0 pointer-events-none' : 'max-h-10 opacity-100 mb-4 px-3'}`}>
         Dashboards
       </div>
-      <nav className="space-y-2">
-        <a href="#" onClick={() => setActiveView('dashboard')} className={navItemClass(activeView === 'dashboard', isCollapsed)} title="Dashboard">
+      <nav className="space-y-1">
+        <a href="#" onClick={(e) => { e.preventDefault(); setActiveView('dashboard'); }} className={navItemClass(activeView === 'dashboard', isCollapsed)} title="Dashboard Overview">
           <LayoutDashboard className={`w-5 h-5 flex-shrink-0 transition-colors ${activeView === 'dashboard' ? 'text-[#00a4e4]' : ''}`} />
           {!isCollapsed && (
-            <span className="transition-all duration-300 whitespace-nowrap overflow-hidden origin-left opacity-100 w-auto translate-x-0">
+            <span className="transition-opacity duration-300 whitespace-nowrap overflow-hidden opacity-100">
               Dashboard Overview
             </span>
           )}
         </a>
       </nav>
 
-      <div className={`text-xs font-semibold text-[#3860be]/70 uppercase tracking-wider mt-8 mb-4 px-3 transition-all duration-300 whitespace-nowrap overflow-hidden ${isCollapsed ? 'opacity-0 h-0 mt-0 mb-0 invisible' : 'opacity-100 h-auto visible'}`}>
+      <div className={`text-[10px] font-bold text-[#3860be]/70 uppercase tracking-widest transition-all duration-300 overflow-hidden
+        ${isCollapsed ? 'max-h-0 opacity-0 mt-0 mb-0 pointer-events-none' : 'max-h-10 opacity-100 mt-8 mb-4 px-3'}`}>
         Data Management
       </div>
-      <nav className="space-y-2">
-        <a href="#" onClick={() => setActiveView('data-management')} className={navItemClass(activeView === 'data-management', isCollapsed)} title="Data Management">
+      <nav className="space-y-1">
+        <a href="#" onClick={(e) => { e.preventDefault(); setActiveView('data-management'); }} className={navItemClass(activeView === 'data-management', isCollapsed)} title="Data Management">
           <Database className={`w-5 h-5 flex-shrink-0 transition-colors ${activeView === 'data-management' ? 'text-[#00a4e4]' : ''}`} />
           {!isCollapsed && (
-            <span className="transition-all duration-300 whitespace-nowrap overflow-hidden origin-left opacity-100 w-auto translate-x-0">
+            <span className="transition-opacity duration-300 whitespace-nowrap overflow-hidden opacity-100">
               Data Management
             </span>
           )}
