@@ -52,36 +52,40 @@ export function useDashboardData() {
   }, [selectedSegmentTypes, segmentGroupOptions]);
 
   const segments = performance?.segments || [];
+  const invalidSheetCounts = performance?.invalidSheetCounts || {};
 
-  const parsedSegments = useMemo(
-    () => (
-      segments
-        .map((segment, idx) => {
-          const startTs = Date.parse(segment.start || '');
-          const endTsRaw = Date.parse(segment.end || '');
-          if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) return null;
+  const { parsedSegments } = useMemo(() => {
+    const valid = [];
 
-          const [docFileFromId = '', docPageFromId = ''] = String(segment.documentId || '').split('::');
-          const fileName = String(segment.fileName || docFileFromId || 'Unknown File');
-          const pageName = String(segment.pageName || docPageFromId || '');
-          const documentLabel = pageName ? `${fileName} / ${pageName}` : fileName;
-          return {
-            ...segment,
-            id: segment.id || `${segment.segmentType || 'UNKNOWN'}-${idx}`,
-            segmentType: String(segment.segmentType || 'UNKNOWN'),
-            userName: String(segment.userName || 'Unknown User'),
-            fileName,
-            pageName,
-            sheetKey: buildSheetKey(fileName, pageName),
-            startTs,
-            endTs: Math.max(endTsRaw, startTs + 1000),
-            documentLabel,
-          };
-        })
-        .filter(Boolean)
-    ),
-    [segments]
-  );
+    segments.forEach((segment, idx) => {
+      const [docFileFromId = '', docPageFromId = ''] = String(segment.documentId || '').split('::');
+      const fileName = String(segment.fileName || docFileFromId || 'Unknown File');
+      const pageName = String(segment.pageName || docPageFromId || '');
+      const sheetKey = buildSheetKey(fileName, pageName);
+
+      const startTs = Date.parse(segment.start || '');
+      const endTsRaw = Date.parse(segment.end || '');
+      if (!Number.isFinite(startTs) || !Number.isFinite(endTsRaw)) {
+        return;
+      }
+
+      const documentLabel = pageName ? `${fileName} / ${pageName}` : fileName;
+      valid.push({
+        ...segment,
+        id: segment.id || `${segment.segmentType || 'UNKNOWN'}-${idx}`,
+        segmentType: String(segment.segmentType || 'UNKNOWN'),
+        userName: String(segment.userName || 'Unknown User'),
+        fileName,
+        pageName,
+        sheetKey,
+        startTs,
+        endTs: Math.max(endTsRaw, startTs + 1000),
+        documentLabel,
+      });
+    });
+
+    return { parsedSegments: valid };
+  }, [segments]);
 
   const documentTree = useMemo(() => {
     const fileMap = new Map();
@@ -440,7 +444,7 @@ export function useDashboardData() {
     showIdle, setShowIdle, showWorkloadIdle, setShowWorkloadIdle, showWorkloadSystem, setShowWorkloadSystem,
     pinnedFiles, setPinnedFiles, pinnedSheets, setPinnedSheets,
     activeDocumentFile, setActiveDocumentFile,
-    documentTree, userOptions, segmentTypeOptions,
+    documentTree, userOptions, segmentTypeOptions, invalidSheetCounts,
     ganttVisibleSegments, kpiData, filteredBaseSegments,
     flowRows, contributionRows, matrixRows, workloadContributors,
     refreshAll

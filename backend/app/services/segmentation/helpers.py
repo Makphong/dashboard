@@ -130,17 +130,10 @@ def parse_datetime(value) -> dt.datetime | None:
     text = text.replace("T", " ")
 
     datetime_formats = [
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
+        "%m/%d/%Y %I:%M:%S %p",
+        "%m/%d/%Y %I:%M %p",
         "%d/%m/%Y %I:%M:%S %p",
         "%d/%m/%Y %I:%M %p",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y %H:%M",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y/%m/%d %H:%M:%S",
-        "%Y/%m/%d %H:%M",
-        "%Y-%m-%d",
     ]
 
     result = None
@@ -150,12 +143,6 @@ def parse_datetime(value) -> dt.datetime | None:
             break
         except ValueError:
             continue
-
-    if not result:
-        try:
-            result = dt.datetime.fromisoformat(text)
-        except ValueError:
-            pass
 
     if result and result.year > 2400:
         try:

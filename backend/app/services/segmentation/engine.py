@@ -137,15 +137,8 @@ def parse_datetime(value) -> dt.datetime | None:
     datetime_formats = [
         "%m/%d/%Y %I:%M:%S %p",
         "%m/%d/%Y %I:%M %p",
-        "%m/%d/%Y %H:%M:%S",
-        "%m/%d/%Y %H:%M",
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y/%m/%d %H:%M:%S",
-        "%Y/%m/%d %H:%M",
-        "%Y-%m-%d",
+        "%d/%m/%Y %I:%M:%S %p",
+        "%d/%m/%Y %I:%M %p",
     ]
 
     for fmt in datetime_formats:
@@ -154,14 +147,11 @@ def parse_datetime(value) -> dt.datetime | None:
         except ValueError:
             continue
 
-    try:
-        return dt.datetime.fromisoformat(text)
-    except ValueError:
-        return None
+    return None
 
 
 _NORMALIZED_EVENTS_CACHE_SIGNATURE: tuple[int, int] | None = None
-_NORMALIZED_EVENTS_CACHE_VALUE: list[dict] | None = None
+_NORMALIZED_EVENTS_CACHE_VALUE: tuple[list[dict], dict[str, int]] | None = None
 
 def build_canonical_map(row: dict) -> dict[str, object]:
     result: dict[str, object] = {}
@@ -222,14 +212,15 @@ def assign_time_group(
     )
 
 
-def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[dict]:
+def fetch_normalized_events(signature: tuple[int, int] | None = None) -> tuple[list[dict], dict[str, int]]:
     global _NORMALIZED_EVENTS_CACHE_SIGNATURE, _NORMALIZED_EVENTS_CACHE_VALUE
     cache_signature = signature or current_unified_rows_signature()
     if (
         _NORMALIZED_EVENTS_CACHE_VALUE is not None
         and _NORMALIZED_EVENTS_CACHE_SIGNATURE == cache_signature
     ):
-        return [event.copy() for event in _NORMALIZED_EVENTS_CACHE_VALUE]
+        events_cache, invalid_counts_cache = _NORMALIZED_EVENTS_CACHE_VALUE
+        return [event.copy() for event in events_cache], invalid_counts_cache.copy()
 
     with get_conn() as conn:
         rows = conn.execute(
@@ -241,6 +232,8 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
         ).fetchall()
 
     events: list[dict] = []
+    invalid_counts: dict[str, int] = {}
+    
     for db_row in rows:
         try:
             raw = json.loads(db_row["data_json"])
@@ -252,6 +245,8 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
             pick_field(raw, FIELD_ALIASES["event_time"], canonical)
         )
         if not event_time:
+            sheet_key = f"{db_row['file_name']}::{db_row['page_name']}"
+            invalid_counts[sheet_key] = invalid_counts.get(sheet_key, 0) + 1
             continue
 
         actor_name_raw = pick_field(raw, FIELD_ALIASES["actor_name"], canonical)
@@ -342,8 +337,8 @@ def fetch_normalized_events(signature: tuple[int, int] | None = None) -> list[di
             }
         )
     _NORMALIZED_EVENTS_CACHE_SIGNATURE = cache_signature
-    _NORMALIZED_EVENTS_CACHE_VALUE = events
-    return [event.copy() for event in events]
+    _NORMALIZED_EVENTS_CACHE_VALUE = (events, invalid_counts)
+    return [event.copy() for event in events], invalid_counts.copy()
 
 
 def is_system_evidence(event: dict) -> bool:

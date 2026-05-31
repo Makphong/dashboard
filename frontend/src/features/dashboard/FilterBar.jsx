@@ -37,7 +37,7 @@ export function FilterBar({
     selectedSystemStages, setSelectedSystemStages,
     pinnedFiles, setPinnedFiles, pinnedSheets, setPinnedSheets,
     activeDocumentFile, setActiveDocumentFile,
-    documentTree, userOptions, segmentTypeOptions, systemStageOptions
+    documentTree, userOptions, segmentTypeOptions, systemStageOptions, invalidSheetCounts
   } = dashboard;
 
   const toggleSelectedValue = (setter, value) => {
@@ -261,6 +261,7 @@ export function FilterBar({
                       const sheetKey = buildSheetKey(activeDocumentFile, sheet);
                       const isChecked = selectedSheetSet.has(sheetKey);
                       const isPinned = pinnedSheetSet.has(sheetKey);
+                      const invalidCount = invalidSheetCounts?.[sheetKey] || 0;
                       return (
                         <div key={sheet} className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all">
                           <input
@@ -269,7 +270,12 @@ export function FilterBar({
                             onChange={() => toggleSheetSelection(activeDocumentFile, sheet)}
                             className="h-4 w-4 accent-blue-600 rounded"
                           />
-                          <span className="flex-1 text-sm font-medium text-slate-700 truncate">{sheet}</span>
+                          <span className="flex-1 text-sm font-medium text-slate-700 truncate">
+                            {sheet}
+                            {invalidCount > 0 && (
+                              <span className="text-red-500 ml-1.5 font-bold">(ข้อมูลผิดพลาด)</span>
+                            )}
+                          </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); togglePin(setPinnedSheets, sheetKey); }}
                             className={`p-1 rounded-md transition-all ${isPinned ? 'text-blue-500 opacity-100 bg-blue-50' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-500 hover:bg-slate-100'}`}

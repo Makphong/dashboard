@@ -89,9 +89,10 @@ def compute_user_performance() -> dict:
     ):
         return _USER_PERFORMANCE_CACHE_VALUE
 
-    events = fetch_normalized_events(signature=signature)
+    events, invalid_counts = fetch_normalized_events(signature=signature)
     if not events:
         empty = empty_user_performance_response()
+        empty["invalidSheetCounts"] = invalid_counts
         _USER_PERFORMANCE_CACHE_SIGNATURE = cache_signature
         _USER_PERFORMANCE_CACHE_VALUE = empty
         return empty
@@ -343,6 +344,7 @@ def compute_user_performance() -> dict:
         "flow": flow_rows[:12],
         "matrix": matrix_rows,
         "segments": response_segments,
+        "invalidSheetCounts": invalid_counts,
     }
     _USER_PERFORMANCE_CACHE_SIGNATURE = cache_signature
     _USER_PERFORMANCE_CACHE_VALUE = result
@@ -430,7 +432,7 @@ def build_debug_snapshot() -> dict:
             if looks_like_workflow_status(to_status):
                 parse_stats["rowsWithWorkflowStatusTo"] += 1
 
-    events = fetch_normalized_events()
+    events, invalid_counts = fetch_normalized_events()
     events_with_to_status = sum(1 for e in events if e.get("to_status"))
     files = int(source_row["files"] if source_row else 0)
     pages = int(source_row["pages"] if source_row else 0)
