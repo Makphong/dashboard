@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { isUserContextSegment, isIdleContextSegment, toDrillGroup } from '../../../lib/utils.js';
+import { extractFileNameFromSheetKey, isIdleContextSegment, toTimelineLane } from '../../../lib/utils.js';
+import { toSegmentGroup } from '../utils/segmentData.js';
 
 export function useDashboardFilters(parsedSegments, filters) {
   const {
@@ -8,30 +9,41 @@ export function useDashboardFilters(parsedSegments, filters) {
     selectedUsers,
     selectedSegmentTypes,
     showIdle,
-    dateRangeBounds
+    dateRangeBounds,
   } = filters;
 
   const filteredBaseSegments = useMemo(() => {
     if (parsedSegments.length === 0) return [];
+
     const fileSet = new Set(selectedFiles);
     const sheetSet = new Set(selectedSheets);
     const userSet = new Set(selectedUsers);
-    
+
+    if (fileSet.size === 0 && sheetSet.size === 0) return [];
+
+    const filesWithSpecificSheets = new Set();
+    for (const sheetKey of selectedSheets) {
+      filesWithSpecificSheets.add(extractFileNameFromSheetKey(sheetKey));
+    }
+
     return parsedSegments.filter((segment) => {
       if (segment.endTs < dateRangeBounds.minTs || segment.startTs > dateRangeBounds.maxTs) return false;
-      if (sheetSet.size > 0) {
-        if (!sheetSet.has(segment.sheetKey)) return false;
-      } else if (fileSet.size > 0 && !fileSet.has(segment.fileName)) {
+
+      const fileSelected = fileSet.has(segment.fileName);
+      const sheetSelected = sheetSet.has(segment.sheetKey);
+      const hasSpecificSheets = filesWithSpecificSheets.has(segment.fileName);
+
+      if (hasSpecificSheets) {
+        if (!sheetSelected) return false;
+      } else if (!fileSelected) {
         return false;
       }
+
       if (userSet.size > 0) {
-        const isUserSegment = isUserContextSegment(String(segment.segmentType || ''), segment.userName);
-        if (isUserSegment) {
-          if (!userSet.has(segment.userName)) return false;
-        } else {
-          if (!userSet.has('System')) return false;
-        }
+        const lane = toTimelineLane(segment.segmentType, segment.userName);
+        if (!userSet.has(lane)) return false;
       }
+
       return true;
     });
   }, [parsedSegments, dateRangeBounds, selectedFiles, selectedSheets, selectedUsers]);
@@ -40,10 +52,7 @@ export function useDashboardFilters(parsedSegments, filters) {
     return filteredBaseSegments.filter((segment) => {
       const segmentType = String(segment.segmentType || '');
       if (!showIdle && isIdleContextSegment(segmentType)) return false;
-      const drillGroup = toDrillGroup(segmentType);
-      const segmentGroup = drillGroup === 'Reprocessing'
-        ? 'Reprocess'
-        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      const segmentGroup = toSegmentGroup(segmentType);
       if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return false;
       return true;
     });
@@ -51,6 +60,6 @@ export function useDashboardFilters(parsedSegments, filters) {
 
   return {
     filteredBaseSegments,
-    ganttVisibleSegments
+    ganttVisibleSegments,
   };
 }
