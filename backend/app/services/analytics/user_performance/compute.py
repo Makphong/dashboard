@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from ....contracts.constants_runtime import ALGORITHM_VERSION
-from ....contracts.constants_workflow import CORE_USER_SESSION_SEGMENT_TYPES
-from ....db.sqlite_store import current_unified_rows_signature, get_conn
+from ....config.constants.constants_runtime import ALGORITHM_VERSION
+from ....config.constants.constants_workflow import CORE_USER_SESSION_SEGMENT_TYPES
+from ....infrastructure.db.sqlite_store import current_unified_rows_signature, get_conn
 from ...segmentation.engine import (
     build_segments_for_document,
     countable_segment_seconds,

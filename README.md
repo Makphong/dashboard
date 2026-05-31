@@ -6,10 +6,20 @@
 .
 |- api/                # Vercel function entrypoint
 |- backend/            # Python backend source
+|  `- app/
+|     |- presentation/ # HTTP layer (Flask app, routes, auth, upload validation)
+|     |- application/  # Use-cases / orchestration
+|     |- config/       # Settings and constants
+|     |- infrastructure/ # SQLite, Firebase sync, parser, static/bundler adapters
+|     `- services/     # Domain-oriented service modules
 |- docs/               # Documentation (.md files)
 |- frontend/
 |  |- public/          # Static assets (index.html, fonts)
-|  `- src/             # React frontend source
+|  `- src/
+|     |- features/     # Feature-first modules (dashboard, timeline, charts, etc.)
+|     |- components/   # Shared UI components
+|     |- hooks/        # App-level hooks
+|     `- lib/          # Shared utilities/constants
 |- scripts/            # Startup scripts and app entry point
 |- requirements.txt    # Dependencies
 `- vercel.json         # Vercel config
@@ -68,8 +78,8 @@ When Firebase env vars are present:
 - App loads persisted data from Firestore into local SQLite cache on startup.
 - Data changes are synced back to Firestore after upload/sync/delete actions.
 
-Default SQLite path is `local_dashboard.db` at project root.
-Set `LOCAL_DB_PATH` when you want to move it to `data/local_dashboard.db` or another path.
+Default SQLite path is `data/local_dashboard.db` (with fallback to legacy `local_dashboard.db`).
+Set `LOCAL_DB_PATH` when you want to use another location.
 
 ## Deploy on Vercel
 

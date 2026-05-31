@@ -4,10 +4,10 @@ import json
 import os
 from collections import Counter
 
-from ....contracts.constants_parsing import FIELD_ALIASES
-from ....contracts.constants_paths import DB_PATH
-from ....contracts.constants_runtime import APP_VERSION, SERVER_STARTED_AT
-from ....db.sqlite_store import get_conn
+from ....config.constants.constants_parsing import FIELD_ALIASES
+from ....config.constants.constants_paths import DB_PATH
+from ....config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
+from ....infrastructure.db.sqlite_store import get_conn
 from ...segmentation.engine import (
     build_canonical_map,
     fetch_normalized_events,

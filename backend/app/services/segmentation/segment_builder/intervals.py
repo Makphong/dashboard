@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ....contracts.constants_workflow import (
+from ....config.constants.constants_workflow import (
     COMPLETED_STATE,
     IN_REVIEW_STATE,
     PENDING_STATES,

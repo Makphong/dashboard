@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sidebar } from '../../components/shared/Sidebar.jsx';
-import { FilterBar } from './FilterBar.jsx';
+import { FilterBar } from './components/FilterBar.jsx';
 
 export function DashboardLayout({
   dashboard,

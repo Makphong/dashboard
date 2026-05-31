@@ -4,9 +4,9 @@ import datetime as dt
 import os
 from pathlib import Path
 
-from ....contracts.constants_paths import DB_PATH
-from ....contracts.constants_runtime import APP_VERSION, SERVER_STARTED_AT
-from ....firebase_sync import is_firestore_enabled
+from ....config.constants.constants_paths import DB_PATH
+from ....config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
+from ....infrastructure.firebase_sync import is_firestore_enabled
 
 
 def build_health_payload() -> dict:

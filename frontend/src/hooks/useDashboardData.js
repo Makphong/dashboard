@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { usePersistentState } from './usePersistentState.js';
-import { fetchDashboardPayload, triggerGSheetSync } from './dashboard/utils/dashboardApi.js';
-import { useDashboardDerivedData } from './dashboard/hooks/useDashboardDerivedData.js';
-import { useDashboardFilters } from './dashboard/hooks/useDashboardFilters.js';
-import { useDashboardMetrics } from './dashboard/hooks/useDashboardMetrics.js';
+import { fetchDashboardPayload, triggerGSheetSync } from '../features/dashboard/utils/dashboardApi.js';
+import { useDashboardDerivedData } from '../features/dashboard/hooks/useDashboardDerivedData.js';
+import { useDashboardFilters } from '../features/dashboard/hooks/useDashboardFilters.js';
+import { useDashboardMetrics } from '../features/dashboard/hooks/useDashboardMetrics.js';
 
 export function useDashboardData() {
   const [sources, setSources] = useState([]);

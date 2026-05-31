@@ -15,4 +15,3 @@ __pycache__/
 data/*.db
 local_dashboard.db
 artifacts/
-docs/

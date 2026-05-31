@@ -9,12 +9,12 @@ from pathlib import Path
 import datetime as dt
 from urllib.parse import parse_qs, urlparse
 
-from ...contracts.constants_paths import DB_PATH
-from ...db.sqlite_store import _sync_to_firestore_if_enabled, get_conn, current_unified_rows_signature
-from ...firebase_sync import is_firestore_enabled
+from ...config.constants.constants_paths import DB_PATH
+from ...infrastructure.db.sqlite_store import _sync_to_firestore_if_enabled, get_conn, current_unified_rows_signature
+from ...infrastructure.firebase_sync import is_firestore_enabled
 from ..segmentation import engine as segmentation_engine
 from ..analytics import user_performance as analytics_service
-from ...parsers import tabular_parser
+from ...infrastructure.parsers import tabular_parser
 
 def utc_now_iso() -> str:
     return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"

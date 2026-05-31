@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from ...contracts.constants_parsing import FIELD_ALIASES
-from ...db.sqlite_store import current_unified_rows_signature, get_conn
+from ...config.constants.constants_parsing import FIELD_ALIASES
+from ...infrastructure.db.sqlite_store import current_unified_rows_signature, get_conn
 from .engine_utils import (
     build_canonical_map,
     canonicalize_workflow_state,

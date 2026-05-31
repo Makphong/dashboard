@@ -1,0 +1,105 @@
+import { extractFileNameFromSheetKey, buildSheetKey } from '../../../../lib/utils.js';
+
+export const togglePinInList = (list, value) => (
+  list.includes(value) ? list.filter((item) => item !== value) : [value, ...list]
+);
+
+export function updateSelectionForFile({
+  selectedFiles,
+  selectedSheets,
+  fileName,
+  currentlyChecked,
+}) {
+  if (currentlyChecked) {
+    return {
+      nextFiles: selectedFiles.filter((item) => item !== fileName),
+      nextSheets: selectedSheets.filter(
+        (sheetKey) => extractFileNameFromSheetKey(sheetKey) !== fileName,
+      ),
+    };
+  }
+
+  return {
+    nextFiles: selectedFiles.includes(fileName) ? selectedFiles : [...selectedFiles, fileName],
+    nextSheets: selectedSheets.filter(
+      (sheetKey) => extractFileNameFromSheetKey(sheetKey) !== fileName,
+    ),
+  };
+}
+
+export function updateSelectionForSheet({
+  selectedFiles,
+  selectedSheets,
+  fileName,
+  sheetName,
+}) {
+  const sheetKey = buildSheetKey(fileName, sheetName);
+  const nextSheets = selectedSheets.includes(sheetKey)
+    ? selectedSheets.filter((item) => item !== sheetKey)
+    : [...selectedSheets, sheetKey];
+
+  const hasRemainingSheetsForFile = nextSheets.some(
+    (key) => extractFileNameFromSheetKey(key) === fileName,
+  );
+  const nextFiles = hasRemainingSheetsForFile
+    ? (selectedFiles.includes(fileName) ? selectedFiles : [...selectedFiles, fileName])
+    : selectedFiles.filter((item) => item !== fileName);
+
+  return { nextFiles, nextSheets };
+}
+
+export function getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles }) {
+  const pinnedFileSet = new Set(pinnedFiles);
+  const searchText = documentFileSearch.trim().toLowerCase();
+
+  return documentTree
+    .filter((item) => item.fileName.toLowerCase().includes(searchText))
+    .sort((a, b) => {
+      const aPinned = pinnedFileSet.has(a.fileName);
+      const bPinned = pinnedFileSet.has(b.fileName);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+}
+
+export function getFilteredSheetsForActiveFile({
+  documentTree,
+  activeDocumentFile,
+  documentSheetSearch,
+  pinnedSheets,
+}) {
+  const pinnedSheetSet = new Set(pinnedSheets);
+  const searchText = documentSheetSearch.trim().toLowerCase();
+  const activeDocumentEntry = documentTree.find((item) => item.fileName === activeDocumentFile) || null;
+
+  const filteredSheetsForActiveFile = activeDocumentEntry
+    ? activeDocumentEntry.sheets
+      .filter((sheet) => sheet.toLowerCase().includes(searchText))
+      .sort((a, b) => {
+        const aKey = buildSheetKey(activeDocumentFile, a);
+        const bKey = buildSheetKey(activeDocumentFile, b);
+        const aPinned = pinnedSheetSet.has(aKey);
+        const bPinned = pinnedSheetSet.has(bKey);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return 0;
+      })
+    : [];
+
+  return { activeDocumentEntry, filteredSheetsForActiveFile };
+}
+
+export function getDateRangeSummary(datePreset, dateStart, dateEnd) {
+  if (datePreset === 'all') return 'All Time';
+  if (datePreset === 'custom') return `${dateStart} - ${dateEnd}`;
+  if (datePreset === '7d') return 'Last 7 Days';
+  if (datePreset === '30d') return 'Last 30 Days';
+  return 'Last 90 Days';
+}
+
+export function getDocumentSummary(selectedFiles, selectedSheets) {
+  if (selectedFiles.length === 0 && selectedSheets.length === 0) return 'Select Document';
+  if (selectedSheets.length > 0) return `${selectedSheets.length} Sheets`;
+  return `${selectedFiles.length} Files`;
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 
-from ...contracts.constants_workflow import (
+from ...config.constants.constants_workflow import (
     ACTIVITY_GRACE_MINUTES_DEFAULT,
     COMPLETED_STATE,
     COMPLETED_STATUSES,

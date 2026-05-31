@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ....contracts.constants_runtime import ALGORITHM_VERSION
+from ....config.constants.constants_runtime import ALGORITHM_VERSION
 
 
 def format_duration(seconds: float) -> str:
