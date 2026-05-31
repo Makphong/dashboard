@@ -16,6 +16,6 @@ DEFAULT_DB_PATH = (
 DB_PATH = Path(
     os.getenv(
         "LOCAL_DB_PATH",
-        str(DEFAULT_DB_PATH if DEFAULT_DB_PATH.exists() else LEGACY_DB_PATH),
+        str(DEFAULT_DB_PATH),
     )
 )
