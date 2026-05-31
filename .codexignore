@@ -9,6 +9,7 @@ docs/
 .vscode/
 .idea/
 *.code-workspace
+.agents/
 
 # Python cache and virtual environments
 __pycache__/
@@ -44,8 +45,9 @@ coverage/
 *.map
 
 # Local databases and large data artifacts
-local_dashboard.db
-artifacts
+/local_dashboard.db
+/data/local_dashboard.db
+artifacts/
 data/*.db
 *.db
 *.sqlite
@@ -94,3 +96,4 @@ temp/
 # Make Gemini ignore Codex-specific config files.
 .codexignore
 .codex/
+.geminiignore
