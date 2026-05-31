@@ -1,0 +1,74 @@
+import React from 'react';
+import { ChevronRight, Pin } from 'lucide-react';
+import { DropdownSearch } from '../../../components/shared/DropdownSearch.jsx';
+
+export function DocumentFileListColumn({
+  filteredDocumentTree,
+  documentFileSearch,
+  setDocumentFileSearch,
+  selectedFileSet,
+  activeDocumentFile,
+  setActiveDocumentFile,
+  pinnedFileSet,
+  onToggleFileSelection,
+  onTogglePin,
+  onClearSelection,
+}) {
+  return (
+    <div className="w-1/2 flex flex-col">
+      <div className="p-3 border-b border-slate-50 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source Files</div>
+          <button
+            onClick={onClearSelection}
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            Clear
+          </button>
+        </div>
+        <DropdownSearch value={documentFileSearch} onChange={setDocumentFileSearch} placeholder="Search files..." />
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
+        {filteredDocumentTree.map((item) => {
+          const isPinned = pinnedFileSet.has(item.fileName);
+          return (
+            <div
+              key={item.fileName}
+              onClick={() => setActiveDocumentFile(item.fileName)}
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${activeDocumentFile === item.fileName ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedFileSet.has(item.fileName)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onToggleFileSelection(item.fileName, selectedFileSet.has(item.fileName));
+                }}
+                className="h-4 w-4 accent-blue-600 rounded"
+              />
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium truncate ${activeDocumentFile === item.fileName ? 'text-blue-700' : 'text-slate-700'}`}>
+                  {item.fileName}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium">{item.sheets.length} sheets</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePin(item.fileName);
+                  }}
+                  className={`p-1 rounded-md transition-all ${isPinned ? 'text-blue-500 opacity-100 bg-blue-50' : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-500 hover:bg-slate-100'}`}
+                >
+                  <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-current' : ''}`} />
+                </button>
+                <ChevronRight className={`w-4 h-4 transition-transform ${activeDocumentFile === item.fileName ? 'text-blue-400 translate-x-0.5' : 'text-slate-300 opacity-0 group-hover:opacity-100'}`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
