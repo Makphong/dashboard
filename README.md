@@ -2,7 +2,7 @@
 
 ## Project Structure
 
-```text
+```text 
 .
 |- api/                # Vercel function entrypoint
 |- backend/            # Python backend source
