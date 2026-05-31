@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from ..contracts.constants import DB_PATH
+from ..contracts.constants_paths import DB_PATH
 from ..firebase_sync import (
     hydrate_sqlite_from_firestore,
     is_firestore_enabled,
@@ -108,4 +108,3 @@ def init_db() -> None:
             """
         )
     _bootstrap_from_firestore_if_needed()
-

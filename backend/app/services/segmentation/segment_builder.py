@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from ...contracts.constants import (
+from ...contracts.constants_workflow import (
     ACTIVITY_GRACE_MINUTES_DEFAULT,
     COMPLETED_STATE,
     IN_REVIEW_STATE,
@@ -701,4 +701,3 @@ def countable_segment_seconds(segment: dict) -> float:
     ):
         return max(0.0, float(segment.get("effectiveDurationSeconds") or 0.0))
     return max(0.0, float(segment.get("durationSeconds") or 0.0))
-

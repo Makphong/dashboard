@@ -8,7 +8,8 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
 
-from .contracts.constants import APP_VERSION, DB_PATH, PROJECT_ROOT, SERVER_STARTED_AT
+from .contracts.constants_paths import DB_PATH, PROJECT_ROOT
+from .contracts.constants_runtime import APP_VERSION, SERVER_STARTED_AT
 from .db.sqlite_store import init_db
 from .parsers import tabular_parser
 from .services.analytics import user_performance as analytics_service

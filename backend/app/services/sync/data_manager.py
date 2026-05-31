@@ -9,7 +9,7 @@ from pathlib import Path
 import datetime as dt
 from urllib.parse import parse_qs, urlparse
 
-from ...contracts.constants import DB_PATH
+from ...contracts.constants_paths import DB_PATH
 from ...db.sqlite_store import _sync_to_firestore_if_enabled, get_conn, current_unified_rows_signature
 from ...firebase_sync import is_firestore_enabled
 from ..segmentation import engine as segmentation_engine

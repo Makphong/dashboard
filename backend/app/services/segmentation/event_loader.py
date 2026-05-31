@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from ...contracts.constants import FIELD_ALIASES
+from ...contracts.constants_parsing import FIELD_ALIASES
 from ...db.sqlite_store import current_unified_rows_signature, get_conn
 from .engine_utils import (
     build_canonical_map,
@@ -152,4 +152,3 @@ def clear_normalized_events_cache() -> None:
     global _NORMALIZED_EVENTS_CACHE_SIGNATURE, _NORMALIZED_EVENTS_CACHE_VALUE
     _NORMALIZED_EVENTS_CACHE_SIGNATURE = None
     _NORMALIZED_EVENTS_CACHE_VALUE = None
-

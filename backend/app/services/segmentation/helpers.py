@@ -3,17 +3,17 @@ from __future__ import annotations
 import datetime as dt
 import re
 
-from ...contracts.constants import (
+from ...contracts.constants_workflow import (
     ACTIVITY_GRACE_MINUTES_DEFAULT,
     COMPLETED_STATE,
+    COMPLETED_STATUSES,
     IN_REVIEW_STATE,
+    IN_REVIEW_STATUSES,
     PENDING_REREVIEW_STATUSES,
     PENDING_REVIEW_STATUSES,
-    COMPLETED_STATUSES,
-    IN_REVIEW_STATUSES,
+    PENDING_STATES,
     SESSION_TIMEOUT_MINUTES_DEFAULT,
     SYSTEM_DETAIL_EVIDENCE_CHANGE_TYPES,
-    PENDING_STATES,
 )
 
 def normalize_key(value: str) -> str:

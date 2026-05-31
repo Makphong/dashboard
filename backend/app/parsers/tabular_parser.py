@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from ..contracts.constants import (
+from ..contracts.constants_parsing import (
     CSV_DECODE_CANDIDATES,
     DATE_NUMBER_FORMAT_IDS,
     MOJIBAKE_MARKERS,
@@ -333,4 +333,3 @@ def parse_uploaded_file(file_name: str, payload: bytes) -> list[tuple[str, list[
             "Unsupported .xls format. Please save as .xlsx and upload again."
         )
     raise ValueError(f"Unsupported file type: {suffix or '(no extension)'}")
-

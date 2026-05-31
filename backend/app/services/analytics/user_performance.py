@@ -4,14 +4,14 @@ import json
 import os
 from collections import Counter, defaultdict
 
-from ...contracts.constants import (
+from ...contracts.constants_parsing import FIELD_ALIASES
+from ...contracts.constants_paths import DB_PATH
+from ...contracts.constants_runtime import (
     ALGORITHM_VERSION,
     APP_VERSION,
-    CORE_USER_SESSION_SEGMENT_TYPES,
-    DB_PATH,
-    FIELD_ALIASES,
     SERVER_STARTED_AT,
 )
+from ...contracts.constants_workflow import CORE_USER_SESSION_SEGMENT_TYPES
 from ...db.sqlite_store import current_unified_rows_signature, get_conn
 from ...firebase_sync import is_firestore_enabled
 from ..segmentation.engine import (
