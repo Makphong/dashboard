@@ -52,9 +52,10 @@ export function FilterBar({
     if (currentlyChecked) {
       setSelectedFiles((prev) => prev.filter((item) => item !== fileName));
       setSelectedSheets((prev) => prev.filter((sheetKey) => extractFileNameFromSheetKey(sheetKey) !== fileName));
-      return;
+    } else {
+      setSelectedFiles((prev) => (prev.includes(fileName) ? prev : [...prev, fileName]));
+      setSelectedSheets((prev) => prev.filter((sheetKey) => extractFileNameFromSheetKey(sheetKey) !== fileName));
     }
-    setSelectedFiles((prev) => (prev.includes(fileName) ? prev : [...prev, fileName]));
   };
 
   const toggleSheetSelection = (fileName, sheetName) => {
@@ -63,8 +64,12 @@ export function FilterBar({
       ? selectedSheets.filter((item) => item !== sheetKey)
       : [...selectedSheets, sheetKey];
     setSelectedSheets(nextSheets);
-    if (nextSheets.length === 0) {
-      setSelectedFiles(documentTree.map(t => t.fileName));
+
+    const hasRemainingSheetsForFile = nextSheets.some(key => extractFileNameFromSheetKey(key) === fileName);
+    if (hasRemainingSheetsForFile) {
+       setSelectedFiles(prev => prev.includes(fileName) ? prev : [...prev, fileName]);
+    } else {
+       setSelectedFiles(prev => prev.filter(f => f !== fileName));
     }
   };
 
@@ -198,7 +203,10 @@ export function FilterBar({
               {/* File List */}
               <div className="w-1/2 flex flex-col">
                 <div className="p-3 border-b border-slate-50 space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source Files</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Source Files</div>
+                    <button onClick={() => { setSelectedFiles([]); setSelectedSheets([]); }} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">Clear</button>
+                  </div>
                   <DropdownSearch value={documentFileSearch} onChange={setDocumentFileSearch} placeholder="Search files..." />
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">

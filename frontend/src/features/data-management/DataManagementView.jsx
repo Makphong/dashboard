@@ -57,7 +57,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
         <div className="flex justify-between items-end mb-6">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
-            <p className="text-slate-500 mt-1">Upload Excel/CSV and consolidate all data into one central SQLite table with file and page names.</p>
+            <p className="text-slate-500 mt-1">Upload files or connect Google Sheets to consolidate all your data in one place.</p>
           </div>
         </div>
 

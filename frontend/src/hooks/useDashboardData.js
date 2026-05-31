@@ -8,6 +8,7 @@ import {
   isIdleContextSegment,
   toDrillGroup,
   buildSheetKey,
+  extractFileNameFromSheetKey,
   buildKpisFromSegments,
   buildKpiData
 } from '../lib/utils.js';
@@ -42,10 +43,8 @@ export function useDashboardData() {
   const [showWorkloadSystem, setShowWorkloadSystem] = usePersistentState('filter_showWorkloadSystem', false);
   const [pinnedFiles, setPinnedFiles] = usePersistentState('filter_pinnedFiles', []);
   const [pinnedSheets, setPinnedSheets] = usePersistentState('filter_pinnedSheets', []);
-  const [isFilterInitialized, setIsFilterInitialized] = usePersistentState('filter_isInitialized', false);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
-  
-  const didInitDocumentDefaultRef = useRef(false);
+
   const segmentGroupOptions = useMemo(() => ['Uploading', 'Processing', 'Reprocess', 'Review', 'Edit', 'Idle'], []);
   const normalizedSelectedSegmentTypes = useMemo(() => {
     const allowedGroups = new Set(segmentGroupOptions);
@@ -181,14 +180,25 @@ export function useDashboardData() {
     if (fileSet.size === 0 && sheetSet.size === 0) {
       return [];
     }
+
+    const filesWithSpecificSheets = new Set();
+    for (const sheetKey of selectedSheets) {
+      filesWithSpecificSheets.add(extractFileNameFromSheetKey(sheetKey));
+    }
     
     return parsedSegments.filter((segment) => {
       if (segment.endTs < dateRangeBounds.minTs || segment.startTs > dateRangeBounds.maxTs) return false;
-      if (sheetSet.size > 0) {
-        if (!sheetSet.has(segment.sheetKey)) return false;
-      } else if (fileSet.size > 0 && !fileSet.has(segment.fileName)) {
-        return false;
+
+      const fileSelected = fileSet.has(segment.fileName);
+      const sheetSelected = sheetSet.has(segment.sheetKey);
+      const hasSpecificSheets = filesWithSpecificSheets.has(segment.fileName);
+
+      if (hasSpecificSheets) {
+        if (!sheetSelected) return false;
+      } else {
+        if (!fileSelected) return false;
       }
+
       if (userSet.size > 0) {
         const lane = toTimelineLane(segment.segmentType, segment.userName);
         if (!userSet.has(lane)) return false;
@@ -196,25 +206,6 @@ export function useDashboardData() {
       return true;
     });
   }, [parsedSegments, dateRangeBounds, selectedFiles, selectedSheets, selectedUsers]);
-
-  // Auto-initialize selection if empty and sources are available
-  useEffect(() => {
-    if (!loading && sources.length > 0 && selectedFiles.length === 0 && selectedSheets.length === 0 && !isFilterInitialized) {
-      const firstSource = sources[0];
-      const fileName = firstSource.fileName || firstSource.name;
-      if (fileName) {
-        if (firstSource.pages && firstSource.pages.length > 0) {
-          // If it's a Google Sheet or has pages, select only the first page
-          const firstPage = firstSource.pages[0];
-          setSelectedSheets([buildSheetKey(fileName, firstPage)]);
-        } else {
-          // Otherwise select the file
-          setSelectedFiles([fileName]);
-        }
-        setIsFilterInitialized(true);
-      }
-    }
-  }, [loading, sources, selectedFiles, selectedSheets, isFilterInitialized, setSelectedFiles, setSelectedSheets, setIsFilterInitialized]);
 
   const ganttVisibleSegments = useMemo(() => {
     let filtered = filteredBaseSegments.filter((segment) => {

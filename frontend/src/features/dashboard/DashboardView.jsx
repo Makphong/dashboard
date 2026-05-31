@@ -213,7 +213,7 @@ export const DashboardView = React.memo(({
       <div className="flex justify-between items-end mb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Dashboard Overview</h1>
-          <p className="text-slate-500 mt-1">Real-time performance metrics and timeline analysis.</p>
+          <p className="text-slate-500 mt-1">Comprehensive performance metrics and timeline analysis.</p>
         </div>
       </div>
 
