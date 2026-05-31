@@ -36,6 +36,15 @@ def api_user_performance():
 def api_gsheet_connections():
     return jsonify(dashboard_service.api_gsheet_connections_payload())
 
+@api_bp.get("/dashboard")
+def api_dashboard():
+    include_debug = str(request.args.get("includeDebug", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    return jsonify(dashboard_service.api_dashboard_payload(include_debug=include_debug))
+
 
 @api_bp.post("/upload")
 def api_upload():

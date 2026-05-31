@@ -93,6 +93,23 @@ def _get_client():
     return _client
 
 
+def fetch_dashboard_meta_state() -> dict[str, Any] | None:
+    client = _get_client()
+    if client is None:
+        return None
+
+    doc = client.collection("dashboard_meta").document("state").get()
+    if not doc.exists:
+        return None
+
+    payload = doc.to_dict() or {}
+    return {
+        "updated_at": str(payload.get("updated_at") or ""),
+        "row_count": int(payload.get("row_count") or 0),
+        "source_count": int(payload.get("source_count") or 0),
+    }
+
+
 def _fetch_table_rows(conn: sqlite3.Connection, table_name: str, order_by: str | None = None) -> list[dict[str, Any]]:
     query = f"SELECT * FROM {table_name}"
     if order_by:

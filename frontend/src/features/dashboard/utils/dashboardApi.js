@@ -1,21 +1,16 @@
 import { requestJson } from '../../../lib/api.js';
 
 export async function fetchDashboardPayload(includeDebug = false) {
-  const [sourcesRes, performanceRes, healthRes, debugRes, connectionsRes] = await Promise.all([
-    requestJson('/api/sources'),
-    requestJson('/api/user-performance'),
-    requestJson('/api/health').catch((error) => ({ __error: error.message })),
-    includeDebug ? requestJson('/api/debug').catch((error) => ({ __error: error.message })) : Promise.resolve(null),
-    requestJson('/api/gsheet/connections').catch(() => ({ connections: [] })),
-  ]);
+  const query = includeDebug ? '?includeDebug=1' : '';
+  const payload = await requestJson(`/api/dashboard${query}`);
 
   return {
-    sources: sourcesRes.sources || [],
-    performance: performanceRes || null,
-    connections: connectionsRes.connections || [],
-    healthInfo: healthRes?.__error ? null : healthRes,
-    healthError: healthRes?.__error || '',
-    debugInfo: debugRes?.__error ? null : debugRes,
+    sources: payload.sources || [],
+    performance: payload.performance || null,
+    connections: payload.connections || [],
+    healthInfo: payload.healthInfo || null,
+    healthError: '',
+    debugInfo: includeDebug ? (payload.debugInfo || null) : null,
   };
 }
 

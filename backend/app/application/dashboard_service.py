@@ -10,7 +10,10 @@ from urllib.parse import unquote, urlparse
 
 from ..config.constants.constants_paths import DB_PATH, PROJECT_ROOT
 from ..config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
-from ..infrastructure.db.sqlite_store import init_db
+from ..infrastructure.db.sqlite_store import (
+    ensure_fresh_from_firestore_if_enabled,
+    init_db,
+)
 from ..infrastructure.parsers import tabular_parser
 from ..services.analytics import user_performance as analytics_service
 from ..services.segmentation import engine as segmentation_engine
@@ -40,23 +43,52 @@ build_segments_for_document = segmentation_engine.build_segments_for_document
 countable_segment_seconds = segmentation_engine.countable_segment_seconds
 normalize_text = segmentation_engine.normalize_text
 
+def refresh_runtime_data() -> None:
+    ensure_fresh_from_firestore_if_enabled()
+
+
 # Analytics service exports
-compute_user_performance = analytics_service.compute_user_performance
-build_debug_snapshot = analytics_service.build_debug_snapshot
-build_health_payload = analytics_service.build_health_payload
+def compute_user_performance() -> dict:
+    refresh_runtime_data()
+    return analytics_service.compute_user_performance()
+
+
+def build_debug_snapshot() -> dict:
+    refresh_runtime_data()
+    return analytics_service.build_debug_snapshot()
+
+
+def build_health_payload() -> dict:
+    return analytics_service.build_health_payload()
 
 # Response payload helpers
 def api_sources_payload() -> dict:
+    refresh_runtime_data()
     return {"sources": list_sources()}
 
 def api_gsheet_connections_payload() -> dict:
+    refresh_runtime_data()
     return {"connections": list_gsheet_connections()}
 
+def api_dashboard_payload(include_debug: bool = False) -> dict:
+    refresh_runtime_data()
+    payload = {
+        "sources": list_sources(),
+        "performance": analytics_service.compute_user_performance(),
+        "connections": list_gsheet_connections(),
+        "healthInfo": analytics_service.build_health_payload(),
+    }
+    if include_debug:
+        payload["debugInfo"] = analytics_service.build_debug_snapshot()
+    return payload
+
 def api_upload_payload(files: list[tuple[str, bytes]]) -> dict:
+    refresh_runtime_data()
     uploaded = [ingest_file(name, binary) for name, binary in files]
     return {"uploaded": uploaded, **api_sources_payload()}
 
 def api_connect_gsheet_payload(url: str) -> dict:
+    refresh_runtime_data()
     result = connect_gsheet(url)
     return {
         "connected": result,
@@ -65,6 +97,7 @@ def api_connect_gsheet_payload(url: str) -> dict:
     }
 
 def api_sync_gsheet_payload() -> dict:
+    refresh_runtime_data()
     results = sync_all_gsheets()
     return {
         "synced": results,
@@ -73,10 +106,12 @@ def api_sync_gsheet_payload() -> dict:
     }
 
 def api_delete_source_payload(source_id: str) -> dict:
+    refresh_runtime_data()
     delete_source(source_id)
     return {"ok": True, **api_sources_payload()}
 
 def api_delete_gsheet_payload(connection_id: str) -> dict:
+    refresh_runtime_data()
     disconnect_gsheet(connection_id)
     return {
         "ok": True,
@@ -125,6 +160,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             "/api/debug": build_debug_snapshot,
             "/api/user-performance": compute_user_performance,
             "/api/gsheet/connections": api_gsheet_connections_payload,
+            "/api/dashboard": api_dashboard_payload,
         }
         if parsed.path in routes:
             json_response(self, routes[parsed.path]())

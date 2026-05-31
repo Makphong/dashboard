@@ -4,12 +4,14 @@ import sqlite3
 
 from ...config.constants.constants_paths import DB_PATH
 from ..firebase_sync import (
+    fetch_dashboard_meta_state,
     hydrate_sqlite_from_firestore,
     is_firestore_enabled,
     sync_sqlite_to_firestore,
 )
 
 _FIREBASE_BOOTSTRAPPED = False
+_FIRESTORE_META_SIGNATURE: tuple[str, int, int] | None = None
 
 
 def get_conn() -> sqlite3.Connection:
@@ -37,7 +39,7 @@ def current_unified_rows_signature(
 
 
 def _bootstrap_from_firestore_if_needed() -> None:
-    global _FIREBASE_BOOTSTRAPPED
+    global _FIREBASE_BOOTSTRAPPED, _FIRESTORE_META_SIGNATURE
     if _FIREBASE_BOOTSTRAPPED:
         return
     if not is_firestore_enabled():
@@ -45,10 +47,49 @@ def _bootstrap_from_firestore_if_needed() -> None:
         return
     try:
         hydrate_sqlite_from_firestore(DB_PATH)
+        remote_state = fetch_dashboard_meta_state() or {}
+        _FIRESTORE_META_SIGNATURE = (
+            str(remote_state.get("updated_at") or ""),
+            int(remote_state.get("row_count") or 0),
+            int(remote_state.get("source_count") or 0),
+        )
     except Exception as exc:
         print(f"[Firebase] Bootstrap skipped: {exc}")
     finally:
         _FIREBASE_BOOTSTRAPPED = True
+
+
+def ensure_fresh_from_firestore_if_enabled() -> None:
+    global _FIRESTORE_META_SIGNATURE
+
+    if not is_firestore_enabled():
+        return
+
+    try:
+        remote_state = fetch_dashboard_meta_state()
+    except Exception as exc:
+        print(f"[Firebase] Metadata read skipped: {exc}")
+        return
+
+    if not remote_state:
+        return
+
+    remote_signature = (
+        str(remote_state.get("updated_at") or ""),
+        int(remote_state.get("row_count") or 0),
+        int(remote_state.get("source_count") or 0),
+    )
+
+    if _FIRESTORE_META_SIGNATURE == remote_signature:
+        return
+
+    try:
+        hydrate_sqlite_from_firestore(DB_PATH)
+    except Exception as exc:
+        print(f"[Firebase] Refresh hydrate skipped: {exc}")
+        return
+
+    _FIRESTORE_META_SIGNATURE = remote_signature
 
 
 def _sync_to_firestore_if_enabled() -> None:
