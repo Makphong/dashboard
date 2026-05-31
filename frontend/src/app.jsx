@@ -34,8 +34,6 @@ function App() {
           <DashboardView
             dashboard={dashboard}
             workloadVisibleRows={controller.workloadVisibleRows}
-            showMatrixQuadrants={controller.showMatrixQuadrants}
-            setShowMatrixQuadrants={controller.setShowMatrixQuadrants}
             showProcessBreakdownIdle={controller.showProcessBreakdownIdle}
             setShowProcessBreakdownIdle={controller.setShowProcessBreakdownIdle}
             showProcessBreakdownLabels={controller.showProcessBreakdownLabels}
@@ -64,8 +62,6 @@ function App() {
           showProcessBreakdownLabels: controller.showProcessBreakdownLabels,
           workloadVisibleRows: controller.workloadVisibleRows,
           contributionRows: dashboard.contributionRows,
-          matrixRows: dashboard.matrixRows,
-          showMatrixQuadrants: controller.showMatrixQuadrants,
           mergeReviewAndEdit: controller.mergeReviewAndEdit,
         }}
       />

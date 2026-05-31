@@ -2,7 +2,6 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { GanttTimelineChart } from '../../timeline/GanttTimelineChart.jsx';
 import { DonutWorkloadChart } from '../../charts/DonutWorkloadChart.jsx';
-import { ReworkMatrixScatterChart } from '../../charts/ReworkMatrixScatterChart.jsx';
 import { UserContributionStackChart } from '../../charts/UserContributionStackChart.jsx';
 import { ProcessTimeBreakdownChart } from '../../charts/ProcessTimeBreakdownChart.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
@@ -19,8 +18,6 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
     showProcessBreakdownLabels,
     workloadVisibleRows,
     contributionRows,
-    matrixRows,
-    showMatrixQuadrants,
     mergeReviewAndEdit,
   } = data;
 

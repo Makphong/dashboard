@@ -30,7 +30,6 @@ export function useAppController(dashboard) {
   const [segmentTypeSearchText, setSegmentTypeSearchText] = useState('');
   const [documentFileSearch, setDocumentFileSearch] = useState('');
   const [documentSheetSearch, setDocumentSheetSearch] = useState('');
-  const [showMatrixQuadrants, setShowMatrixQuadrants] = usePersistentState('filter_showMatrixQuadrants', false);
   const [showProcessBreakdownIdle, setShowProcessBreakdownIdle] = usePersistentState('filter_showProcessBreakdownIdle', true);
   const [showProcessBreakdownLabels, setShowProcessBreakdownLabels] = usePersistentState('filter_showProcessBreakdownLabels', true);
   const [mergeReviewAndEdit, setMergeReviewAndEdit] = usePersistentState('chart_mergeReviewAndEdit', true);
@@ -141,8 +140,6 @@ export function useAppController(dashboard) {
     setDocumentFileSearch,
     documentSheetSearch,
     setDocumentSheetSearch,
-    showMatrixQuadrants,
-    setShowMatrixQuadrants,
     showProcessBreakdownIdle,
     setShowProcessBreakdownIdle,
     showProcessBreakdownLabels,

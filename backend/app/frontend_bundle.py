@@ -38,7 +38,6 @@ FILES_TO_BUNDLE = [
     "features/charts/FlowDelayComparisonTable.jsx",
     "features/charts/DonutWorkloadChart.jsx",
     "features/charts/UserContributionStackChart.jsx",
-    "features/charts/ReworkMatrixScatterChart.jsx",
     "features/charts/ProcessTimeBreakdownChart.jsx",
     "features/data-management/DataManagementView.jsx",
     "features/dashboard/DashboardLayout.jsx",

@@ -63,7 +63,6 @@ export function useDashboardData() {
     kpiData,
     flowRows,
     contributionRows,
-    matrixRows,
     workloadContributors,
   } = useDashboardMetrics({
     ganttVisibleSegments,
@@ -167,7 +166,6 @@ export function useDashboardData() {
     filteredBaseSegments,
     flowRows,
     contributionRows,
-    matrixRows,
     workloadContributors,
     refreshAll,
     setErrorMessage,

@@ -29,11 +29,6 @@ export function useDashboardMetrics(params) {
 
   const contributionRows = useMemo(() => userStatsRows.map((row) => ({ ...row })), [userStatsRows]);
 
-  const matrixRows = useMemo(
-    () => userStatsRows.map((row) => ({ ...row, totalActiveSeconds: row.totalSeconds })),
-    [userStatsRows]
-  );
-
   const workloadContributors = useMemo(() => {
     const laneDurationMap = new Map();
 
@@ -63,7 +58,6 @@ export function useDashboardMetrics(params) {
     kpiData,
     flowRows,
     contributionRows,
-    matrixRows,
     workloadContributors,
   };
 }

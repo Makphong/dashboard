@@ -4,7 +4,6 @@ import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, Sliders
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { DonutWorkloadChart } from '../charts/DonutWorkloadChart.jsx';
-import { ReworkMatrixScatterChart } from '../charts/ReworkMatrixScatterChart.jsx';
 import { UserContributionStackChart } from '../charts/UserContributionStackChart.jsx';
 import { GanttTimelineChart } from '../timeline/GanttTimelineChart.jsx';
 import { ProcessTimeBreakdownChart } from '../charts/ProcessTimeBreakdownChart.jsx';
@@ -31,8 +30,6 @@ function ToggleSetting({ checked, onChange, children, notice }) {
 export const DashboardView = React.memo(({
   dashboard,
   workloadVisibleRows,
-  showMatrixQuadrants,
-  setShowMatrixQuadrants,
   showProcessBreakdownIdle,
   setShowProcessBreakdownIdle,
   showProcessBreakdownLabels,
@@ -49,7 +46,6 @@ export const DashboardView = React.memo(({
     filteredBaseSegments,
     selectedSegmentTypes,
     contributionRows,
-    matrixRows,
     showIdle,
     setShowIdle,
     showWorkloadIdle,
