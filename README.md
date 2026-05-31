@@ -1,6 +1,6 @@
 ﻿# Dashboard (Vercel + Firebase Ready)
 
-## Project Structure
+## Project Structure 
 
 ```text 
 .
