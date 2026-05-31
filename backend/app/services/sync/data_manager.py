@@ -5,8 +5,11 @@ import json
 import sqlite3
 import uuid
 import re
+import time
+import threading
 from pathlib import Path
 import datetime as dt
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import parse_qs, urlparse
 
 from ...config.constants.constants_paths import DB_PATH
@@ -15,6 +18,38 @@ from ...infrastructure.firebase_sync import is_firestore_enabled
 from ..segmentation import engine as segmentation_engine
 from ..analytics import user_performance as analytics_service
 from ...infrastructure.parsers import tabular_parser
+
+_GSHEET_TAB_CACHE_TTL_SECONDS = 15 * 60
+_GSHEET_TAB_CACHE: dict[str, tuple[float, list[tuple[str, int]]]] = {}
+_GSHEET_TAB_CACHE_LOCK = threading.Lock()
+
+
+def _read_cached_sheet_tabs(
+    spreadsheet_id: str,
+    allow_stale: bool = False,
+) -> list[tuple[str, int]] | None:
+    now = time.time()
+    with _GSHEET_TAB_CACHE_LOCK:
+        cached = _GSHEET_TAB_CACHE.get(spreadsheet_id)
+    if not cached:
+        return None
+
+    expires_at, tabs = cached
+    if allow_stale or expires_at > now:
+        return list(tabs)
+    return None
+
+
+def _write_cached_sheet_tabs(
+    spreadsheet_id: str,
+    tabs: list[tuple[str, int]],
+) -> None:
+    with _GSHEET_TAB_CACHE_LOCK:
+        _GSHEET_TAB_CACHE[spreadsheet_id] = (
+            time.time() + _GSHEET_TAB_CACHE_TTL_SECONDS,
+            list(tabs),
+        )
+
 
 def utc_now_iso() -> str:
     return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -64,7 +99,32 @@ def _fetch_url_bytes(url: str, timeout: int = 60) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
+
+
+def _download_single_gsheet_tab(
+    spreadsheet_id: str,
+    sheet_name: str,
+    gid: int,
+) -> tuple[int, str, list[dict]] | None:
+    export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
+    try:
+        csv_bytes = _fetch_url_bytes(export_url, timeout=120)
+        if not csv_bytes or len(csv_bytes) < 5:
+            return None
+        rows = tabular_parser.parse_csv_bytes(csv_bytes)
+        if not rows:
+            return None
+        return gid, sheet_name, rows
+    except Exception:
+        return None
+
+
 def _discover_gsheet_gids(spreadsheet_id: str) -> list[tuple[str, int]]:
+    cached_tabs = _read_cached_sheet_tabs(spreadsheet_id)
+    if cached_tabs:
+        return cached_tabs
+
+    stale_tabs = _read_cached_sheet_tabs(spreadsheet_id, allow_stale=True)
     try:
         html_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit?usp=sharing"
         html_bytes = _fetch_url_bytes(html_url, timeout=30)
@@ -104,36 +164,62 @@ def _discover_gsheet_gids(spreadsheet_id: str) -> list[tuple[str, int]]:
                 if gid not in seen:
                     seen.add(gid)
                     unique.append((name, gid))
-            
-            # Temporary log for debugging in workspace
-            with open("/tmp/gsheet_discovery.log", "a") as f:
-                f.write(f"{dt.datetime.now().isoformat()} - Found {len(unique)} sheets for {spreadsheet_id}\n")
-            
-            if unique: return unique
-    except Exception as e:
-        with open("/tmp/gsheet_discovery.log", "a") as f:
-            f.write(f"{dt.datetime.now().isoformat()} - Error for {spreadsheet_id}: {str(e)}\n")
+            if unique:
+                _write_cached_sheet_tabs(spreadsheet_id, unique)
+                return unique
+    except Exception:
+        pass
+    if stale_tabs:
+        return stale_tabs
     return [("Sheet1", 0)]
 
 
 def _download_gsheet_pages(spreadsheet_id: str, preferred_gid: int | None = None) -> list[tuple[str, list[dict]]]:
     all_pages: list[tuple[str, list[dict]]] = []
-    sheet_tabs = _discover_gsheet_gids(spreadsheet_id)
+    discovered_tabs = _discover_gsheet_gids(spreadsheet_id)
+
+    gid_to_name: dict[int, str] = {}
+    for sheet_name, gid in discovered_tabs:
+        if gid not in gid_to_name:
+            gid_to_name[gid] = sheet_name
+
     ordered_tabs: list[tuple[str, int]] = []
     if preferred_gid is not None:
-        ordered_tabs.append((f"Sheet {preferred_gid}", preferred_gid))
-    ordered_tabs.extend(sheet_tabs)
+        preferred_name = gid_to_name.get(preferred_gid, f"Sheet {preferred_gid}")
+        ordered_tabs.append((preferred_name, preferred_gid))
+    ordered_tabs.extend((name, gid) for gid, name in gid_to_name.items())
+
     seen_gid: set[int] = set()
+    unique_tabs: list[tuple[str, int]] = []
     for sheet_name, gid in ordered_tabs:
-        if gid in seen_gid: continue
+        if gid in seen_gid:
+            continue
         seen_gid.add(gid)
-        export_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
-        try:
-            csv_bytes = _fetch_url_bytes(export_url, timeout=120)
-            if not csv_bytes or len(csv_bytes) < 5: continue
-            rows = tabular_parser.parse_csv_bytes(csv_bytes)
-            if rows: all_pages.append((sheet_name, rows))
-        except Exception: continue
+        unique_tabs.append((sheet_name, gid))
+
+    if unique_tabs:
+        max_workers = min(8, max(1, len(unique_tabs)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_gid = {
+                executor.submit(
+                    _download_single_gsheet_tab, spreadsheet_id, sheet_name, gid
+                ): gid
+                for sheet_name, gid in unique_tabs
+            }
+            result_by_gid: dict[int, tuple[str, list[dict]]] = {}
+            for future in as_completed(future_to_gid):
+                result = future.result()
+                if not result:
+                    continue
+                gid, sheet_name, rows = result
+                result_by_gid[gid] = (sheet_name, rows)
+
+        for sheet_name, gid in unique_tabs:
+            resolved = result_by_gid.get(gid)
+            if not resolved:
+                continue
+            all_pages.append(resolved)
+
     if all_pages: return all_pages
     fallback_exports = [
         ("Default Tab", f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv"),
