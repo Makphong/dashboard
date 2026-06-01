@@ -92,13 +92,19 @@ def ensure_fresh_from_firestore_if_enabled() -> None:
     _FIRESTORE_META_SIGNATURE = remote_signature
 
 
-def _sync_to_firestore_if_enabled() -> None:
+def _sync_to_firestore_if_enabled(required: bool = False) -> bool:
     if not is_firestore_enabled():
-        return
+        return True
     try:
-        sync_sqlite_to_firestore(DB_PATH)
+        ok = bool(sync_sqlite_to_firestore(DB_PATH))
+        if required and not ok:
+            raise RuntimeError("Firestore sync was not completed.")
+        return ok
     except Exception as exc:
         print(f"[Firebase] Sync failed: {exc}")
+        if required:
+            raise RuntimeError(f"Firestore sync failed: {exc}") from exc
+        return False
 
 
 def init_db() -> None:
