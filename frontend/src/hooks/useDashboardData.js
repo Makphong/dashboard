@@ -78,6 +78,10 @@ export function useDashboardData() {
     if (!firestore) return '';
 
     const reason = String(firestore.error || firestore.reason || '').trim();
+    const syncError = String(firestore.lastSyncError || '').trim();
+    if (firestore.enabled && firestore.clientReady && firestore.lastSyncOk === false) {
+      return `Firestore sync failed${syncError ? `: ${syncError}` : ''}. Current data may disappear after server restart because only SQLite was updated.`;
+    }
     if (firestore.enabled && !firestore.clientReady) {
       return `Firestore connection failed${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
     }

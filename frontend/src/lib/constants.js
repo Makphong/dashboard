@@ -3,7 +3,7 @@ import {
 } from 'lucide-react';
 
 export const API_BASE = '';
-export const FRONTEND_BUILD_VERSION = '2026-06-01-initial-load-clean';
+export const FRONTEND_BUILD_VERSION = '2026-06-01-cloud-sync-status-2';
 // ... rest of exports ...
 export const initialKpiData = [
   { id: 7, label: 'Total time', value: '-', subtext: '', icon: Timer, color: 'text-[#3860be]', bg: 'bg-[#eef3ff]' },

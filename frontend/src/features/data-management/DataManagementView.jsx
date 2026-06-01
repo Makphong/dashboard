@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle, Database
+  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle
 } from 'lucide-react';
 import { toDisplayDate } from '../../lib/utils.js';
 
@@ -35,17 +35,15 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   const totalRows = sources.reduce((sum, s) => sum + (Number(s.rows) || 0), 0);
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
   const firestore = healthInfo?.firestore || null;
-  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady);
+  const hasSyncError = Boolean(firestore?.lastSyncOk === false);
+  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady && !hasSyncError);
   const cloudConfigured = Boolean(firestore?.configured);
-  const cloudStatusText = cloudConnected
-    ? 'Cloud DB Connected'
-    : (cloudConfigured ? 'Cloud DB Disconnected' : 'Cloud DB Not Configured');
-  const cloudStatusClass = cloudConnected
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : (cloudConfigured ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200');
-  const cloudDotClass = cloudConnected
-    ? 'bg-emerald-500'
-    : (cloudConfigured ? 'bg-red-500' : 'bg-slate-400');
+  const fileCloudStatusText = cloudConnected
+    ? 'Cloud Synced'
+    : (hasSyncError ? 'Cloud Sync Failed' : (cloudConfigured ? 'Cloud Disconnected' : 'Local Only'));
+  const fileCloudStatusClass = cloudConnected
+    ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
+    : (hasSyncError ? 'text-amber-700 bg-amber-50 border-amber-100' : (cloudConfigured ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-100 border-slate-200'));
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -70,11 +68,6 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
             <p className="text-slate-500 mt-1">Upload files or connect Google Sheets to consolidate all your data in one place.</p>
-          </div>
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${cloudStatusClass}`} title={String(firestore?.error || firestore?.reason || '')}>
-            <span className={`w-2 h-2 rounded-full ${cloudDotClass}`} />
-            <Database className="w-3.5 h-3.5" />
-            <span>{cloudStatusText}</span>
           </div>
         </div>
 
@@ -200,9 +193,9 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                  <div className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border ${fileCloudStatusClass}`} title={String(firestore?.lastSyncError || firestore?.error || firestore?.reason || '')}>
                     <CheckCircle2 className="w-4 h-4" />
-                    {source.status || 'Active'}
+                    {source.status || 'Active'} · {fileCloudStatusText}
                   </div>
                   <button
                     onClick={() => setItemToDelete(source)}
