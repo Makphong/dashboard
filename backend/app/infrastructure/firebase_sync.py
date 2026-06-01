@@ -242,6 +242,8 @@ def _doc_id_for_row(table_name: str, row: dict[str, Any]) -> str:
 def sync_sqlite_to_firestore(db_path: Path) -> bool:
     client = _get_client()
     if client is None:
+        error_message = _last_error or "Firestore client is not ready"
+        _mark_sync_failure(error_message)
         return False
 
     conn = sqlite3.connect(db_path)
