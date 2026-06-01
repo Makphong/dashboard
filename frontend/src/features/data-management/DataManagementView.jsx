@@ -34,16 +34,6 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   const fileSources = sources.filter(s => s.type !== 'gsheet' && s.type !== '.gsheet');
   const totalRows = sources.reduce((sum, s) => sum + (Number(s.rows) || 0), 0);
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
-  const supabase = healthInfo?.supabase || null;
-  const hasSyncError = Boolean(supabase?.lastSyncOk === false);
-  const cloudConnected = Boolean(supabase?.enabled && supabase?.clientReady && !hasSyncError);
-  const cloudConfigured = Boolean(supabase?.configured);
-  const fileCloudStatusText = cloudConnected
-    ? 'Cloud Synced'
-    : (hasSyncError ? 'Cloud Sync Failed' : (cloudConfigured ? 'Cloud Ready' : 'Local Only'));
-  const fileCloudStatusClass = cloudConnected
-    ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
-    : (hasSyncError ? 'text-amber-700 bg-amber-50 border-amber-100' : (cloudConfigured ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-slate-600 bg-slate-100 border-slate-200'));
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -193,9 +183,9 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border ${fileCloudStatusClass}`} title={String(supabase?.lastSyncError || supabase?.error || supabase?.reason || '')}>
+                  <div className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border text-slate-700 bg-slate-100 border-slate-200">
                     <CheckCircle2 className="w-4 h-4" />
-                    {source.status || 'Active'} · {fileCloudStatusText}
+                    {source.status || 'Active'}
                   </div>
                   <button
                     onClick={() => setItemToDelete(source)}

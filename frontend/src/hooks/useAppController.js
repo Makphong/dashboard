@@ -41,22 +41,32 @@ export function useAppController(dashboard) {
   }, [workloadContributors, showWorkloadSystem]);
 
   const handleUploadFiles = async (files) => {
+    let uploadSucceeded = false;
     setUploading(true);
     try {
       const payloadFiles = await Promise.all(files.map(async (file) => {
         const reader = new FileReader();
-        const base64 = await new Promise((resolve) => {
+        const base64 = await new Promise((resolve, reject) => {
           reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+          reader.onabort = () => reject(new Error(`File read was aborted: ${file.name}`));
           reader.readAsDataURL(file);
         });
         return { name: file.name, contentBase64: base64 };
       }));
       await requestJson('/api/upload', { method: 'POST', body: JSON.stringify({ files: payloadFiles }) });
-      await refreshAll();
+      uploadSucceeded = true;
     } catch (error) {
       setErrorMessage(error.message);
     } finally {
       setUploading(false);
+    }
+
+    if (uploadSucceeded) {
+      // Refresh UI after upload without blocking upload state on optional sheet sync.
+      refreshAll({ syncFirst: false, backgroundSync: true }).catch((error) => {
+        setErrorMessage(error.message || 'Refresh failed');
+      });
     }
   };
 
