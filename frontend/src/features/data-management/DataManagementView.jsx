@@ -36,14 +36,15 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
   const firestore = healthInfo?.firestore || null;
   const hasSyncError = Boolean(firestore?.lastSyncOk === false);
-  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady && !hasSyncError);
+  const syncConfirmed = Boolean(firestore?.lastSyncOk === true);
+  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady && syncConfirmed && !hasSyncError);
   const cloudConfigured = Boolean(firestore?.configured);
   const fileCloudStatusText = cloudConnected
     ? 'Cloud Synced'
-    : (hasSyncError ? 'Cloud Sync Failed' : (cloudConfigured ? 'Cloud Disconnected' : 'Local Only'));
+    : (hasSyncError ? 'Cloud Sync Failed' : (cloudConfigured ? 'Cloud Ready' : 'Local Only'));
   const fileCloudStatusClass = cloudConnected
     ? 'text-emerald-600 bg-emerald-50 border-emerald-100'
-    : (hasSyncError ? 'text-amber-700 bg-amber-50 border-amber-100' : (cloudConfigured ? 'text-red-600 bg-red-50 border-red-100' : 'text-slate-600 bg-slate-100 border-slate-200'));
+    : (hasSyncError ? 'text-amber-700 bg-amber-50 border-amber-100' : (cloudConfigured ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-slate-600 bg-slate-100 border-slate-200'));
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
