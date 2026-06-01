@@ -85,7 +85,7 @@ def api_dashboard_payload(include_debug: bool = False) -> dict:
 def api_upload_payload(files: list[tuple[str, bytes]]) -> dict:
     refresh_runtime_data()
     uploaded = [ingest_file(name, binary) for name, binary in files]
-    return {"uploaded": uploaded, **api_sources_payload()}
+    return {"uploaded": uploaded}
 
 def api_connect_gsheet_payload(url: str) -> dict:
     refresh_runtime_data()

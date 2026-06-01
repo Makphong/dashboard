@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle
+  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, Trash2
 } from 'lucide-react';
 import { toDisplayDate } from '../../lib/utils.js';
 
@@ -183,10 +183,6 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border text-slate-700 bg-slate-100 border-slate-200">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {source.status || 'Active'}
-                  </div>
                   <button
                     onClick={() => setItemToDelete(source)}
                     className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"

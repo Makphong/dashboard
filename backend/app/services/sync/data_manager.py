@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import parse_qs, urlparse
 
 from ...infrastructure.db.sqlite_store import (
+    _sync_source_to_supabase_if_enabled,
     _sync_to_supabase_if_enabled,
     get_conn,
 )
@@ -59,17 +60,18 @@ def invalidate_runtime_caches() -> None:
     segmentation_engine.clear_normalized_events_cache()
     analytics_service.clear_user_performance_cache()
 
-def clear_source_by_file_name(conn: sqlite3.Connection, file_name: str) -> None:
+def clear_source_by_file_name(conn: sqlite3.Connection, file_name: str) -> str | None:
     row = conn.execute(
         "SELECT source_id FROM source_files WHERE file_name = ?",
         (file_name,),
     ).fetchone()
     if not row:
-        return
+        return None
     source_id = row["source_id"]
     conn.execute("DELETE FROM unified_rows WHERE source_id = ?", (source_id,))
     conn.execute("DELETE FROM source_pages WHERE source_id = ?", (source_id,))
     conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
+    return str(source_id)
 
 def _extract_gsheet_id(url: str) -> str | None:
     m = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", url)
@@ -329,8 +331,9 @@ def ingest_file(file_name: str, payload: bytes) -> dict:
     source_id = uuid.uuid4().hex
     file_ext = Path(file_name).suffix.lower()
     total_rows = 0
+    removed_source_id: str | None = None
     with get_conn() as conn:
-        clear_source_by_file_name(conn, file_name)
+        removed_source_id = clear_source_by_file_name(conn, file_name)
         conn.execute("INSERT INTO source_files (source_id, file_name, file_ext, uploaded_at, total_rows, total_pages) VALUES (?, ?, ?, ?, 0, 0)", (source_id, file_name, file_ext, now))
         for page_name, rows in pages:
             conn.execute("INSERT INTO source_pages (source_id, page_name, row_count) VALUES (?, ?, ?)", (source_id, page_name, len(rows)))
@@ -341,7 +344,11 @@ def ingest_file(file_name: str, payload: bytes) -> dict:
             total_rows += len(rows)
         conn.execute("UPDATE source_files SET total_rows = ?, total_pages = ? WHERE source_id = ?", (total_rows, len(pages), source_id))
     invalidate_runtime_caches()
-    _sync_to_supabase_if_enabled(required=True)
+    _sync_source_to_supabase_if_enabled(
+        source_id=source_id,
+        removed_source_id=removed_source_id,
+        required=True,
+    )
     return {"source_id": source_id, "file_name": file_name, "total_rows": total_rows, "total_pages": len(pages), "pages": [name for name, _ in pages], "uploaded_at": now}
 
 def list_sources() -> list[dict]:

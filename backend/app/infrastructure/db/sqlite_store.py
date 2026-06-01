@@ -7,6 +7,7 @@ from ..supabase_sync import (
     fetch_dashboard_meta_state,
     hydrate_sqlite_from_supabase,
     is_supabase_enabled,
+    sync_source_to_supabase,
     sync_sqlite_to_supabase,
 )
 
@@ -104,6 +105,40 @@ def _sync_to_supabase_if_enabled(required: bool = False) -> bool:
         print(f"[Supabase] Sync failed: {exc}")
         if required:
             raise RuntimeError(f"Supabase sync failed: {exc}") from exc
+        return False
+
+
+def _sync_source_to_supabase_if_enabled(
+    source_id: str,
+    removed_source_id: str | None = None,
+    required: bool = False,
+) -> bool:
+    global _REMOTE_META_SIGNATURE
+
+    if not is_supabase_enabled():
+        return True
+    try:
+        ok = bool(
+            sync_source_to_supabase(
+                DB_PATH,
+                source_id=source_id,
+                removed_source_id=removed_source_id,
+            )
+        )
+        if ok:
+            remote_state = fetch_dashboard_meta_state() or {}
+            _REMOTE_META_SIGNATURE = (
+                str(remote_state.get("updated_at") or ""),
+                int(remote_state.get("row_count") or 0),
+                int(remote_state.get("source_count") or 0),
+            )
+        if required and not ok:
+            raise RuntimeError("Supabase source sync was not completed.")
+        return ok
+    except Exception as exc:
+        print(f"[Supabase] Source sync failed: {exc}")
+        if required:
+            raise RuntimeError(f"Supabase source sync failed: {exc}") from exc
         return False
 
 
