@@ -14,6 +14,7 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [firestoreError, setFirestoreError] = useState('');
   const [backendWarning, setBackendWarning] = useState('');
   const [debugFetchError, setDebugFetchError] = useState('');
 
@@ -71,6 +72,20 @@ export function useDashboardData() {
     selectedSegmentTypes: normalizedSelectedSegmentTypes,
   });
 
+  const buildFirestoreErrorMessage = (healthInfo) => {
+    const firestore = healthInfo?.firestore;
+    if (!firestore) return '';
+
+    const reason = String(firestore.error || firestore.reason || '').trim();
+    if (firestore.enabled && !firestore.clientReady) {
+      return `Firestore connection failed${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
+    }
+    if (firestore.configured && !firestore.enabled) {
+      return `Firestore configuration is invalid${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
+    }
+    return '';
+  };
+
   const loadDashboardPayload = async (options = {}) => {
     const payload = await fetchDashboardPayload(Boolean(options.includeDebug));
 
@@ -78,6 +93,7 @@ export function useDashboardData() {
     setPerformance(payload.performance);
     setGsheetConnections(payload.connections);
     setHealthInfo(payload.healthInfo);
+    setFirestoreError(buildFirestoreErrorMessage(payload.healthInfo));
 
     if (payload.healthError) {
       setBackendWarning(`Health error: ${payload.healthError}`);
@@ -129,6 +145,7 @@ export function useDashboardData() {
     loading,
     syncing,
     errorMessage,
+    firestoreError,
     backendWarning,
     debugFetchError,
     datePreset,

@@ -24,6 +24,66 @@ _COLLECTIONS = {
 
 _client = None
 _enabled_cache: bool | None = None
+_last_error: str = ""
+
+
+def _set_last_error(message: str) -> None:
+    global _last_error
+    _last_error = message.strip()
+
+
+def _clear_last_error() -> None:
+    global _last_error
+    _last_error = ""
+
+
+def _build_firestore_config() -> dict[str, Any]:
+    raw_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+    client_email = os.getenv("FIREBASE_CLIENT_EMAIL", "").strip()
+    private_key = os.getenv("FIREBASE_PRIVATE_KEY", "").strip()
+    env_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+
+    has_inline_json = bool(raw_json)
+    has_split_key = bool(client_email and private_key)
+    has_adc = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+    has_app = firebase_admin is not None and firestore is not None
+
+    json_error = ""
+    json_project_id = ""
+    if raw_json:
+        try:
+            payload = json.loads(raw_json)
+            json_project_id = str(payload.get("project_id") or "").strip()
+        except Exception as exc:
+            json_error = f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {exc}"
+
+    project_id = env_project_id or json_project_id
+    has_credentials = has_inline_json or has_split_key or has_adc
+    enabled = bool(has_app and bool(project_id) and has_credentials and not json_error)
+    configured = bool(has_credentials or env_project_id)
+
+    reasons: list[str] = []
+    if json_error:
+        reasons.append(json_error)
+    if not has_app:
+        reasons.append("firebase-admin package is not available in runtime")
+    if has_credentials and not project_id:
+        reasons.append("Missing FIREBASE_PROJECT_ID (or project_id in FIREBASE_SERVICE_ACCOUNT_JSON)")
+    if not has_credentials:
+        reasons.append(
+            "Missing Firebase credentials: set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY"
+        )
+
+    return {
+        "configured": configured,
+        "enabled": enabled,
+        "project_id": project_id,
+        "has_sdk": has_app,
+        "has_inline_json": has_inline_json,
+        "has_split_key": has_split_key,
+        "has_adc": has_adc,
+        "reason": "; ".join(reasons),
+    }
 
 
 def is_firestore_enabled() -> bool:
@@ -31,20 +91,17 @@ def is_firestore_enabled() -> bool:
     if _enabled_cache is not None:
         return _enabled_cache
 
-    has_inline_json = bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"))
-    has_split_key = bool(os.getenv("FIREBASE_CLIENT_EMAIL") and os.getenv("FIREBASE_PRIVATE_KEY"))
-    has_adc = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-    has_project = bool(os.getenv("FIREBASE_PROJECT_ID"))
-    has_app = firebase_admin is not None and firestore is not None
-
-    _enabled_cache = bool(has_app and has_project and (has_inline_json or has_split_key or has_adc))
+    _enabled_cache = bool(_build_firestore_config()["enabled"])
     return _enabled_cache
 
 
 def _get_service_account_dict() -> dict[str, Any] | None:
     raw_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
     if raw_json:
-        payload = json.loads(raw_json)
+        try:
+            payload = json.loads(raw_json)
+        except Exception as exc:
+            raise ValueError(f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {exc}") from exc
         if "private_key" in payload and isinstance(payload["private_key"], str):
             payload["private_key"] = payload["private_key"].replace("\\n", "\n")
         return payload
@@ -73,23 +130,65 @@ def _get_service_account_dict() -> dict[str, Any] | None:
     return None
 
 
+def get_firestore_status(probe_client: bool = True) -> dict[str, Any]:
+    config = _build_firestore_config()
+    status = {
+        "configured": bool(config["configured"]),
+        "enabled": bool(config["enabled"]),
+        "projectId": str(config["project_id"] or ""),
+        "clientReady": False,
+        "error": "",
+        "reason": str(config["reason"] or ""),
+    }
+
+    if not status["enabled"]:
+        if status["configured"] and status["reason"]:
+            status["error"] = status["reason"]
+        return status
+
+    if not probe_client:
+        status["clientReady"] = _client is not None
+        status["error"] = _last_error
+        return status
+
+    client = _get_client()
+    status["clientReady"] = client is not None
+    status["error"] = _last_error
+    return status
+
+
 def _get_client():
     global _client
     if _client is not None:
+        _clear_last_error()
         return _client
 
-    if not is_firestore_enabled():
+    config = _build_firestore_config()
+    if not config["enabled"]:
+        if config["configured"]:
+            _set_last_error(str(config["reason"] or "Firestore is not enabled due to invalid configuration"))
+        else:
+            _clear_last_error()
         return None
 
-    if not firebase_admin._apps:
-        service_account_dict = _get_service_account_dict()
-        if service_account_dict:
-            cred = credentials.Certificate(service_account_dict)
-            firebase_admin.initialize_app(cred, {"projectId": os.getenv("FIREBASE_PROJECT_ID")})
-        else:
-            firebase_admin.initialize_app(options={"projectId": os.getenv("FIREBASE_PROJECT_ID")})
+    project_id = str(config["project_id"] or os.getenv("FIREBASE_PROJECT_ID") or "").strip()
 
-    _client = firestore.client()
+    try:
+        if not firebase_admin._apps:
+            service_account_dict = _get_service_account_dict()
+            if service_account_dict:
+                cred = credentials.Certificate(service_account_dict)
+                firebase_admin.initialize_app(cred, {"projectId": project_id})
+            else:
+                firebase_admin.initialize_app(options={"projectId": project_id})
+
+        _client = firestore.client()
+        _clear_last_error()
+    except Exception as exc:
+        _client = None
+        _set_last_error(f"{type(exc).__name__}: {exc}")
+        return None
+
     return _client
 
 
@@ -98,7 +197,12 @@ def fetch_dashboard_meta_state() -> dict[str, Any] | None:
     if client is None:
         return None
 
-    doc = client.collection("dashboard_meta").document("state").get()
+    try:
+        doc = client.collection("dashboard_meta").document("state").get()
+    except Exception as exc:
+        _set_last_error(f"{type(exc).__name__}: {exc}")
+        raise
+
     if not doc.exists:
         return None
 
@@ -152,29 +256,35 @@ def sync_sqlite_to_firestore(db_path: Path) -> bool:
     finally:
         conn.close()
 
-    for table_name, collection_name in _COLLECTIONS.items():
-        docs = list(client.collection(collection_name).stream())
-        for doc_batch in _chunk([{"id": d.id} for d in docs], chunk_size=400):
-            batch = client.batch()
-            for ref in doc_batch:
-                batch.delete(client.collection(collection_name).document(ref["id"]))
-            batch.commit()
+    try:
+        for table_name, collection_name in _COLLECTIONS.items():
+            docs = list(client.collection(collection_name).stream())
+            for doc_batch in _chunk([{"id": d.id} for d in docs], chunk_size=400):
+                batch = client.batch()
+                for ref in doc_batch:
+                    batch.delete(client.collection(collection_name).document(ref["id"]))
+                batch.commit()
 
-        rows = tables[table_name]
-        for row_batch in _chunk(rows, chunk_size=350):
-            batch = client.batch()
-            for row in row_batch:
-                doc_id = _doc_id_for_row(table_name, row)
-                batch.set(client.collection(collection_name).document(doc_id), row)
-            batch.commit()
+            rows = tables[table_name]
+            for row_batch in _chunk(rows, chunk_size=350):
+                batch = client.batch()
+                for row in row_batch:
+                    doc_id = _doc_id_for_row(table_name, row)
+                    batch.set(client.collection(collection_name).document(doc_id), row)
+                batch.commit()
 
-    client.collection("dashboard_meta").document("state").set(
-        {
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "row_count": len(tables["unified_rows"]),
-            "source_count": len(tables["source_files"]),
-        }
-    )
+        client.collection("dashboard_meta").document("state").set(
+            {
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "row_count": len(tables["unified_rows"]),
+                "source_count": len(tables["source_files"]),
+            }
+        )
+    except Exception as exc:
+        _set_last_error(f"{type(exc).__name__}: {exc}")
+        raise
+
+    _clear_last_error()
     return True
 
 
@@ -232,13 +342,17 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
     if client is None:
         return False
 
-    source_docs = list(client.collection(_COLLECTIONS["source_files"]).stream())
+    try:
+        source_docs = list(client.collection(_COLLECTIONS["source_files"]).stream())
+        page_docs = list(client.collection(_COLLECTIONS["source_pages"]).stream())
+        row_docs = list(client.collection(_COLLECTIONS["unified_rows"]).stream())
+        connection_docs = list(client.collection(_COLLECTIONS["connected_sheets"]).stream())
+    except Exception as exc:
+        _set_last_error(f"{type(exc).__name__}: {exc}")
+        raise
+
     if not source_docs:
         return False
-
-    page_docs = list(client.collection(_COLLECTIONS["source_pages"]).stream())
-    row_docs = list(client.collection(_COLLECTIONS["unified_rows"]).stream())
-    connection_docs = list(client.collection(_COLLECTIONS["connected_sheets"]).stream())
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -340,4 +454,5 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
     finally:
         conn.close()
 
+    _clear_last_error()
     return True
