@@ -204,33 +204,17 @@
   </head>
   <body class="bg-[#fbfdff]">
     <div id="root">
-      <!-- Instant Skeleton UI (Visible during Babel compilation) -->
-      <div class="flex h-screen bg-[#fbfdff] overflow-hidden animate-pulse">
-        <div class="w-64 bg-white border-r border-[#d7e8f6] h-full hidden lg:block"></div>
-        <div class="flex-1 flex flex-col">
-          <div class="h-16 bg-white border-b border-[#d7e8f6] w-full"></div>
-          <div class="p-8 space-y-8">
-            <div class="h-10 bg-slate-200 rounded-lg w-1/4"></div>
-            <div class="grid grid-cols-5 gap-4">
-              <div class="h-32 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-              <div class="h-32 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-              <div class="h-32 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-              <div class="h-32 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-              <div class="h-32 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-            </div>
-            <div class="h-64 bg-white rounded-2xl border border-slate-100 shadow-sm w-full"></div>
-            <div class="grid grid-cols-5 gap-6">
-              <div class="col-span-2 h-96 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-              <div class="col-span-3 h-96 bg-white rounded-2xl border border-slate-100 shadow-sm"></div>
-            </div>
-          </div>
+      <div class="h-screen w-screen bg-[#fbfdff] flex items-center justify-center">
+        <div class="text-center">
+          <div class="mx-auto mb-3 h-9 w-9 rounded-full border-4 border-slate-200 border-t-[#00a4e4] animate-spin"></div>
+          <p class="text-sm font-semibold text-slate-600">Loading dashboard...</p>
         </div>
       </div>
     </div>
 
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="module">
-      const frontendBuildVersion = '20260531-dashboard-refactor-2';
+      const frontendBuildVersion = '20260601-initial-load-clean';
       const moduleCache = new Map();
       const relativeImportPattern = /(import\s+(?:[^'"]*?\s+from\s+)?|export\s+[^'"]*?\s+from\s+)(['"])(\.[^'"]+)\2/g;
 
