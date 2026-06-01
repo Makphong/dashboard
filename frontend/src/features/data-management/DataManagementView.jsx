@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle
+  UploadCloud, Link2, Plus, FileText, FileSpreadsheet, CheckCircle2, Trash2, AlertTriangle, Database
 } from 'lucide-react';
 import { toDisplayDate } from '../../lib/utils.js';
 
-export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectGSheet, onDisconnectGSheet, gsheetConnections, uploading, syncing }) => {
+export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onConnectGSheet, onDisconnectGSheet, gsheetConnections, uploading, syncing, healthInfo }) => {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [gsheetToDisconnect, setGsheetToDisconnect] = useState(null);
   const fileInputRef = useRef(null);
@@ -34,6 +34,18 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   const fileSources = sources.filter(s => s.type !== 'gsheet' && s.type !== '.gsheet');
   const totalRows = sources.reduce((sum, s) => sum + (Number(s.rows) || 0), 0);
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
+  const firestore = healthInfo?.firestore || null;
+  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady);
+  const cloudConfigured = Boolean(firestore?.configured);
+  const cloudStatusText = cloudConnected
+    ? 'Cloud DB Connected'
+    : (cloudConfigured ? 'Cloud DB Disconnected' : 'Cloud DB Not Configured');
+  const cloudStatusClass = cloudConnected
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : (cloudConfigured ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200');
+  const cloudDotClass = cloudConnected
+    ? 'bg-emerald-500'
+    : (cloudConfigured ? 'bg-red-500' : 'bg-slate-400');
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -58,6 +70,11 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Data Management</h1>
             <p className="text-slate-500 mt-1">Upload files or connect Google Sheets to consolidate all your data in one place.</p>
+          </div>
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold ${cloudStatusClass}`} title={String(firestore?.error || firestore?.reason || '')}>
+            <span className={`w-2 h-2 rounded-full ${cloudDotClass}`} />
+            <Database className="w-3.5 h-3.5" />
+            <span>{cloudStatusText}</span>
           </div>
         </div>
 

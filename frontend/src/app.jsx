@@ -38,6 +38,7 @@ function App() {
             gsheetConnections={dashboard.gsheetConnections}
             uploading={controller.uploading}
             syncing={dashboard.syncing}
+            healthInfo={dashboard.healthInfo}
           />
         ) : controller.activeView === 'system-performance' ? (
           <SystemPerformanceView segments={dashboard.ganttVisibleSegments} flowRows={dashboard.flowRows} />
