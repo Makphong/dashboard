@@ -17,6 +17,7 @@ export function useDashboardData() {
   const [firestoreError, setFirestoreError] = useState('');
   const [backendWarning, setBackendWarning] = useState('');
   const [debugFetchError, setDebugFetchError] = useState('');
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
 
   const [datePreset, setDatePreset] = usePersistentState('filter_datePreset', 'all');
   const [dateStart, setDateStart] = usePersistentState('filter_dateStart', '');
@@ -129,6 +130,7 @@ export function useDashboardData() {
     } finally {
       setLoading(false);
       if (!options.backgroundSync) setSyncing(false);
+      setIsInitialLoadDone(true);
     }
   };
 
@@ -148,6 +150,7 @@ export function useDashboardData() {
     firestoreError,
     backendWarning,
     debugFetchError,
+    isInitialLoadDone,
     datePreset,
     setDatePreset,
     dateStart,

@@ -14,6 +14,17 @@ function App() {
   const dashboard = useDashboardData();
   const controller = useAppController(dashboard);
 
+  if (!dashboard.isInitialLoadDone) {
+    return (
+      <div className="h-screen w-screen bg-[#fbfdff] flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-9 w-9 rounded-full border-4 border-slate-200 border-t-[#00a4e4] animate-spin" />
+          <p className="text-sm font-semibold text-slate-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <DashboardLayout dashboard={dashboard} controller={controller}>
