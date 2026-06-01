@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useAppController } from './hooks/useAppController.js';
 import { useDashboardData } from './hooks/useDashboardData.js';
@@ -13,6 +13,38 @@ import { SegmentDetailPopup } from './features/dashboard/components/SegmentDetai
 function App() {
   const dashboard = useDashboardData();
   const controller = useAppController(dashboard);
+  const getRotateNoticeState = () => {
+    const width = window.innerWidth || 0;
+    const height = window.innerHeight || 0;
+    return width <= 1024 && height > width;
+  };
+  const [showRotateNotice, setShowRotateNotice] = useState(getRotateNoticeState);
+
+  useEffect(() => {
+    const updateOrientationState = () => {
+      setShowRotateNotice(getRotateNoticeState());
+    };
+    updateOrientationState();
+    window.addEventListener('resize', updateOrientationState);
+    window.addEventListener('orientationchange', updateOrientationState);
+    return () => {
+      window.removeEventListener('resize', updateOrientationState);
+      window.removeEventListener('orientationchange', updateOrientationState);
+    };
+  }, []);
+
+  if (showRotateNotice) {
+    return (
+      <div className="h-screen w-screen bg-[#fbfdff] flex items-center justify-center p-6 text-center">
+        <div>
+          <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-[#e8f7fd] text-[#00a4e4] flex items-center justify-center">
+            <span className="text-2xl font-bold leading-none">↻</span>
+          </div>
+          <p className="text-base font-bold text-[#17335f]">กรุณาปรับจอเป็นแนวนอนก่อนใช้งาน</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!dashboard.isInitialLoadDone) {
     return (
