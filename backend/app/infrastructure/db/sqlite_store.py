@@ -3,15 +3,15 @@ from __future__ import annotations
 import sqlite3
 
 from ...config.constants.constants_paths import DB_PATH
-from ..firebase_sync import (
+from ..supabase_sync import (
     fetch_dashboard_meta_state,
-    hydrate_sqlite_from_firestore,
-    is_firestore_enabled,
-    sync_sqlite_to_firestore,
+    hydrate_sqlite_from_supabase,
+    is_supabase_enabled,
+    sync_sqlite_to_supabase,
 )
 
-_FIREBASE_BOOTSTRAPPED = False
-_FIRESTORE_META_SIGNATURE: tuple[str, int, int] | None = None
+_SUPABASE_BOOTSTRAPPED = False
+_REMOTE_META_SIGNATURE: tuple[str, int, int] | None = None
 
 
 def get_conn() -> sqlite3.Connection:
@@ -38,37 +38,37 @@ def current_unified_rows_signature(
             local_conn.close()
 
 
-def _bootstrap_from_firestore_if_needed() -> None:
-    global _FIREBASE_BOOTSTRAPPED, _FIRESTORE_META_SIGNATURE
-    if _FIREBASE_BOOTSTRAPPED:
+def _bootstrap_from_supabase_if_needed() -> None:
+    global _SUPABASE_BOOTSTRAPPED, _REMOTE_META_SIGNATURE
+    if _SUPABASE_BOOTSTRAPPED:
         return
-    if not is_firestore_enabled():
-        _FIREBASE_BOOTSTRAPPED = True
+    if not is_supabase_enabled():
+        _SUPABASE_BOOTSTRAPPED = True
         return
     try:
-        hydrate_sqlite_from_firestore(DB_PATH)
+        hydrate_sqlite_from_supabase(DB_PATH)
         remote_state = fetch_dashboard_meta_state() or {}
-        _FIRESTORE_META_SIGNATURE = (
+        _REMOTE_META_SIGNATURE = (
             str(remote_state.get("updated_at") or ""),
             int(remote_state.get("row_count") or 0),
             int(remote_state.get("source_count") or 0),
         )
     except Exception as exc:
-        print(f"[Firebase] Bootstrap skipped: {exc}")
+        print(f"[Supabase] Bootstrap skipped: {exc}")
     finally:
-        _FIREBASE_BOOTSTRAPPED = True
+        _SUPABASE_BOOTSTRAPPED = True
 
 
-def ensure_fresh_from_firestore_if_enabled() -> None:
-    global _FIRESTORE_META_SIGNATURE
+def ensure_fresh_from_supabase_if_enabled() -> None:
+    global _REMOTE_META_SIGNATURE
 
-    if not is_firestore_enabled():
+    if not is_supabase_enabled():
         return
 
     try:
         remote_state = fetch_dashboard_meta_state()
     except Exception as exc:
-        print(f"[Firebase] Metadata read skipped: {exc}")
+        print(f"[Supabase] Metadata read skipped: {exc}")
         return
 
     if not remote_state:
@@ -80,30 +80,30 @@ def ensure_fresh_from_firestore_if_enabled() -> None:
         int(remote_state.get("source_count") or 0),
     )
 
-    if _FIRESTORE_META_SIGNATURE == remote_signature:
+    if _REMOTE_META_SIGNATURE == remote_signature:
         return
 
     try:
-        hydrate_sqlite_from_firestore(DB_PATH)
+        hydrate_sqlite_from_supabase(DB_PATH)
     except Exception as exc:
-        print(f"[Firebase] Refresh hydrate skipped: {exc}")
+        print(f"[Supabase] Refresh hydrate skipped: {exc}")
         return
 
-    _FIRESTORE_META_SIGNATURE = remote_signature
+    _REMOTE_META_SIGNATURE = remote_signature
 
 
-def _sync_to_firestore_if_enabled(required: bool = False) -> bool:
-    if not is_firestore_enabled():
+def _sync_to_supabase_if_enabled(required: bool = False) -> bool:
+    if not is_supabase_enabled():
         return True
     try:
-        ok = bool(sync_sqlite_to_firestore(DB_PATH))
+        ok = bool(sync_sqlite_to_supabase(DB_PATH))
         if required and not ok:
-            raise RuntimeError("Firestore sync was not completed.")
+            raise RuntimeError("Supabase sync was not completed.")
         return ok
     except Exception as exc:
-        print(f"[Firebase] Sync failed: {exc}")
+        print(f"[Supabase] Sync failed: {exc}")
         if required:
-            raise RuntimeError(f"Firestore sync failed: {exc}") from exc
+            raise RuntimeError(f"Supabase sync failed: {exc}") from exc
         return False
 
 
@@ -154,4 +154,4 @@ def init_db() -> None:
             );
             """
         )
-    _bootstrap_from_firestore_if_needed()
+    _bootstrap_from_supabase_if_needed()

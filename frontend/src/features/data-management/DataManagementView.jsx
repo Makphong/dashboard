@@ -34,11 +34,10 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
   const fileSources = sources.filter(s => s.type !== 'gsheet' && s.type !== '.gsheet');
   const totalRows = sources.reduce((sum, s) => sum + (Number(s.rows) || 0), 0);
   const totalPages = sources.reduce((sum, s) => sum + (Number(s.pageCount) || 0), 0);
-  const firestore = healthInfo?.firestore || null;
-  const hasSyncError = Boolean(firestore?.lastSyncOk === false);
-  const syncConfirmed = Boolean(firestore?.lastSyncOk === true);
-  const cloudConnected = Boolean(firestore?.enabled && firestore?.clientReady && syncConfirmed && !hasSyncError);
-  const cloudConfigured = Boolean(firestore?.configured);
+  const supabase = healthInfo?.supabase || null;
+  const hasSyncError = Boolean(supabase?.lastSyncOk === false);
+  const cloudConnected = Boolean(supabase?.enabled && supabase?.clientReady && !hasSyncError);
+  const cloudConfigured = Boolean(supabase?.configured);
   const fileCloudStatusText = cloudConnected
     ? 'Cloud Synced'
     : (hasSyncError ? 'Cloud Sync Failed' : (cloudConfigured ? 'Cloud Ready' : 'Local Only'));
@@ -194,7 +193,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <div className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border ${fileCloudStatusClass}`} title={String(firestore?.lastSyncError || firestore?.error || firestore?.reason || '')}>
+                  <div className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full border ${fileCloudStatusClass}`} title={String(supabase?.lastSyncError || supabase?.error || supabase?.reason || '')}>
                     <CheckCircle2 className="w-4 h-4" />
                     {source.status || 'Active'} · {fileCloudStatusText}
                   </div>

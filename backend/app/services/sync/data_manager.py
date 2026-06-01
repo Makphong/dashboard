@@ -12,9 +12,10 @@ import datetime as dt
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import parse_qs, urlparse
 
-from ...config.constants.constants_paths import DB_PATH
-from ...infrastructure.db.sqlite_store import _sync_to_firestore_if_enabled, get_conn, current_unified_rows_signature
-from ...infrastructure.firebase_sync import is_firestore_enabled
+from ...infrastructure.db.sqlite_store import (
+    _sync_to_supabase_if_enabled,
+    get_conn,
+)
 from ..segmentation import engine as segmentation_engine
 from ..analytics import user_performance as analytics_service
 from ...infrastructure.parsers import tabular_parser
@@ -280,7 +281,7 @@ def connect_gsheet(url: str) -> dict:
             "INSERT INTO connected_sheets (connection_id, url, spreadsheet_id, label, connected_at, last_sync_at, last_sync_rows, last_sync_pages, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
             (connection_id, url, spreadsheet_id, label, now, now, result["total_rows"], result["total_pages"]),
         )
-    _sync_to_firestore_if_enabled(required=True)
+    _sync_to_supabase_if_enabled(required=True)
     return {"connection_id": connection_id, "spreadsheet_id": spreadsheet_id, "label": label, "total_rows": result["total_rows"], "total_pages": result["total_pages"], "connected_at": now}
 
 def sync_all_gsheets() -> list[dict]:
@@ -304,7 +305,7 @@ def sync_all_gsheets() -> list[dict]:
             results.append({"connection_id": connection_id, "status": "ok", "total_rows": result["total_rows"], "synced_at": now})
         except Exception as exc:
             results.append({"connection_id": connection_id, "status": "error", "error": str(exc)})
-    _sync_to_firestore_if_enabled(required=True)
+    _sync_to_supabase_if_enabled(required=True)
     return results
 
 def disconnect_gsheet(connection_id: str) -> None:
@@ -315,7 +316,7 @@ def disconnect_gsheet(connection_id: str) -> None:
             clear_source_by_file_name(conn, file_name)
         conn.execute("DELETE FROM connected_sheets WHERE connection_id = ?", (connection_id,))
     invalidate_runtime_caches()
-    _sync_to_firestore_if_enabled(required=True)
+    _sync_to_supabase_if_enabled(required=True)
 
 def list_gsheet_connections() -> list[dict]:
     with get_conn() as conn:
@@ -340,7 +341,7 @@ def ingest_file(file_name: str, payload: bytes) -> dict:
             total_rows += len(rows)
         conn.execute("UPDATE source_files SET total_rows = ?, total_pages = ? WHERE source_id = ?", (total_rows, len(pages), source_id))
     invalidate_runtime_caches()
-    _sync_to_firestore_if_enabled(required=True)
+    _sync_to_supabase_if_enabled(required=True)
     return {"source_id": source_id, "file_name": file_name, "total_rows": total_rows, "total_pages": len(pages), "pages": [name for name, _ in pages], "uploaded_at": now}
 
 def list_sources() -> list[dict]:
@@ -365,4 +366,4 @@ def delete_source(source_id: str) -> None:
         conn.execute("DELETE FROM source_pages WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
     invalidate_runtime_caches()
-    _sync_to_firestore_if_enabled(required=True)
+    _sync_to_supabase_if_enabled(required=True)

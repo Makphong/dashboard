@@ -61,7 +61,7 @@ export function DashboardLayout({
         )}
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 relative">
-          {dashboard.firestoreError && <div className="mb-4 p-4 bg-red-50 border border-red-300 text-red-800 rounded-xl">{dashboard.firestoreError}</div>}
+          {dashboard.supabaseError && <div className="mb-4 p-4 bg-red-50 border border-red-300 text-red-800 rounded-xl">{dashboard.supabaseError}</div>}
           {dashboard.errorMessage && <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl">{dashboard.errorMessage}</div>}
           {dashboard.backendWarning && <div className="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl">{dashboard.backendWarning}</div>}
           {children}

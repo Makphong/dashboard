@@ -14,7 +14,7 @@ export function useDashboardData() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [firestoreError, setFirestoreError] = useState('');
+  const [supabaseError, setSupabaseError] = useState('');
   const [backendWarning, setBackendWarning] = useState('');
   const [debugFetchError, setDebugFetchError] = useState('');
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
@@ -73,20 +73,20 @@ export function useDashboardData() {
     selectedSegmentTypes: normalizedSelectedSegmentTypes,
   });
 
-  const buildFirestoreErrorMessage = (healthInfo) => {
-    const firestore = healthInfo?.firestore;
-    if (!firestore) return '';
+  const buildSupabaseErrorMessage = (healthInfo) => {
+    const supabase = healthInfo?.supabase;
+    if (!supabase) return '';
 
-    const reason = String(firestore.error || firestore.reason || '').trim();
-    const syncError = String(firestore.lastSyncError || '').trim();
-    if (firestore.enabled && firestore.clientReady && firestore.lastSyncOk === false) {
-      return `Firestore sync failed${syncError ? `: ${syncError}` : ''}. Current data may disappear after server restart because only SQLite was updated.`;
+    const reason = String(supabase.error || supabase.reason || '').trim();
+    const syncError = String(supabase.lastSyncError || '').trim();
+    if (supabase.enabled && supabase.clientReady && supabase.lastSyncOk === false) {
+      return `Supabase sync failed${syncError ? `: ${syncError}` : ''}. Current data may disappear after server restart because only SQLite was updated.`;
     }
-    if (firestore.enabled && !firestore.clientReady) {
-      return `Firestore connection failed${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
+    if (supabase.enabled && !supabase.clientReady) {
+      return `Supabase connection failed${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
     }
-    if (firestore.configured && !firestore.enabled) {
-      return `Firestore configuration is invalid${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
+    if (supabase.configured && !supabase.enabled) {
+      return `Supabase configuration is invalid${reason ? `: ${reason}` : ''}. System is using SQLite fallback.`;
     }
     return '';
   };
@@ -98,7 +98,7 @@ export function useDashboardData() {
     setPerformance(payload.performance);
     setGsheetConnections(payload.connections);
     setHealthInfo(payload.healthInfo);
-    setFirestoreError(buildFirestoreErrorMessage(payload.healthInfo));
+    setSupabaseError(buildSupabaseErrorMessage(payload.healthInfo));
 
     if (payload.healthError) {
       setBackendWarning(`Health error: ${payload.healthError}`);
@@ -151,7 +151,7 @@ export function useDashboardData() {
     loading,
     syncing,
     errorMessage,
-    firestoreError,
+    supabaseError,
     backendWarning,
     debugFetchError,
     isInitialLoadDone,

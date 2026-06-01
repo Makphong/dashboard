@@ -1,4 +1,4 @@
-﻿# Dashboard (Vercel + Firebase Ready)
+﻿# Dashboard (Vercel + Supabase Ready)
 
 ## Project Structure 
 
@@ -10,7 +10,7 @@
 |     |- presentation/ # HTTP layer (Flask app, routes, auth, upload validation)
 |     |- application/  # Use-cases / orchestration
 |     |- config/       # Settings and constants
-|     |- infrastructure/ # SQLite, Firebase sync, parser, static/bundler adapters
+|     |- infrastructure/ # SQLite, Supabase sync, parser, static/bundler adapters
 |     `- services/     # Domain-oriented service modules
 |- docs/               # Documentation (.md files)
 |- frontend/
@@ -62,21 +62,19 @@ You can tune upload guards with env vars:
 - `DASHBOARD_MAX_UPLOAD_FILE_BYTES` (default: `10485760`)
 - `DASHBOARD_MAX_UPLOAD_FILES` (default: `10`)
 
-## Firebase Firestore Setup
+## Supabase Setup
 
 Set environment variables (see `.env.example`):
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_SERVICE_ACCOUNT_JSON` (recommended)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (recommended for backend writes)
+- optional: `SUPABASE_SCHEMA` (default `public`)
 
-Optional split keys:
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
-- `FIREBASE_PRIVATE_KEY_ID`
-- `FIREBASE_CLIENT_ID`
+Before first run, create the required tables in Supabase SQL Editor:
+- run [`docs/supabase_schema.sql`](docs/supabase_schema.sql)
 
-When Firebase env vars are present:
-- App loads persisted data from Firestore into local SQLite cache on startup.
-- Data changes are synced back to Firestore after upload/sync/delete actions.
+When Supabase env vars are present:
+- App loads persisted data from Supabase into local SQLite cache on startup.
+- Data changes are synced back to Supabase after upload/sync/delete actions.
 
 Default SQLite path is `data/local_dashboard.db` (with fallback to legacy `local_dashboard.db`).
 Set `LOCAL_DB_PATH` when you want to use another location.
@@ -85,7 +83,11 @@ Set `LOCAL_DB_PATH` when you want to use another location.
 
 1. Push repository to GitHub.
 2. Import project in Vercel.
-3. Add env vars from `.env.example` in Vercel Project Settings.
+3. Add env vars from `.env.example` in Vercel Project Settings:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - optional `SUPABASE_SCHEMA`
+   - optional `DASHBOARD_WRITE_TOKEN`
 4. Deploy.
 
 API endpoints stay under `/api/*`, and frontend is served from `/`.

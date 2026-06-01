@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlparse
 from ..config.constants.constants_paths import DB_PATH, PROJECT_ROOT
 from ..config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
 from ..infrastructure.db.sqlite_store import (
-    ensure_fresh_from_firestore_if_enabled,
+    ensure_fresh_from_supabase_if_enabled,
     init_db,
 )
 from ..infrastructure.parsers import tabular_parser
@@ -44,7 +44,7 @@ countable_segment_seconds = segmentation_engine.countable_segment_seconds
 normalize_text = segmentation_engine.normalize_text
 
 def refresh_runtime_data() -> None:
-    ensure_fresh_from_firestore_if_enabled()
+    ensure_fresh_from_supabase_if_enabled()
 
 
 # Analytics service exports

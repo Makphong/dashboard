@@ -1,28 +1,30 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
 import sqlite3
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-try:
-    import firebase_admin
-    from firebase_admin import credentials, firestore
-except Exception:  # pragma: no cover - optional runtime dependency
-    firebase_admin = None
-    credentials = None
-    firestore = None
-
-_COLLECTIONS = {
+_TABLES = {
     "source_files": "source_files",
     "source_pages": "source_pages",
     "unified_rows": "unified_rows",
     "connected_sheets": "connected_sheets",
 }
 
-_client = None
+_TABLE_DELETE_FILTERS = {
+    "source_files": ("source_id", "not.is.null"),
+    "source_pages": ("source_id", "not.is.null"),
+    "unified_rows": ("row_id", "not.is.null"),
+    "connected_sheets": ("connection_id", "not.is.null"),
+}
+
+_client_config: dict[str, Any] | None = None
 _enabled_cache: bool | None = None
 _last_error: str = ""
 
@@ -37,105 +39,56 @@ def _clear_last_error() -> None:
     _last_error = ""
 
 
-def _build_firestore_config() -> dict[str, Any]:
-    raw_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
-    client_email = os.getenv("FIREBASE_CLIENT_EMAIL", "").strip()
-    private_key = os.getenv("FIREBASE_PRIVATE_KEY", "").strip()
-    env_project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
+def _mark_sync_failure(message: str) -> None:
+    _set_last_error(message or "Supabase sync failed")
 
-    has_inline_json = bool(raw_json)
-    has_split_key = bool(client_email and private_key)
-    has_adc = bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-    has_app = firebase_admin is not None and firestore is not None
 
-    json_error = ""
-    json_project_id = ""
-    if raw_json:
-        try:
-            payload = json.loads(raw_json)
-            json_project_id = str(payload.get("project_id") or "").strip()
-        except Exception as exc:
-            json_error = f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {exc}"
+def _build_supabase_config() -> dict[str, Any]:
+    base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    service_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+        or os.getenv("SUPABASE_KEY", "").strip()
+    )
+    schema = os.getenv("SUPABASE_SCHEMA", "public").strip() or "public"
 
-    project_id = env_project_id or json_project_id
-    has_credentials = has_inline_json or has_split_key or has_adc
-    enabled = bool(has_app and bool(project_id) and has_credentials and not json_error)
-    configured = bool(has_credentials or env_project_id)
+    has_url = bool(base_url)
+    has_service_key = bool(service_key)
+    enabled = bool(has_url and has_service_key)
+    configured = bool(has_url or has_service_key)
 
     reasons: list[str] = []
-    if json_error:
-        reasons.append(json_error)
-    if not has_app:
-        reasons.append("firebase-admin package is not available in runtime")
-    if has_credentials and not project_id:
-        reasons.append("Missing FIREBASE_PROJECT_ID (or project_id in FIREBASE_SERVICE_ACCOUNT_JSON)")
-    if not has_credentials:
-        reasons.append(
-            "Missing Firebase credentials: set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY"
-        )
+    if not has_url:
+        reasons.append("Missing SUPABASE_URL")
+    if not has_service_key:
+        reasons.append("Missing SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)")
 
     return {
         "configured": configured,
         "enabled": enabled,
-        "project_id": project_id,
-        "has_sdk": has_app,
-        "has_inline_json": has_inline_json,
-        "has_split_key": has_split_key,
-        "has_adc": has_adc,
+        "base_url": base_url,
+        "rest_url": f"{base_url}/rest/v1" if base_url else "",
+        "service_key": service_key,
+        "schema": schema,
         "reason": "; ".join(reasons),
     }
 
 
-def is_firestore_enabled() -> bool:
+def is_supabase_enabled() -> bool:
     global _enabled_cache
     if _enabled_cache is not None:
         return _enabled_cache
 
-    _enabled_cache = bool(_build_firestore_config()["enabled"])
+    _enabled_cache = bool(_build_supabase_config()["enabled"])
     return _enabled_cache
 
 
-def _get_service_account_dict() -> dict[str, Any] | None:
-    raw_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
-    if raw_json:
-        try:
-            payload = json.loads(raw_json)
-        except Exception as exc:
-            raise ValueError(f"Invalid FIREBASE_SERVICE_ACCOUNT_JSON: {exc}") from exc
-        if "private_key" in payload and isinstance(payload["private_key"], str):
-            payload["private_key"] = payload["private_key"].replace("\\n", "\n")
-        return payload
-
-    client_email = os.getenv("FIREBASE_CLIENT_EMAIL", "").strip()
-    private_key = os.getenv("FIREBASE_PRIVATE_KEY", "").strip()
-    project_id = os.getenv("FIREBASE_PROJECT_ID", "").strip()
-    private_key_id = os.getenv("FIREBASE_PRIVATE_KEY_ID", "").strip()
-    client_id = os.getenv("FIREBASE_CLIENT_ID", "").strip()
-
-    if client_email and private_key and project_id:
-        return {
-            "type": "service_account",
-            "project_id": project_id,
-            "private_key_id": private_key_id,
-            "private_key": private_key.replace("\\n", "\n"),
-            "client_email": client_email,
-            "client_id": client_id,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}",
-            "universe_domain": "googleapis.com",
-        }
-
-    return None
-
-
-def get_firestore_status(probe_client: bool = True) -> dict[str, Any]:
-    config = _build_firestore_config()
+def get_supabase_status(probe_client: bool = True) -> dict[str, Any]:
+    config = _build_supabase_config()
     status = {
         "configured": bool(config["configured"]),
         "enabled": bool(config["enabled"]),
-        "projectId": str(config["project_id"] or ""),
+        "projectUrl": str(config["base_url"] or ""),
+        "schema": str(config["schema"] or "public"),
         "clientReady": False,
         "error": "",
         "reason": str(config["reason"] or ""),
@@ -147,7 +100,7 @@ def get_firestore_status(probe_client: bool = True) -> dict[str, Any]:
         return status
 
     if not probe_client:
-        status["clientReady"] = _client is not None
+        status["clientReady"] = _client_config is not None
         status["error"] = _last_error
         return status
 
@@ -157,39 +110,130 @@ def get_firestore_status(probe_client: bool = True) -> dict[str, Any]:
     return status
 
 
-def _get_client():
-    global _client
-    if _client is not None:
+def _get_client() -> dict[str, Any] | None:
+    global _client_config
+    if _client_config is not None:
         _clear_last_error()
-        return _client
+        return _client_config
 
-    config = _build_firestore_config()
+    config = _build_supabase_config()
     if not config["enabled"]:
         if config["configured"]:
-            _set_last_error(str(config["reason"] or "Firestore is not enabled due to invalid configuration"))
+            _set_last_error(str(config["reason"] or "Supabase is not enabled due to invalid configuration"))
         else:
             _clear_last_error()
         return None
 
-    project_id = str(config["project_id"] or os.getenv("FIREBASE_PROJECT_ID") or "").strip()
+    _client_config = {
+        "rest_url": str(config["rest_url"]),
+        "service_key": str(config["service_key"]),
+        "schema": str(config["schema"]),
+    }
+    _clear_last_error()
+    return _client_config
 
+
+def _supabase_request(
+    method: str,
+    path: str,
+    query: dict[str, str] | None = None,
+    payload: Any | None = None,
+    prefer: str | None = None,
+) -> Any:
+    client = _get_client()
+    if client is None:
+        raise RuntimeError(_last_error or "Supabase client is not ready")
+
+    base_url = str(client["rest_url"]).rstrip("/")
+    if query:
+        encoded_query = urllib.parse.urlencode(query, doseq=True, safe=",.()*")
+        url = f"{base_url}/{path}?{encoded_query}"
+    else:
+        url = f"{base_url}/{path}"
+
+    data: bytes | None = None
+    headers = {
+        "Accept": "application/json",
+        "apikey": str(client["service_key"]),
+        "Authorization": f"Bearer {client['service_key']}",
+        "Accept-Profile": str(client["schema"]),
+        "Content-Profile": str(client["schema"]),
+    }
+
+    if prefer:
+        headers["Prefer"] = prefer
+
+    if payload is not None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    request = urllib.request.Request(url, method=method, headers=headers, data=data)
     try:
-        if not firebase_admin._apps:
-            service_account_dict = _get_service_account_dict()
-            if service_account_dict:
-                cred = credentials.Certificate(service_account_dict)
-                firebase_admin.initialize_app(cred, {"projectId": project_id})
-            else:
-                firebase_admin.initialize_app(options={"projectId": project_id})
-
-        _client = firestore.client()
-        _clear_last_error()
+        with urllib.request.urlopen(request, timeout=45) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        message = f"Supabase {method} {path} failed ({exc.code}): {detail[:500]}"
+        _set_last_error(message)
+        raise RuntimeError(message) from exc
     except Exception as exc:
-        _client = None
-        _set_last_error(f"{type(exc).__name__}: {exc}")
+        message = f"Supabase {method} {path} failed: {type(exc).__name__}: {exc}"
+        _set_last_error(message)
+        raise RuntimeError(message) from exc
+
+    if not raw:
+        _clear_last_error()
         return None
 
-    return _client
+    try:
+        result = json.loads(raw.decode("utf-8"))
+    except Exception:
+        _clear_last_error()
+        return raw.decode("utf-8", errors="replace")
+
+    _clear_last_error()
+    return result
+
+
+def _fetch_table_rows(
+    conn: sqlite3.Connection, table_name: str, order_by: str | None = None
+) -> list[dict[str, Any]]:
+    query = f"SELECT * FROM {table_name}"
+    if order_by:
+        query = f"{query} ORDER BY {order_by}"
+    rows = conn.execute(query).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _chunk(items: list[dict[str, Any]], chunk_size: int = 300):
+    for idx in range(0, len(items), chunk_size):
+        yield items[idx : idx + chunk_size]
+
+
+def _fetch_all_rows(table_name: str, order: str | None = None) -> list[dict[str, Any]]:
+    page_size = 1000
+    offset = 0
+    rows: list[dict[str, Any]] = []
+
+    while True:
+        query = {
+            "select": "*",
+            "limit": str(page_size),
+            "offset": str(offset),
+        }
+        if order:
+            query["order"] = order
+        page = _supabase_request("GET", table_name, query=query) or []
+        if not isinstance(page, list):
+            raise RuntimeError(f"Unexpected Supabase response for table '{table_name}'")
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        offset += len(page)
+
+    return rows
 
 
 def fetch_dashboard_meta_state() -> dict[str, Any] | None:
@@ -198,15 +242,23 @@ def fetch_dashboard_meta_state() -> dict[str, Any] | None:
         return None
 
     try:
-        doc = client.collection("dashboard_meta").document("state").get()
+        rows = _supabase_request(
+            "GET",
+            "dashboard_meta_state",
+            query={
+                "select": "updated_at,row_count,source_count",
+                "id": "eq.state",
+                "limit": "1",
+            },
+        )
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
         raise
 
-    if not doc.exists:
+    if not rows:
         return None
 
-    payload = doc.to_dict() or {}
+    payload = rows[0] if isinstance(rows, list) else {}
     return {
         "updated_at": str(payload.get("updated_at") or ""),
         "row_count": int(payload.get("row_count") or 0),
@@ -214,35 +266,10 @@ def fetch_dashboard_meta_state() -> dict[str, Any] | None:
     }
 
 
-def _fetch_table_rows(conn: sqlite3.Connection, table_name: str, order_by: str | None = None) -> list[dict[str, Any]]:
-    query = f"SELECT * FROM {table_name}"
-    if order_by:
-        query = f"{query} ORDER BY {order_by}"
-    rows = conn.execute(query).fetchall()
-    return [dict(row) for row in rows]
-
-
-def _chunk(items: list[dict[str, Any]], chunk_size: int = 400):
-    for idx in range(0, len(items), chunk_size):
-        yield items[idx : idx + chunk_size]
-
-
-def _doc_id_for_row(table_name: str, row: dict[str, Any]) -> str:
-    if table_name == "source_files":
-        return str(row["source_id"])
-    if table_name == "source_pages":
-        return f"{row['source_id']}::{row['page_name']}"
-    if table_name == "unified_rows":
-        return str(row["row_id"])
-    if table_name == "connected_sheets":
-        return str(row["connection_id"])
-    raise ValueError(f"Unsupported table: {table_name}")
-
-
-def sync_sqlite_to_firestore(db_path: Path) -> bool:
+def sync_sqlite_to_supabase(db_path: Path) -> bool:
     client = _get_client()
     if client is None:
-        error_message = _last_error or "Firestore client is not ready"
+        error_message = _last_error or "Supabase client is not ready"
         _mark_sync_failure(error_message)
         return False
 
@@ -253,34 +280,44 @@ def sync_sqlite_to_firestore(db_path: Path) -> bool:
             "source_files": _fetch_table_rows(conn, "source_files", "uploaded_at DESC"),
             "source_pages": _fetch_table_rows(conn, "source_pages"),
             "unified_rows": _fetch_table_rows(conn, "unified_rows", "row_id ASC"),
-            "connected_sheets": _fetch_table_rows(conn, "connected_sheets", "connected_at DESC"),
+            "connected_sheets": _fetch_table_rows(
+                conn, "connected_sheets", "connected_at DESC"
+            ),
         }
     finally:
         conn.close()
 
     try:
-        for table_name, collection_name in _COLLECTIONS.items():
-            docs = list(client.collection(collection_name).stream())
-            for doc_batch in _chunk([{"id": d.id} for d in docs], chunk_size=400):
-                batch = client.batch()
-                for ref in doc_batch:
-                    batch.delete(client.collection(collection_name).document(ref["id"]))
-                batch.commit()
+        for table_name, remote_table in _TABLES.items():
+            filter_name, filter_value = _TABLE_DELETE_FILTERS[table_name]
+            _supabase_request(
+                "DELETE",
+                remote_table,
+                query={filter_name: filter_value},
+                prefer="return=minimal",
+            )
 
             rows = tables[table_name]
-            for row_batch in _chunk(rows, chunk_size=350):
-                batch = client.batch()
-                for row in row_batch:
-                    doc_id = _doc_id_for_row(table_name, row)
-                    batch.set(client.collection(collection_name).document(doc_id), row)
-                batch.commit()
+            for row_batch in _chunk(rows, chunk_size=300):
+                _supabase_request(
+                    "POST",
+                    remote_table,
+                    payload=row_batch,
+                    prefer="resolution=merge-duplicates,return=minimal",
+                )
 
-        client.collection("dashboard_meta").document("state").set(
-            {
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "row_count": len(tables["unified_rows"]),
-                "source_count": len(tables["source_files"]),
-            }
+        _supabase_request(
+            "POST",
+            "dashboard_meta_state",
+            payload=[
+                {
+                    "id": "state",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "row_count": len(tables["unified_rows"]),
+                    "source_count": len(tables["source_files"]),
+                }
+            ],
+            prefer="resolution=merge-duplicates,return=minimal",
         )
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
@@ -339,21 +376,23 @@ def _create_empty_schema(conn: sqlite3.Connection) -> None:
     )
 
 
-def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
+def hydrate_sqlite_from_supabase(db_path: Path) -> bool:
     client = _get_client()
     if client is None:
         return False
 
     try:
-        source_docs = list(client.collection(_COLLECTIONS["source_files"]).stream())
-        page_docs = list(client.collection(_COLLECTIONS["source_pages"]).stream())
-        row_docs = list(client.collection(_COLLECTIONS["unified_rows"]).stream())
-        connection_docs = list(client.collection(_COLLECTIONS["connected_sheets"]).stream())
+        source_rows = _fetch_all_rows(_TABLES["source_files"], order="uploaded_at.desc")
+        page_rows = _fetch_all_rows(_TABLES["source_pages"])
+        unified_rows = _fetch_all_rows(_TABLES["unified_rows"], order="row_id.asc")
+        connection_rows = _fetch_all_rows(
+            _TABLES["connected_sheets"], order="connected_at.desc"
+        )
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
         raise
 
-    if not source_docs:
+    if not source_rows:
         return False
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -369,8 +408,7 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
             """
         )
 
-        for doc in source_docs:
-            row = doc.to_dict() or {}
+        for row in source_rows:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO source_files (source_id, file_name, file_ext, uploaded_at, total_rows, total_pages)
@@ -386,8 +424,7 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
                 ),
             )
 
-        for doc in page_docs:
-            row = doc.to_dict() or {}
+        for row in page_rows:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO source_pages (source_id, page_name, row_count)
@@ -400,8 +437,7 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
                 ),
             )
 
-        for doc in row_docs:
-            row = doc.to_dict() or {}
+        for row in unified_rows:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO unified_rows (row_id, source_id, file_name, page_name, row_number, data_json, ingested_at)
@@ -418,8 +454,7 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
                 ),
             )
 
-        for doc in connection_docs:
-            row = doc.to_dict() or {}
+        for row in connection_rows:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO connected_sheets (
@@ -449,7 +484,6 @@ def hydrate_sqlite_from_firestore(db_path: Path) -> bool:
                 (max_row_id,),
             )
         except sqlite3.OperationalError:
-            # sqlite_sequence might not exist yet in some SQLite builds.
             pass
 
         conn.commit()
