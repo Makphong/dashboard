@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
 import { usePersistentState } from '../../hooks/usePersistentState.js';
-import { FileSpreadsheet, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
+import { FileSpreadsheet, FileText, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { DonutWorkloadChart } from '../charts/DonutWorkloadChart.jsx';
@@ -271,7 +271,10 @@ export const DashboardView = React.memo(({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-3">
           <div className="absolute right-4 top-4 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => setExpandedVisualizationId('donut')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
+            <button onClick={() => setExpandedVisualizationId('donut-detail')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white" title="View details">
+              <FileText className="w-4 h-4" />
+            </button>
+            <button onClick={() => setExpandedVisualizationId('donut')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white" title="Full view"><Maximize2 className="w-4 h-4" /></button>
           </div>
           <h2 className="text-lg font-bold mb-4 text-[#17335f]">User Share</h2>
           <div className="flex-1 min-h-0">
