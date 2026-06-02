@@ -303,6 +303,7 @@ export const DashboardView = React.memo(({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-bold text-[#17335f]">Time Breakdown</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => setExpandedVisualizationId('process-breakdown-detail')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white" title="View details"><FileText className="w-4 h-4" /></button>
               <div className="relative" ref={processFilterRef}>
                 <button onClick={() => setShowProcessFilterMenu(!showProcessFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showProcessFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
                 {showProcessFilterMenu && (
