@@ -30,7 +30,7 @@ export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, t
         </div>
         {!isCollapsed && (
           <span className="text-2xl font-extrabold tracking-tight text-[#17335f] transition-opacity duration-300 opacity-100">
-            Analytics
+            Audit Log
           </span>
         )}
       </div>
