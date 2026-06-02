@@ -164,6 +164,67 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
     .filter((group) => group.totalSeconds > 0);
 }
 
+function buildTransitionBreakdownGroups(segments) {
+  const sourceSegments = Array.isArray(segments) ? segments : [];
+  const groupsByKey = new Map([
+    ['after-processing', { key: 'after-processing', label: 'After Processing', colorClass: 'bg-[#dbeafe] text-[#1d4ed8]', dotClass: 'bg-[#3b82f6]', activities: [], totalSeconds: 0 }],
+    ['after-reprocessing', { key: 'after-reprocessing', label: 'After Reprocessing', colorClass: 'bg-[#e0e7ff] text-[#4338ca]', dotClass: 'bg-[#6366f1]', activities: [], totalSeconds: 0 }],
+    ['between-review-edit', { key: 'between-review-edit', label: 'Between Review & Edit', colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]', activities: [], totalSeconds: 0 }],
+  ]);
+
+  const segmentGroups = new Map();
+  sourceSegments.forEach((segment) => {
+    if (!segmentGroups.has(segment.sheetKey)) segmentGroups.set(segment.sheetKey, []);
+    segmentGroups.get(segment.sheetKey).push(segment);
+  });
+
+  segmentGroups.forEach((items) => {
+    const sorted = [...items].sort((a, b) => a.startTs - b.startTs);
+    for (let i = 1; i < sorted.length; i += 1) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      const prevDrill = toDrillGroup(prev.segmentType);
+      const currDrill = toDrillGroup(curr.segmentType);
+      if (currDrill !== 'Idle') continue;
+
+      let groupKey = '';
+      if (prevDrill === 'Processing') {
+        groupKey = 'after-processing';
+      } else if (prevDrill === 'Reprocessing') {
+        groupKey = 'after-reprocessing';
+      } else if (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading') {
+        const hasFutureAction = sorted.slice(i + 1).some((s) => {
+          const dg = toDrillGroup(s.segmentType);
+          return dg === 'Review' || dg === 'Edit';
+        });
+        if (hasFutureAction) groupKey = 'between-review-edit';
+      }
+      if (!groupKey) continue;
+
+      const group = groupsByKey.get(groupKey);
+      const durationSeconds = Number(curr.durationSeconds) || 0;
+      group.activities.push({
+        id: curr.id || `${groupKey}-${curr.startTs}`,
+        activity: toGanttSegmentTypeLabel(curr.segmentType),
+        start: curr.start,
+        end: curr.end,
+        startTs: curr.startTs,
+        durationSeconds,
+        documentLabel: curr.documentLabel,
+      });
+      group.totalSeconds += durationSeconds;
+    }
+  });
+
+  return Array.from(groupsByKey.values())
+    .map((group) => ({
+      ...group,
+      averageSeconds: group.activities.length > 0 ? group.totalSeconds / group.activities.length : 0,
+      activities: group.activities.slice().sort((a, b) => a.startTs - b.startTs),
+    }))
+    .filter((group) => group.activities.length > 0);
+}
+
 const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
   const [openUser, setOpenUser] = React.useState('');
   const [contentHeight, setContentHeight] = React.useState(0);
@@ -594,6 +655,122 @@ const TimeBreakdownDetailView = React.memo(({
   );
 });
 
+const TransitionBreakdownDetailView = React.memo(({ segments }) => {
+  const [openGroup, setOpenGroup] = React.useState('');
+  const [contentHeight, setContentHeight] = React.useState(0);
+  const contentRef = React.useRef(null);
+
+  const groups = React.useMemo(() => buildTransitionBreakdownGroups(segments), [segments]);
+
+  React.useLayoutEffect(() => {
+    if (!openGroup) {
+      setContentHeight(0);
+      return;
+    }
+    const measure = () => setContentHeight(contentRef.current?.scrollHeight || 0);
+    measure();
+    if (typeof ResizeObserver === 'undefined' || !contentRef.current) return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [openGroup]);
+
+  if (groups.length === 0) {
+    return (
+      <div className="min-h-[320px] flex items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50 text-slate-500">
+        No transition breakdown details available for the current filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {groups.map((group, index) => {
+        const isOpen = openGroup === group.key;
+        return (
+          <section key={group.key} className="overflow-hidden rounded-[1.5rem] bg-white">
+            <button
+              type="button"
+              onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
+              className="flex w-full flex-col gap-3 border-b border-slate-200 px-5 py-4 text-left md:flex-row md:items-center md:justify-between"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${group.colorClass}`}>
+                  <span className={`h-2.5 w-2.5 rounded-full ${group.dotClass}`} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Group {index + 1}</div>
+                  <div className="truncate text-xl font-bold text-[#17335f]">{group.label}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-start md:self-auto">
+                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
+                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Average</div>
+                    <div className="text-base font-bold text-[#17335f]">{formatDuration(group.averageSeconds)}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
+                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Total Time</div>
+                    <div className="text-base font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
+                  </div>
+                </div>
+                <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            <div
+              className={`overflow-hidden transition-all ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? 'translate-y-0 duration-500' : '-translate-y-1 duration-300'}`}
+              style={{ height: isOpen ? `${contentHeight}px` : '0px' }}
+            >
+              <div ref={isOpen ? contentRef : null} className="overflow-x-auto border-t border-slate-200" style={{ contain: 'layout paint' }}>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-white">
+                    <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      <th className="px-5 py-3">Activity</th>
+                      <th className="px-5 py-3">Start</th>
+                      <th className="px-5 py-3">End</th>
+                      <th className="px-5 py-3">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.activities.map((activity) => (
+                      <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-[#17335f]">{activity.activity}</div>
+                          {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
+                        </td>
+                        <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(activity.start)}</td>
+                        <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(activity.end)}</td>
+                        <td className="px-5 py-4 font-bold text-[#17335f]">{formatDuration(activity.durationSeconds)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-slate-200 bg-slate-50/70">
+                      <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                      <td className="px-5 py-4" />
+                      <td className="px-5 py-4" />
+                      <td className="px-5 py-4 text-sm font-bold text-[#17335f]">
+                        {formatDuration(group.totalSeconds)}
+                        <span className="ml-2 text-xs font-semibold text-slate-500">/ {group.activities.length}</span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+});
+
 export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose, data }) => {
   if (!visualizationId) return null;
 
@@ -603,6 +780,8 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       ? 'User Breakdown Details'
       : visualizationId === 'process-breakdown-detail'
         ? 'Time Breakdown Details'
+        : visualizationId === 'matrix-detail'
+          ? 'Average Transition Time Details'
       : 'Full View Analysis';
   const modalSubtitle = visualizationId === 'donut-detail'
     ? 'User Activity Timeline'
@@ -610,6 +789,8 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       ? 'Review And Edit Summary'
       : visualizationId === 'process-breakdown-detail'
         ? 'Grouped By Y-Axis Labels'
+        : visualizationId === 'matrix-detail'
+          ? 'Average Transition Source Rows'
       : 'Advanced Visualization';
 
   const {
@@ -754,6 +935,9 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
               showProcessBreakdownIdle={showProcessBreakdownIdle}
               mergeReviewAndEdit={mergeReviewAndEdit}
             />
+          )}
+          {visualizationId === 'matrix-detail' && (
+            <TransitionBreakdownDetailView segments={processBreakdownSegments || ganttVisibleSegments} />
           )}
           {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
           {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
