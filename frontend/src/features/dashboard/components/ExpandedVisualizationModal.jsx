@@ -54,14 +54,22 @@ function buildUserGroups(segments, workloadVisibleRows) {
 
 const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
   const [openUser, setOpenUser] = React.useState('');
-  let userGroups = [];
-  let renderError = '';
+  const [contentHeight, setContentHeight] = React.useState(0);
+  const contentRef = React.useRef(null);
 
-  try {
-    userGroups = buildUserGroups(segments, workloadVisibleRows);
-  } catch (error) {
-    renderError = error instanceof Error ? error.message : String(error);
-  }
+  const { userGroups, renderError } = React.useMemo(() => {
+    try {
+      return {
+        userGroups: buildUserGroups(segments, workloadVisibleRows),
+        renderError: '',
+      };
+    } catch (error) {
+      return {
+        userGroups: [],
+        renderError: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }, [segments, workloadVisibleRows]);
 
   if (renderError) {
     return (
@@ -82,6 +90,28 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
   const toggleUser = (user) => {
     setOpenUser((current) => (current === user ? '' : user));
   };
+
+  React.useLayoutEffect(() => {
+    if (!openUser) {
+      setContentHeight(0);
+      return;
+    }
+
+    const measure = () => {
+      const nextHeight = contentRef.current?.scrollHeight || 0;
+      setContentHeight(nextHeight);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined' || !contentRef.current) return undefined;
+
+    const observer = new ResizeObserver(() => {
+      measure();
+    });
+    observer.observe(contentRef.current);
+    return () => observer.disconnect();
+  }, [openUser]);
 
   return (
     <div className="space-y-6">
@@ -116,11 +146,16 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
           <div
             className={`overflow-hidden transition-all ease-[cubic-bezier(0.22,1,0.36,1)] ${
               openUser === group.user
-                ? 'max-h-[1200px] translate-y-0 duration-[2000ms]'
-                : 'max-h-0 -translate-y-1 duration-500'
+                ? 'translate-y-0 duration-[2000ms]'
+                : '-translate-y-1 duration-500'
             }`}
+            style={{ height: openUser === group.user ? `${contentHeight}px` : '0px' }}
           >
-            <div className="overflow-x-auto border-t border-slate-200">
+            <div
+              ref={openUser === group.user ? contentRef : null}
+              className="overflow-x-auto border-t border-slate-200"
+              style={{ contain: 'layout paint' }}
+            >
               <table className="min-w-full text-sm">
                 <thead className="bg-white">
                   <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
