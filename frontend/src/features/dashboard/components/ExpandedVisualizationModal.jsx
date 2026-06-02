@@ -802,6 +802,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
     workloadVisibleRows,
     contributionRows,
     mergeReviewAndEdit,
+    timelineSettings,
   } = data;
 
   const processBreakdownData = React.useMemo(() => {
@@ -917,7 +918,18 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
           <button onClick={onClose} className="p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all hover:rotate-90 duration-300"><X className="w-8 h-8" /></button>
         </div>
         <div className="flex-1 overflow-auto p-6 md:p-10 no-scrollbar">
-          {visualizationId === 'gantt' && <GanttTimelineChart segments={ganttVisibleSegments} expanded />}
+          {visualizationId === 'gantt' && (
+            <GanttTimelineChart
+              segments={ganttVisibleSegments}
+              expanded
+              singleLane={timelineSettings?.singleLane}
+              showSystemLane={timelineSettings?.showSystemLane}
+              showIdleLane={timelineSettings?.showIdleLane}
+              showStarMarkers={timelineSettings?.showStarMarkers}
+              collapseGaps={timelineSettings?.collapseGaps}
+              showGanttLegend={timelineSettings?.showGanttLegend}
+            />
+          )}
           {visualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView

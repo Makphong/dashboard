@@ -33,6 +33,11 @@ export function useAppController(dashboard) {
   const [showProcessBreakdownIdle, setShowProcessBreakdownIdle] = usePersistentState('filter_showProcessBreakdownIdle', true);
   const [showProcessBreakdownLabels, setShowProcessBreakdownLabels] = usePersistentState('filter_showProcessBreakdownLabels', true);
   const [mergeReviewAndEdit, setMergeReviewAndEdit] = usePersistentState('chart_mergeReviewAndEdit', true);
+  const [ganttSingleLaneMode, setGanttSingleLaneMode] = usePersistentState('filter_ganttSingleLaneMode', false);
+  const [showSystemLane, setShowSystemLane] = usePersistentState('filter_showSystemLane', true);
+  const [showStarMarkers, setShowStarMarkers] = usePersistentState('filter_showStarMarkers', true);
+  const [ganttCollapseGaps, setGanttCollapseGaps] = usePersistentState('filter_ganttCollapseGaps', false);
+  const [showGanttLegend, setShowGanttLegend] = usePersistentState('filter_showGanttLegend', true);
 
   const workloadVisibleRows = useMemo(() => {
     const filtered = workloadContributors.filter((row) => showWorkloadSystem || row.user !== 'System');
@@ -156,6 +161,16 @@ export function useAppController(dashboard) {
     setShowProcessBreakdownLabels,
     mergeReviewAndEdit,
     setMergeReviewAndEdit,
+    ganttSingleLaneMode,
+    setGanttSingleLaneMode,
+    showSystemLane,
+    setShowSystemLane,
+    showStarMarkers,
+    setShowStarMarkers,
+    ganttCollapseGaps,
+    setGanttCollapseGaps,
+    showGanttLegend,
+    setShowGanttLegend,
     workloadVisibleRows,
     handleUploadFiles,
     handleDeleteSource,

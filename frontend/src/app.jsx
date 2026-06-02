@@ -84,6 +84,15 @@ function App() {
             setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
             mergeReviewAndEdit={controller.mergeReviewAndEdit}
             setMergeReviewAndEdit={controller.setMergeReviewAndEdit}
+            ganttSingleLaneMode={controller.ganttSingleLaneMode}
+            setGanttSingleLaneMode={controller.setGanttSingleLaneMode}
+            showSystemLane={controller.showSystemLane}
+            setShowSystemLane={controller.setShowSystemLane}
+            showStarMarkers={controller.showStarMarkers}
+            ganttCollapseGaps={controller.ganttCollapseGaps}
+            setGanttCollapseGaps={controller.setGanttCollapseGaps}
+            showGanttLegend={controller.showGanttLegend}
+            setShowGanttLegend={controller.setShowGanttLegend}
             setSelectedGanttSegment={controller.setSelectedGanttSegment}
             setExpandedVisualizationId={controller.setExpandedVisualizationId}
             setShowExportConfirm={controller.setShowExportConfirm}
@@ -107,6 +116,14 @@ function App() {
           workloadVisibleRows: controller.workloadVisibleRows,
           contributionRows: dashboard.contributionRows,
           mergeReviewAndEdit: controller.mergeReviewAndEdit,
+          timelineSettings: {
+            singleLane: controller.ganttSingleLaneMode,
+            showSystemLane: controller.showSystemLane,
+            showIdleLane: dashboard.showIdle,
+            showStarMarkers: controller.showStarMarkers,
+            collapseGaps: controller.ganttCollapseGaps,
+            showGanttLegend: controller.showGanttLegend,
+          },
         }}
       />
       <ExportConfirmModal
