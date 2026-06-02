@@ -79,15 +79,16 @@ export const DashboardView = React.memo(({
       const mergedReviewEdit = totals.Review + totals.Edit;
       items = [
         { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
-        { label: 'Processing', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
-        { label: 'Reprocess', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
-        { label: 'Review And Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
+        { label: 'First Spread', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
+        { label: 'Second Spread', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+        { label: 'Review & Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
       ];
     } else {
+      const labelMap = { Processing: 'First Spread', Reprocess: 'Second Spread' };
       items = Object.entries(totals)
         .filter(([label]) => label !== 'Idle')
         .map(([label, seconds]) => ({
-          label,
+          label: labelMap[label] || label,
           seconds,
           color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
         }));
@@ -147,9 +148,9 @@ export const DashboardView = React.memo(({
     });
 
     return [
-      { label: 'After Processing', seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0, totalSeconds: idleAfterProcess, color: '#3b82f6' },
-      { label: 'After Reprocessing', seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0, totalSeconds: idleAfterReprocess, color: '#6366f1' },
-      { label: 'Between Review And Edit', seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0, totalSeconds: idleBetweenActions, color: '#f59e0b' }
+      { label: 'First Spread', seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0, totalSeconds: idleAfterProcess, color: '#3b82f6' },
+      { label: 'Second Spread', seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0, totalSeconds: idleAfterReprocess, color: '#6366f1' },
+      { label: 'Review & Edit', seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0, totalSeconds: idleBetweenActions, color: '#f59e0b' }
     ];
   }, [filteredBaseSegments]);
 
@@ -316,7 +317,7 @@ export const DashboardView = React.memo(({
 
         <div className="bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb flex flex-col min-h-[400px] relative group animate-stagger-4">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-[#17335f]">Average Transition Time</h2>
+            <h2 className="text-lg font-bold text-[#17335f]">Average Transition Time Breakdown</h2>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => setExpandedVisualizationId('matrix')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><Maximize2 className="w-4 h-4" /></button>
             </div>
