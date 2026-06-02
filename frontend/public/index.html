@@ -8,13 +8,13 @@
     <link rel="preconnect" href="https://d3js.org" crossorigin>
     <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <link rel="preconnect" href="https://esm.sh" crossorigin>
+    <link rel="preload" href="https://unpkg.com/@babel/standalone/babel.min.js" as="script" crossorigin>
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
     <link rel="icon" type="image/svg+xml" href="/krung-thai-bank-logo.svg?v=2" />
     <link rel="shortcut icon" href="/krung-thai-bank-logo.svg?v=2" />
     <link rel="preload" href="/fonts/Krungthai.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="preload" href="/fonts/Krungthai-Bold.ttf" as="font" type="font/ttf" crossorigin>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
       @font-face {
         font-family: "Krungthai Fast Regular";
@@ -215,64 +215,81 @@
         </div>
       </div>
     </div>
-
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="module">
-      const frontendBuildVersion = '20260602-user-share-detail-2';
-      const moduleCache = new Map();
-      const relativeImportPattern = /(import\s+(?:[^'"]*?\s+from\s+)?|export\s+[^'"]*?\s+from\s+)(['"])(\.[^'"]+)\2/g;
+      const frontendBuildVersion = '__FRONTEND_BUILD_VERSION__';
+      const frontendBundleUrl = `/frontend/src/app.jsx?v=${encodeURIComponent(frontendBuildVersion)}`;
+      const transpiledBundleCacheKey = `frontend-transpiled:${frontendBuildVersion}`;
+      let babelLoaderPromise;
 
-      function withBuildVersion(url) {
-        const parsedUrl = new URL(url, window.location.href);
-        if (parsedUrl.origin === window.location.origin && parsedUrl.pathname.includes('/frontend/src/')) {
-          parsedUrl.searchParams.set('v', frontendBuildVersion);
+      function createBlobModuleUrl(source) {
+        return URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+      }
+
+      function readCachedTranspiledBundle() {
+        try {
+          return window.localStorage.getItem(transpiledBundleCacheKey);
+        } catch (error) {
+          console.warn('Unable to read transpiled bundle cache.', error);
+          return null;
         }
-        return parsedUrl.href;
       }
 
-      async function loadJsxModule(url) {
-        const normalizedUrl = withBuildVersion(url);
-        if (moduleCache.has(normalizedUrl)) return moduleCache.get(normalizedUrl);
-
-        const modulePromise = (async () => {
-          const response = await fetch(normalizedUrl);
-          if (!response.ok) throw new Error(`Failed to load module ${normalizedUrl}: ${response.status}`);
-
-          let source = await response.text();
-          const dependencies = [];
-          source.replace(relativeImportPattern, (match, prefix, quote, specifier) => {
-            dependencies.push({
-              match,
-              replacementPrefix: prefix,
-              quote,
-              specifier,
-              url: withBuildVersion(new URL(specifier, normalizedUrl)),
-            });
-            return match;
-          });
-
-          for (const dependency of dependencies) {
-            const dependencyBlobUrl = await loadJsxModule(dependency.url);
-            source = source.replace(
-              dependency.match,
-              `${dependency.replacementPrefix}${dependency.quote}${dependencyBlobUrl}${dependency.quote}`
-            );
-          }
-
-          const transformed = Babel.transform(source, {
-            presets: ['react'],
-            sourceType: 'module',
-            filename: normalizedUrl,
-          }).code;
-          return URL.createObjectURL(new Blob([transformed], { type: 'text/javascript' }));
-        })();
-
-        moduleCache.set(normalizedUrl, modulePromise);
-        return modulePromise;
+      function writeCachedTranspiledBundle(source) {
+        try {
+          window.localStorage.setItem(transpiledBundleCacheKey, source);
+        } catch (error) {
+          console.warn('Unable to store transpiled bundle cache.', error);
+        }
       }
 
-      loadJsxModule(new URL('/frontend/src/app.jsx', window.location.href))
-        .then((entryUrl) => import(entryUrl))
+      function loadExternalScript(src) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.async = true;
+          script.crossOrigin = 'anonymous';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error(`Failed to load script ${src}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      async function ensureBabelLoaded() {
+        if (window.Babel) return window.Babel;
+        if (!babelLoaderPromise) {
+          babelLoaderPromise = loadExternalScript('https://unpkg.com/@babel/standalone/babel.min.js');
+        }
+        await babelLoaderPromise;
+        if (!window.Babel) {
+          throw new Error('Babel runtime is unavailable after loading.');
+        }
+        return window.Babel;
+      }
+
+      async function getTranspiledBundleSource() {
+        const cachedSource = readCachedTranspiledBundle();
+        if (cachedSource) return cachedSource;
+
+        const [BabelRuntime, response] = await Promise.all([
+          ensureBabelLoaded(),
+          fetch(frontendBundleUrl, { credentials: 'same-origin' }),
+        ]);
+        if (!response.ok) {
+          throw new Error(`Failed to load bundle ${frontendBundleUrl}: ${response.status}`);
+        }
+
+        const source = await response.text();
+        const transformed = BabelRuntime.transform(source, {
+          presets: ['react'],
+          sourceType: 'module',
+          filename: frontendBundleUrl,
+        }).code;
+        writeCachedTranspiledBundle(transformed);
+        return transformed;
+      }
+
+      getTranspiledBundleSource()
+        .then((source) => import(createBlobModuleUrl(source)))
         .catch((error) => {
           console.error(error);
           document.getElementById('root').innerHTML = `

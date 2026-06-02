@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -11,6 +12,7 @@ FILES_TO_BUNDLE = [
     "lib/excelExport.js",
     "lib/segmentUtils.js",
     "lib/kpiUtils.js",
+    "lib/utils.js",
     "lib/api.js",
     "features/dashboard/utils/segmentData.js",
     "features/dashboard/utils/dataParsers.js",
@@ -54,6 +56,8 @@ FILES_TO_BUNDLE = [
     "app.jsx",
 ]
 
+BUNDLER_VERSION = "2"
+
 HEADER_LINES = [
     "// AUTO-GENERATED FAIL-SAFE BUNDLE",
     "import React, { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';",
@@ -73,6 +77,25 @@ IMPORT_PATTERN = re.compile(
     r'^import\s+.*?\s+from\s+[\'"].*?[\'"];?',
     re.DOTALL | re.MULTILINE,
 )
+
+
+def get_frontend_bundle_version(project_root: Path) -> str:
+    src_dir = project_root / "frontend" / "src"
+    digest = hashlib.sha1()
+    digest.update(f"bundler:{BUNDLER_VERSION}".encode("utf-8"))
+
+    for rel_path in FILES_TO_BUNDLE:
+        file_path = src_dir / rel_path
+        digest.update(rel_path.encode("utf-8"))
+        if not file_path.exists():
+            digest.update(b":missing")
+            continue
+
+        content = file_path.read_bytes()
+        digest.update(b":present:")
+        digest.update(hashlib.sha1(content).digest())
+
+    return digest.hexdigest()[:12]
 
 
 def build_frontend_bundle(project_root: Path, cache: dict) -> tuple[str, str]:
@@ -107,6 +130,10 @@ def build_frontend_bundle(project_root: Path, cache: dict) -> tuple[str, str]:
         for line in clean_content.splitlines():
             stripped = line.strip()
             if stripped.startswith("export "):
+                if stripped.startswith("export * from "):
+                    continue
+                if stripped.startswith("export {") and " from " in stripped:
+                    continue
                 if stripped.startswith("export default "):
                     continue
                 line = line.replace("export ", "", 1)

@@ -26,12 +26,12 @@ def create_app() -> Flask:
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
+        elif version and path.startswith("/frontend/src/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif path == "/frontend/src/app.jsx":
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
-        elif version and path.startswith("/frontend/src/"):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif (
             path.startswith("/fonts/")
             or path.endswith(".svg")

@@ -6,17 +6,25 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, send_from_directory
 
 from ....application import dashboard_service
-from ....infrastructure.frontend_bundle import build_frontend_bundle
+from ....infrastructure.frontend_bundle import (
+    build_frontend_bundle,
+    get_frontend_bundle_version,
+)
 from ....infrastructure.static_files import serve_static_file
 
 web_bp = Blueprint("web", __name__)
+FRONTEND_BUILD_VERSION_PLACEHOLDER = "__FRONTEND_BUILD_VERSION__"
 
 
 @web_bp.get("/")
 def web_index():
-    return send_from_directory(
-        dashboard_service.PROJECT_ROOT / "frontend" / "public", "index.html"
-    )
+    project_root = dashboard_service.PROJECT_ROOT
+    index_path = project_root / "frontend" / "public" / "index.html"
+    html = index_path.read_text(encoding="utf-8")
+    build_version = get_frontend_bundle_version(project_root)
+    return html.replace(FRONTEND_BUILD_VERSION_PLACEHOLDER, build_version), 200, {
+        "Content-Type": "text/html; charset=utf-8",
+    }
 
 
 @web_bp.get("/frontend/src/app.jsx")
