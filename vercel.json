@@ -24,7 +24,15 @@
       "dest": "/frontend/public/fonts/$1"
     },
     {
-      "src": "/(favicon\\.ico|robots\\.txt|manifest\\.webmanifest)",
+      "src": "/favicon\\.ico",
+      "dest": "/frontend/public/krung-thai-bank-logo.svg"
+    },
+    {
+      "src": "/(robots\\.txt|manifest\\.webmanifest)",
+      "dest": "/frontend/public/$1"
+    },
+    {
+      "src": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico))",
       "dest": "/frontend/public/$1"
     },
     {
