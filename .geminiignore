@@ -94,6 +94,7 @@ temp/
 
 # Cross-tool ignore rules
 # Make Gemini ignore Codex-specific config files.
+Agents.md
 .codexignore
 .codex/
 .geminiignore

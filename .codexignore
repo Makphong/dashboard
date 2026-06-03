@@ -93,7 +93,9 @@ temp/
 .vercel/
 
 # Cross-tool ignore rules
-# Make Gemini ignore Codex-specific config files.
-.codexignore
+# Make Codex ignore Gemini-specific config files.
+GEMINI.md
+.geminiignore
 .codex/
 .geminiignore
+.codexignore
