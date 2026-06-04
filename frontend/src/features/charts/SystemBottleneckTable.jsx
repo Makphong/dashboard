@@ -25,7 +25,7 @@ export const SystemBottleneckTable = ({ rows, maxVisibleRows = 6 }) => {
                 <div className="text-xs font-semibold text-slate-600 whitespace-nowrap">{formatDuration(row.totalSeconds)}</div>
               </div>
               <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(4, share)}%` }}></div>
+                <div className="h-full rounded-full bg-[#2563EB] transition-[width] duration-500 ease-out" style={{ width: `${Math.max(4, share)}%` }}></div>
               </div>
             </div>
           );

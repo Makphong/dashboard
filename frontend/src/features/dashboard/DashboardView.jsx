@@ -6,6 +6,15 @@ import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 import { toDrillGroup } from '../../lib/segmentUtils.js';
 import { buildAverageTransitionTimeData } from './utils/transitionMetrics.js';
 
+function buildChartAnimationKey(rows, fields) {
+  if (!Array.isArray(rows) || rows.length === 0) return 'empty';
+  return rows.map((row, index) => {
+    const rowId = row.id || row.key || row.label || row.name || row.user || `row-${index}`;
+    const values = fields.map((field) => String(row?.[field] ?? ''));
+    return `${rowId}:${values.join(':')}`;
+  }).join('|');
+}
+
 const DonutWorkloadChart = lazy(() => import('../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
 const UserContributionStackChart = lazy(() => import('../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
 const GanttTimelineChart = lazy(() => import('../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
@@ -126,6 +135,26 @@ export const DashboardView = React.memo(({
       betweenReviewEdit: 'Review & Edit',
     });
   }, [filteredBaseSegments]);
+
+  const donutAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
+    [workloadVisibleRows]
+  );
+
+  const contributionAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editSeconds', 'totalSeconds', 'reworkRate']),
+    [contributionRows]
+  );
+
+  const processBreakdownAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(processBreakdownData, ['seconds', 'label', 'color', 'vat', 'wait', 'rework', 'handover', 'other']),
+    [processBreakdownData]
+  );
+
+  const transitionAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(transitionTimeData, ['seconds', 'label', 'color', 'vat', 'wait', 'rework', 'handover', 'other']),
+    [transitionTimeData]
+  );
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);
   const [showWorkloadFilterMenu, setShowWorkloadFilterMenu] = useState(false);
@@ -250,7 +279,7 @@ export const DashboardView = React.memo(({
           <div className="flex-1 min-h-0">
             {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
-                <DonutWorkloadChart rows={workloadVisibleRows} />
+                <DonutWorkloadChart key={donutAnimationKey} rows={workloadVisibleRows} />
               </Suspense>
             )}
           </div>
@@ -269,7 +298,7 @@ export const DashboardView = React.memo(({
           <div className="flex-1 min-h-0">
             {contributionRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
-                <UserContributionStackChart rows={contributionRows} maxVisibleRows={3} />
+                <UserContributionStackChart key={contributionAnimationKey} rows={contributionRows} maxVisibleRows={3} />
               </Suspense>
             )}
           </div>
@@ -300,7 +329,7 @@ export const DashboardView = React.memo(({
           <div className="flex-1 min-h-0">
             {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
-                <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />
+                <ProcessTimeBreakdownChart key={processBreakdownAnimationKey} data={processBreakdownData} showLabels={showProcessBreakdownLabels} />
               </Suspense>
             )}
           </div>
@@ -317,7 +346,7 @@ export const DashboardView = React.memo(({
           <div className="flex-1 min-h-0">
             {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
-                <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />
+                <ProcessTimeBreakdownChart key={transitionAnimationKey} data={transitionTimeData} showLabels={showProcessBreakdownLabels} />
               </Suspense>
             )}
           </div>

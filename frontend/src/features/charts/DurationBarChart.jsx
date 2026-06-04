@@ -32,7 +32,7 @@ export const DurationBarChart = React.memo(({ rows, maxVisibleRows = 0 }) => {
               <div className="text-slate-500 whitespace-nowrap">{row.valueLabel}</div>
             </div>
             <div className="mt-2 h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: color }}></div>
+              <div className="h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: `${width}%`, backgroundColor: color }}></div>
             </div>
             {row.meta ? <div className="mt-1 text-xs text-slate-500">{row.meta}</div> : null}
           </div>

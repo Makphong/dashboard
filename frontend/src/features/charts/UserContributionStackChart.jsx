@@ -114,7 +114,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
                 <span className="text-[11px] font-bold text-slate-400">{formatDuration(row.total)}</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-slate-100/80 overflow-hidden shadow-inner">
-                <div className="h-full rounded-full overflow-hidden flex shadow-sm" style={{ width: `${totalWidth}%` }}>
+                <div className="h-full rounded-full overflow-hidden flex shadow-sm transition-[width] duration-500 ease-out" style={{ width: `${totalWidth}%` }}>
                   <div 
                     onMouseEnter={(e) => {
                       handleMouseMove(e, row.user, 'Review', formatDuration(row.review), formatPercent(row.review / (row.total || 1)), '#06B6D4');
@@ -127,7 +127,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
                       setHoveredUser(null);
                       setHoveredType(null);
                     }}
-                    className={`h-full bg-[#06B6D4] cursor-pointer transition-all duration-300 hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'edit' ? 'opacity-20' : 'opacity-100'}`} 
+                    className={`h-full bg-[#06B6D4] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'edit' ? 'opacity-20' : 'opacity-100'}`} 
                     style={{ width: `${reviewWidth}%` }}
                   />
                   <div 
@@ -142,7 +142,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
                       setHoveredUser(null);
                       setHoveredType(null);
                     }}
-                    className={`h-full bg-[#F59E0B] cursor-pointer transition-all duration-300 hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'review' ? 'opacity-20' : 'opacity-100'}`} 
+                    className={`h-full bg-[#F59E0B] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'review' ? 'opacity-20' : 'opacity-100'}`} 
                     style={{ width: `${editWidth}%` }}
                   />
                 </div>

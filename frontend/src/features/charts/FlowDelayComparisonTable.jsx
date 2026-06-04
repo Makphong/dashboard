@@ -32,7 +32,7 @@ export const FlowDelayComparisonTable = ({ rows, maxVisibleRows = 0 }) => {
                 <span>Max</span>
               </div>
               <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${barWidth}%`, backgroundColor: color }}></div>
+                <div className="h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: `${barWidth}%`, backgroundColor: color }}></div>
               </div>
             </div>
           </div>

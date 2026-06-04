@@ -14,6 +14,15 @@ function ExpandedChartFallback() {
   return <div className="min-h-[420px] w-full rounded-[2rem] bg-slate-100 animate-pulse" />;
 }
 
+function buildChartAnimationKey(rows, fields) {
+  if (!Array.isArray(rows) || rows.length === 0) return 'empty';
+  return rows.map((row, index) => {
+    const rowId = row.id || row.key || row.label || row.name || row.user || `row-${index}`;
+    const values = fields.map((field) => String(row?.[field] ?? ''));
+    return `${rowId}:${values.join(':')}`;
+  }).join('|');
+}
+
 function buildUserGroups(segments, workloadVisibleRows) {
   const safeSegments = Array.isArray(segments) ? segments : [];
   const safeRows = Array.isArray(workloadVisibleRows) ? workloadVisibleRows : [];
@@ -871,6 +880,26 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
     });
   }, [ganttVisibleSegments, processBreakdownSegments]);
 
+  const donutAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
+    [workloadVisibleRows]
+  );
+
+  const contributionAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editSeconds', 'totalSeconds', 'reworkRate']),
+    [contributionRows]
+  );
+
+  const processBreakdownAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(processBreakdownData, ['seconds', 'label', 'color', 'vat', 'wait', 'rework', 'handover', 'other']),
+    [processBreakdownData]
+  );
+
+  const transitionAnimationKey = React.useMemo(
+    () => buildChartAnimationKey(transitionTimeData, ['seconds', 'label', 'color', 'vat', 'wait', 'rework', 'handover', 'other']),
+    [transitionTimeData]
+  );
+
   return (
     <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 md:p-8 viz-overlay-enter" onClick={onClose}>
       <div 
@@ -898,7 +927,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
                 showGanttLegend={timelineSettings?.showGanttLegend}
               />
             )}
-            {visualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
+            {visualizationId === 'donut' && <DonutWorkloadChart key={donutAnimationKey} rows={workloadVisibleRows} expanded />}
           </Suspense>
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView
@@ -921,9 +950,9 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
             <TransitionBreakdownDetailView segments={processBreakdownSegments || ganttVisibleSegments} />
           )}
           <Suspense fallback={<ExpandedChartFallback />}>
-            {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
-            {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
-            {visualizationId === 'matrix' && <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
+            {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart key={processBreakdownAnimationKey} data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
+            {visualizationId === 'contribution' && <UserContributionStackChart key={contributionAnimationKey} rows={contributionRows} expanded />}
+            {visualizationId === 'matrix' && <ProcessTimeBreakdownChart key={transitionAnimationKey} data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
           </Suspense>
         </div>
       </div>

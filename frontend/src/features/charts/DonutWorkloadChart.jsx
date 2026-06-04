@@ -35,6 +35,14 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
   const totalValue = useMemo(() => data.reduce((sum, item) => sum + item.value, 0), [data]);
 
   useEffect(() => {
+    if (!hoveredUser) return;
+    const hasHoveredUser = data.some((item) => item.user === hoveredUser);
+    if (hasHoveredUser) return;
+    setHoveredUser(null);
+    setHoverSource(null);
+  }, [data, hoveredUser]);
+
+  useEffect(() => {
     if (!svgRef.current || data.length === 0) return;
 
     const svg = d3.select(svgRef.current);
@@ -128,7 +136,7 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
           return arc(d);
         };
       });
-  }, [data.length, hoveredUser, hoverOuterRadius, innerRadius, outerRadius]);
+  }, [hoveredUser, hoverOuterRadius, innerRadius, outerRadius]);
 
   if (data.length === 0) return null;
 
