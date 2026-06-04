@@ -4,6 +4,7 @@ import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 import { toDrillGroup } from '../../lib/segmentUtils.js';
+import { buildAverageTransitionTimeData } from './utils/transitionMetrics.js';
 
 const DonutWorkloadChart = lazy(() => import('../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
 const UserContributionStackChart = lazy(() => import('../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
@@ -116,55 +117,14 @@ export const DashboardView = React.memo(({
       });
     }
     return items;
-  }, [filteredBaseSegments, selectedSegmentTypes, mergeReviewAndEdit]);
+  }, [filteredBaseSegments, selectedSegmentTypes, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    const groups = new Map();
-    filteredBaseSegments.forEach(s => {
-      if (!groups.has(s.sheetKey)) groups.set(s.sheetKey, []);
-      groups.get(s.sheetKey).push(s);
+    return buildAverageTransitionTimeData(filteredBaseSegments, {
+      afterProcessing: 'First Spread',
+      afterReprocessing: 'Second Spread',
+      betweenReviewEdit: 'Review & Edit',
     });
-
-    let idleAfterProcess = 0, countAfterProcess = 0;
-    let idleAfterReprocess = 0, countAfterReprocess = 0;
-    let idleBetweenActions = 0, countBetweenActions = 0;
-
-    groups.forEach(segments => {
-      const sorted = [...segments].sort((a, b) => a.startTs - b.startTs);
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const curr = sorted[i];
-
-        const prevDrill = toDrillGroup(prev.segmentType);
-        const currDrill = toDrillGroup(curr.segmentType);
-
-        if (currDrill === 'Idle') {
-          const duration = Number(curr.durationSeconds) || 0;
-          if (prevDrill === 'Processing') {
-            idleAfterProcess += duration;
-            countAfterProcess++;
-          } else if (prevDrill === 'Reprocessing') {
-            idleAfterReprocess += duration;
-            countAfterReprocess++;
-          } else if (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading') {
-            const hasFutureAction = sorted.slice(i + 1).some(s => {
-              const dg = toDrillGroup(s.segmentType);
-              return dg === 'Review' || dg === 'Edit';
-            });
-            if (hasFutureAction) {
-              idleBetweenActions += duration;
-              countBetweenActions++;
-            }
-          }
-        }
-      }
-    });
-
-    return [
-      { label: 'First Spread', seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0, totalSeconds: idleAfterProcess, color: '#3b82f6' },
-      { label: 'Second Spread', seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0, totalSeconds: idleAfterReprocess, color: '#6366f1' },
-      { label: 'Review & Edit', seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0, totalSeconds: idleBetweenActions, color: '#f59e0b' }
-    ];
   }, [filteredBaseSegments]);
 
   const [showTimelineFilterMenu, setShowTimelineFilterMenu] = useState(false);

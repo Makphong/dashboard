@@ -94,15 +94,41 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
         this._current = i(0);
         return t => {
           const currentArc = i(t);
-          const isHovered = hoveredUser === d.data.user;
-          arc.outerRadius(isHovered ? hoverOuterRadius : outerRadius);
+          arc.outerRadius(outerRadius);
           return arc(currentArc);
         };
       })
-      .attr('opacity', d => (hoveredUser && hoveredUser !== d.data.user ? 0.4 : 1))
       .attr('fill', d => d.data.color);
 
-  }, [data, hoveredUser, innerRadius, outerRadius, hoverOuterRadius]);
+  }, [data, innerRadius, outerRadius]);
+
+  useEffect(() => {
+    if (!svgRef.current || data.length === 0) return;
+
+    const svg = d3.select(svgRef.current);
+    const g = svg.select('g.chart-group');
+    const arc = d3.arc().innerRadius(innerRadius).cornerRadius(8);
+
+    g.selectAll('path.arc-segment')
+      .interrupt()
+      .transition()
+      .duration(140)
+      .ease(d3.easeCubicOut)
+      .attr('opacity', (d) => (hoveredUser && hoveredUser !== d.data.user ? 0.4 : 1))
+      .attrTween('d', function(d) {
+        const isHovered = hoveredUser === d.data.user;
+        const nextOuterRadius = isHovered ? hoverOuterRadius : outerRadius;
+        const startOuterRadius = this._outerRadius ?? outerRadius;
+        const interpolateOuterRadius = d3.interpolateNumber(startOuterRadius, nextOuterRadius);
+
+        return (t) => {
+          const currentOuterRadius = interpolateOuterRadius(t);
+          this._outerRadius = currentOuterRadius;
+          arc.outerRadius(currentOuterRadius);
+          return arc(d);
+        };
+      });
+  }, [data.length, hoveredUser, hoverOuterRadius, innerRadius, outerRadius]);
 
   if (data.length === 0) return null;
 

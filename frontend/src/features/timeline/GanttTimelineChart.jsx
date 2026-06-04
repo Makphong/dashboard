@@ -44,6 +44,7 @@ export const GanttTimelineChart = ({
   const zoomScaleRef = useRef(1);
   const pendingZoomAnchorRef = useRef(null);
   const scrollRequestRef = useRef(null);
+  const tooltipFrameRef = useRef(null);
 
   const [hoveredSegment, setHoveredSegment] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
@@ -264,8 +265,7 @@ export const GanttTimelineChart = ({
     const rect = containerRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-
-    setHoveredSegment({
+    const nextHoveredSegment = {
       x: Math.max(8, Math.min(x + 12, rect.width - 318)),
       y: Math.max(8, Math.min(y + 12, rect.height - 132)),
       lane,
@@ -275,8 +275,33 @@ export const GanttTimelineChart = ({
       start: segment.start,
       end: segment.end,
       durationSeconds: segment.durationSeconds,
+    };
+
+    if (tooltipFrameRef.current) cancelAnimationFrame(tooltipFrameRef.current);
+    tooltipFrameRef.current = requestAnimationFrame(() => {
+      setHoveredSegment((prev) => {
+        if (
+          prev &&
+          prev.x === nextHoveredSegment.x &&
+          prev.y === nextHoveredSegment.y &&
+          prev.lane === nextHoveredSegment.lane &&
+          prev.color === nextHoveredSegment.color &&
+          prev.segmentType === nextHoveredSegment.segmentType &&
+          prev.start === nextHoveredSegment.start &&
+          prev.end === nextHoveredSegment.end &&
+          prev.durationSeconds === nextHoveredSegment.durationSeconds
+        ) {
+          return prev;
+        }
+        return nextHoveredSegment;
+      });
     });
   };
+
+  useEffect(() => () => {
+    if (scrollRequestRef.current) cancelAnimationFrame(scrollRequestRef.current);
+    if (tooltipFrameRef.current) cancelAnimationFrame(tooltipFrameRef.current);
+  }, []);
 
   if (mapped.length === 0) return null;
 

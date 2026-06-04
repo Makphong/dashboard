@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { ChevronDown, Clock, User, X } from 'lucide-react';
 import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
 import { toDrillGroup } from '../../../lib/segmentUtils.js';
+import { buildAverageTransitionTimeData } from '../utils/transitionMetrics.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
 
 const GanttTimelineChart = lazy(() => import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
@@ -863,50 +864,11 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
 
   const transitionTimeData = React.useMemo(() => {
     const sourceSegments = processBreakdownSegments || ganttVisibleSegments;
-    const groups = new Map();
-    sourceSegments.forEach(s => {
-      if (!groups.has(s.sheetKey)) groups.set(s.sheetKey, []);
-      groups.get(s.sheetKey).push(s);
+    return buildAverageTransitionTimeData(sourceSegments, {
+      afterProcessing: 'After Processing',
+      afterReprocessing: 'After Reprocessing',
+      betweenReviewEdit: 'Between Review And Edit',
     });
-
-    let idleAfterProcess = 0, countAfterProcess = 0;
-    let idleAfterReprocess = 0, countAfterReprocess = 0;
-    let idleBetweenActions = 0, countBetweenActions = 0;
-
-    groups.forEach(segments => {
-      const sorted = [...segments].sort((a, b) => a.startTs - b.startTs);
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const curr = sorted[i];
-        const prevDrill = toDrillGroup(prev.segmentType);
-        const currDrill = toDrillGroup(curr.segmentType);
-        if (currDrill === 'Idle') {
-          const duration = Number(curr.durationSeconds) || 0;
-          if (prevDrill === 'Processing') {
-            idleAfterProcess += duration;
-            countAfterProcess++;
-          } else if (prevDrill === 'Reprocessing') {
-            idleAfterReprocess += duration;
-            countAfterReprocess++;
-          } else if (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading') {
-            const hasFutureAction = sorted.slice(i + 1).some(s => {
-              const dg = toDrillGroup(s.segmentType);
-              return dg === 'Review' || dg === 'Edit';
-            });
-            if (hasFutureAction) {
-              idleBetweenActions += duration;
-              countBetweenActions++;
-            }
-          }
-        }
-      }
-    });
-
-    return [
-      { label: 'After Processing', seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0, totalSeconds: idleAfterProcess, color: '#3b82f6' },
-      { label: 'After Reprocessing', seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0, totalSeconds: idleAfterReprocess, color: '#6366f1' },
-      { label: 'Between Review And Edit', seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0, totalSeconds: idleBetweenActions, color: '#f59e0b' }
-    ];
   }, [ganttVisibleSegments, processBreakdownSegments]);
 
   return (

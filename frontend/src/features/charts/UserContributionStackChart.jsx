@@ -9,6 +9,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
   const [hoveredUser, setHoveredUser] = useState(null);
   const [hoveredType, setHoveredType] = useState(null); // 'review' | 'edit' | null
   const containerRef = React.useRef(null);
+  const tooltipFrameRef = React.useRef(null);
 
   const prepared = useMemo(() => {
     if (!Array.isArray(rows)) return [];
@@ -44,7 +45,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
   const handleMouseMove = (e, user, type, duration, percent, color) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    setTooltip({
+    const nextTooltip = {
       show: true,
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -53,8 +54,31 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
       duration,
       percent,
       color
+    };
+
+    if (tooltipFrameRef.current) cancelAnimationFrame(tooltipFrameRef.current);
+    tooltipFrameRef.current = requestAnimationFrame(() => {
+      setTooltip((prev) => {
+        if (
+          prev.show === nextTooltip.show &&
+          prev.x === nextTooltip.x &&
+          prev.y === nextTooltip.y &&
+          prev.user === nextTooltip.user &&
+          prev.type === nextTooltip.type &&
+          prev.duration === nextTooltip.duration &&
+          prev.percent === nextTooltip.percent &&
+          prev.color === nextTooltip.color
+        ) {
+          return prev;
+        }
+        return nextTooltip;
+      });
     });
   };
+
+  React.useEffect(() => () => {
+    if (tooltipFrameRef.current) cancelAnimationFrame(tooltipFrameRef.current);
+  }, []);
 
   return (
     <div className="space-y-4 relative" ref={containerRef}>
