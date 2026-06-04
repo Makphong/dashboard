@@ -66,7 +66,7 @@ You can tune upload guards with env vars:
 - `DASHBOARD_MAX_UPLOAD_FILE_BYTES` (default: `10485760`)
 - `DASHBOARD_MAX_UPLOAD_FILES` (default: `10`)
 
-## Supabase Setup
+## Supabase Setup 
 
 Set environment variables (see `.env.example`):
 - `SUPABASE_URL`
