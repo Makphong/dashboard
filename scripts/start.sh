@@ -32,6 +32,15 @@ cd "$DIR/.."
 # Install dependencies if needed (optional, but good for first run)
 # pip install -r requirements.txt
 
+if command -v npm >/dev/null 2>&1 && [ -f package.json ]; then
+    if [ ! -d node_modules ]; then
+        echo "Installing frontend dependencies..."
+        npm install
+    fi
+    echo "Building frontend assets..."
+    npm run build
+fi
+
 stop_existing_python_on_port $PORT
 
 echo "Starting Dashboard server on http://localhost:$PORT"

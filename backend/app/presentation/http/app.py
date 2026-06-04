@@ -15,30 +15,25 @@ def create_app() -> Flask:
     dashboard_service.init_db()
 
     app.config["UPLOAD_LIMITS"] = build_upload_limits()
-    app.extensions["frontend_bundle_cache"] = {"signature": None, "content": None}
 
     @app.after_request
     def optimize_response_headers(response):
         path = request.path or ""
-        version = (request.args.get("v") or "").strip()
 
         if path.startswith("/api/") or path == "/" or path.endswith(".html"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
-        elif version and path.startswith("/frontend/src/"):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif path == "/frontend/src/app.jsx":
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
         elif (
-            path.startswith("/fonts/")
+            path.startswith("/assets/")
+            or path.startswith("/fonts/")
             or path.endswith(".svg")
             or path.endswith(".ico")
             or path.endswith(".ttf")
+            or path.endswith(".woff")
+            or path.endswith(".woff2")
         ):
-            response.headers["Cache-Control"] = "public, max-age=604800"
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
 
         accepted_encodings = request.headers.get("Accept-Encoding", "")
         should_gzip = (

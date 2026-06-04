@@ -1,13 +1,18 @@
-import React, { useEffect, useRef, useState, memo } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState, memo } from 'react';
 import { FileSpreadsheet, FileText, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
-import { DonutWorkloadChart } from '../charts/DonutWorkloadChart.jsx';
-import { UserContributionStackChart } from '../charts/UserContributionStackChart.jsx';
-import { GanttTimelineChart } from '../timeline/GanttTimelineChart.jsx';
-import { ProcessTimeBreakdownChart } from '../charts/ProcessTimeBreakdownChart.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 import { toDrillGroup } from '../../lib/segmentUtils.js';
+
+const DonutWorkloadChart = lazy(() => import('../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
+const UserContributionStackChart = lazy(() => import('../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
+const GanttTimelineChart = lazy(() => import('../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
+const ProcessTimeBreakdownChart = lazy(() => import('../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart })));
+
+function ChartPanelFallback({ height = 'min-h-[320px]' }) {
+  return <div className={`w-full rounded-2xl bg-slate-100 animate-pulse ${height}`} />;
+}
 
 function ToggleSetting({ checked, onChange, children, notice }) {
   return (
@@ -258,16 +263,18 @@ export const DashboardView = React.memo(({
         </div>
         <h2 className="text-lg font-bold mb-6 text-[#17335f]">Timeline</h2>
         {ganttVisibleSegments.length === 0 ? <EmptyState icon={LayoutDashboard} title="No Data" /> : (
-          <GanttTimelineChart
-            segments={ganttVisibleSegments}
-            onSelectSegment={setSelectedGanttSegment}
-            singleLane={ganttSingleLaneMode}
-            showSystemLane={showSystemLane}
-            showIdleLane={showIdle}
-            showStarMarkers={showStarMarkers}
-            collapseGaps={ganttCollapseGaps}
-            showGanttLegend={showGanttLegend}
-          />
+          <Suspense fallback={<ChartPanelFallback height="h-[28rem]" />}>
+            <GanttTimelineChart
+              segments={ganttVisibleSegments}
+              onSelectSegment={setSelectedGanttSegment}
+              singleLane={ganttSingleLaneMode}
+              showSystemLane={showSystemLane}
+              showIdleLane={showIdle}
+              showStarMarkers={showStarMarkers}
+              collapseGaps={ganttCollapseGaps}
+              showGanttLegend={showGanttLegend}
+            />
+          </Suspense>
         )}
       </div>
 
@@ -281,7 +288,11 @@ export const DashboardView = React.memo(({
           </div>
           <h2 className="text-lg font-bold mb-4 text-[#17335f]">User Share</h2>
           <div className="flex-1 min-h-0">
-            {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : <DonutWorkloadChart rows={workloadVisibleRows} />}
+            {workloadVisibleRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
+              <Suspense fallback={<ChartPanelFallback />}>
+                <DonutWorkloadChart rows={workloadVisibleRows} />
+              </Suspense>
+            )}
           </div>
         </div>
 
@@ -296,7 +307,11 @@ export const DashboardView = React.memo(({
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {contributionRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : <UserContributionStackChart rows={contributionRows} maxVisibleRows={3} />}
+            {contributionRows.length === 0 ? <EmptyState icon={Users} title="No Data" /> : (
+              <Suspense fallback={<ChartPanelFallback />}>
+                <UserContributionStackChart rows={contributionRows} maxVisibleRows={3} />
+              </Suspense>
+            )}
           </div>
         </div>
       </div>
@@ -323,7 +338,11 @@ export const DashboardView = React.memo(({
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
+            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
+              <Suspense fallback={<ChartPanelFallback />}>
+                <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />
+              </Suspense>
+            )}
           </div>
         </div>
 
@@ -336,7 +355,11 @@ export const DashboardView = React.memo(({
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
+            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
+              <Suspense fallback={<ChartPanelFallback />}>
+                <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />
+              </Suspense>
+            )}
           </div>
         </div>
       </div>

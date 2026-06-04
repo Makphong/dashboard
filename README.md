@@ -29,12 +29,15 @@
 
 1. Install dependencies:
    `pip install -r requirements.txt`
-2. Start server:
+   `npm install`
+2. Build frontend:
+   `npm run build`
+3. Start server:
    `bash scripts/start.sh` (Linux/macOS)
    or `.\scripts\start.ps1` (Windows)
    
    (Alternatively: `python scripts/app.py --port 8000`)
-3. Open:
+4. Open:
    `http://localhost:8000/`
 
 ## Write Endpoint Authentication (Production)

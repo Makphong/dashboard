@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { ChevronDown, Clock, User, X } from 'lucide-react';
-import { GanttTimelineChart } from '../../timeline/GanttTimelineChart.jsx';
-import { DonutWorkloadChart } from '../../charts/DonutWorkloadChart.jsx';
-import { UserContributionStackChart } from '../../charts/UserContributionStackChart.jsx';
-import { ProcessTimeBreakdownChart } from '../../charts/ProcessTimeBreakdownChart.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
 import { toDrillGroup } from '../../../lib/segmentUtils.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
+
+const GanttTimelineChart = lazy(() => import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
+const DonutWorkloadChart = lazy(() => import('../../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
+const UserContributionStackChart = lazy(() => import('../../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
+const ProcessTimeBreakdownChart = lazy(() => import('../../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart })));
+
+function ExpandedChartFallback() {
+  return <div className="min-h-[420px] w-full rounded-[2rem] bg-slate-100 animate-pulse" />;
+}
 
 function buildUserGroups(segments, workloadVisibleRows) {
   const safeSegments = Array.isArray(segments) ? segments : [];
@@ -918,19 +923,21 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
           <button onClick={onClose} className="p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all hover:rotate-90 duration-300"><X className="w-8 h-8" /></button>
         </div>
         <div className="flex-1 overflow-auto p-6 md:p-10 no-scrollbar">
-          {visualizationId === 'gantt' && (
-            <GanttTimelineChart
-              segments={ganttVisibleSegments}
-              expanded
-              singleLane={timelineSettings?.singleLane}
-              showSystemLane={timelineSettings?.showSystemLane}
-              showIdleLane={timelineSettings?.showIdleLane}
-              showStarMarkers={timelineSettings?.showStarMarkers}
-              collapseGaps={timelineSettings?.collapseGaps}
-              showGanttLegend={timelineSettings?.showGanttLegend}
-            />
-          )}
-          {visualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
+          <Suspense fallback={<ExpandedChartFallback />}>
+            {visualizationId === 'gantt' && (
+              <GanttTimelineChart
+                segments={ganttVisibleSegments}
+                expanded
+                singleLane={timelineSettings?.singleLane}
+                showSystemLane={timelineSettings?.showSystemLane}
+                showIdleLane={timelineSettings?.showIdleLane}
+                showStarMarkers={timelineSettings?.showStarMarkers}
+                collapseGaps={timelineSettings?.collapseGaps}
+                showGanttLegend={timelineSettings?.showGanttLegend}
+              />
+            )}
+            {visualizationId === 'donut' && <DonutWorkloadChart rows={workloadVisibleRows} expanded />}
+          </Suspense>
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView
               segments={ganttVisibleSegments}
@@ -951,9 +958,11 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
           {visualizationId === 'matrix-detail' && (
             <TransitionBreakdownDetailView segments={processBreakdownSegments || ganttVisibleSegments} />
           )}
-          {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
-          {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
-          {visualizationId === 'matrix' && <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
+          <Suspense fallback={<ExpandedChartFallback />}>
+            {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}
+            {visualizationId === 'contribution' && <UserContributionStackChart rows={contributionRows} expanded />}
+            {visualizationId === 'matrix' && <ProcessTimeBreakdownChart data={transitionTimeData} showLabels={showProcessBreakdownLabels} />}
+          </Suspense>
         </div>
       </div>
     </div>

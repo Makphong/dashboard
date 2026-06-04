@@ -1,32 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import * as d3 from 'd3';
 import { CHART_PALETTE } from '../../lib/constants.js';
 import { safeNumber, formatDuration, formatPercent } from '../../lib/utils.js';
-
-let d3LoaderPromise;
-
-function ensureD3Loaded() {
-  if (window.d3) return Promise.resolve(window.d3);
-  if (!d3LoaderPromise) {
-    d3LoaderPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector('script[data-d3-loader="true"]');
-      if (existingScript) {
-        existingScript.addEventListener('load', () => resolve(window.d3), { once: true });
-        existingScript.addEventListener('error', () => reject(new Error('Failed to load D3.js')), { once: true });
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://d3js.org/d3.v7.min.js';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.dataset.d3Loader = 'true';
-      script.onload = () => resolve(window.d3);
-      script.onerror = () => reject(new Error('Failed to load D3.js'));
-      document.head.appendChild(script);
-    });
-  }
-  return d3LoaderPromise;
-}
 
 /**
  * Advanced Workload Share Visualization
@@ -38,7 +13,6 @@ function ensureD3Loaded() {
  */
 export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
   const svgRef = useRef(null);
-  const [d3Ready, setD3Ready] = useState(Boolean(window.d3));
   const [hoveredUser, setHoveredUser] = useState(null);
   const [hoverSource, setHoverSource] = useState(null); // 'chart' | 'legend' | null
   
@@ -61,27 +35,7 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
   const totalValue = useMemo(() => data.reduce((sum, item) => sum + item.value, 0), [data]);
 
   useEffect(() => {
-    if (d3Ready) return undefined;
-
-    let isMounted = true;
-    ensureD3Loaded()
-      .then(() => {
-        if (isMounted) setD3Ready(true);
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [d3Ready]);
-
-  useEffect(() => {
-    if (!d3Ready || !svgRef.current || data.length === 0) return;
-
-    const d3 = window.d3;
-    if (!d3) return;
+    if (!svgRef.current || data.length === 0) return;
 
     const svg = d3.select(svgRef.current);
     const g = svg.select('g.chart-group');
@@ -148,7 +102,7 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
       .attr('opacity', d => (hoveredUser && hoveredUser !== d.data.user ? 0.4 : 1))
       .attr('fill', d => d.data.color);
 
-  }, [d3Ready, data, hoveredUser, innerRadius, outerRadius, hoverOuterRadius]);
+  }, [data, hoveredUser, innerRadius, outerRadius, hoverOuterRadius]);
 
   if (data.length === 0) return null;
 
@@ -197,11 +151,6 @@ export const DonutWorkloadChart = React.memo(({ rows, expanded = false }) => {
             )}
           </g>
         </svg>
-        {!d3Ready && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-8 w-8 rounded-full border-4 border-slate-200 border-t-[#00a4e4] animate-spin" />
-          </div>
-        )}
       </div>
 
       {/* Interactive Legend (Dual-Mode Focus) */}

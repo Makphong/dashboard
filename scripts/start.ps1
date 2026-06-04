@@ -39,6 +39,17 @@ function Stop-ExistingPythonOnPort {
 
 Stop-ExistingPythonOnPort -TargetPort $Port
 
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+  if (Test-Path .\package.json) {
+    if (-not (Test-Path .\node_modules)) {
+      Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
+      npm install
+    }
+    Write-Host "Building frontend assets..." -ForegroundColor Yellow
+    npm run build
+  }
+}
+
 Write-Host "Starting Dashboard server on http://localhost:$Port" -ForegroundColor Green
 Write-Host "Tip: open http://localhost:$Port/api/health to verify backend version" -ForegroundColor DarkGray
 python .\scripts\app.py --port $Port

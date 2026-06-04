@@ -5,9 +5,7 @@ from pathlib import Path, PurePosixPath
 from flask import send_from_directory
 
 ROOT_STATIC_ALLOWLIST = {"favicon.ico", "robots.txt", "manifest.webmanifest"}
-FRONTEND_STATIC_PREFIX = "frontend/src/"
-FRONTEND_PUBLIC_PREFIX = "frontend/public/"
-FRONTEND_STATIC_EXTENSIONS = {".js", ".jsx", ".mjs", ".css", ".json", ".map"}
+FRONTEND_DIST_PREFIX = "assets/"
 
 
 def normalize_relative_url_path(url_path: str) -> str | None:
@@ -30,10 +28,7 @@ def normalize_relative_url_path(url_path: str) -> str | None:
 def is_allowed_static_path(normalized_path: str) -> bool:
     if normalized_path in ROOT_STATIC_ALLOWLIST:
         return True
-    if normalized_path.startswith(FRONTEND_STATIC_PREFIX):
-        suffix = Path(normalized_path).suffix.lower()
-        return suffix in FRONTEND_STATIC_EXTENSIONS
-    if normalized_path.startswith(FRONTEND_PUBLIC_PREFIX):
+    if normalized_path.startswith(FRONTEND_DIST_PREFIX):
         return True
     return False
 
@@ -43,21 +38,31 @@ def resolve_static_file(project_root: Path, url_path: str) -> Path | None:
     if not normalized_path:
         return None
 
+    dist_root = project_root / "frontend" / "dist"
+    public_root = project_root / "frontend" / "public"
+
     if is_allowed_static_path(normalized_path):
-        candidate = (project_root / normalized_path).resolve()
+        candidate = (dist_root / normalized_path).resolve()
         try:
-            candidate.relative_to(project_root)
+            candidate.relative_to(dist_root)
             if candidate.is_file():
                 return candidate
         except ValueError:
             pass
 
-    public_root = project_root / "frontend" / "public"
     public_candidate = (public_root / normalized_path).resolve()
     try:
         public_candidate.relative_to(public_root)
         if public_candidate.is_file():
             return public_candidate
+    except ValueError:
+        pass
+
+    dist_candidate = (dist_root / normalized_path).resolve()
+    try:
+        dist_candidate.relative_to(dist_root)
+        if dist_candidate.is_file():
+            return dist_candidate
     except ValueError:
         pass
 
@@ -69,9 +74,5 @@ def serve_static_file(project_root: Path, url_path: str):
     if static_file is None:
         return None
 
-    mimetype = (
-        "application/javascript"
-        if static_file.suffix.lower() in {".js", ".jsx", ".mjs"}
-        else None
-    )
+    mimetype = "application/javascript" if static_file.suffix.lower() in {".js", ".mjs"} else None
     return send_from_directory(static_file.parent, static_file.name, mimetype=mimetype)
