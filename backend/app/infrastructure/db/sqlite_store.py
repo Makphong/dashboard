@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import time
 
 from ...config.constants.constants_paths import DB_PATH
 from ..supabase_sync import (
+    fetch_dashboard_snapshot_state,
     fetch_dashboard_meta_state,
     hydrate_sqlite_from_supabase,
     is_supabase_enabled,
+    sync_dashboard_snapshot_to_supabase,
     sync_source_to_supabase,
     sync_sqlite_to_supabase,
 )
 
 _SUPABASE_BOOTSTRAPPED = False
+_SNAPSHOT_BOOTSTRAPPED = False
 _REMOTE_META_SIGNATURE: tuple[str, int, int] | None = None
 _LAST_REMOTE_META_CHECK_AT = 0.0
 
@@ -66,13 +70,142 @@ def current_unified_rows_signature(
             local_conn.close()
 
 
-def _bootstrap_from_supabase_if_needed() -> None:
+def _has_local_dashboard_snapshot() -> bool:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT 1
+            FROM dashboard_snapshots
+            WHERE snapshot_key = 'dashboard'
+            LIMIT 1
+            """
+        ).fetchone()
+    return row is not None
+
+
+def _local_dashboard_snapshot_signature() -> tuple[str, int, int] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT updated_at, row_count, source_count
+            FROM dashboard_snapshots
+            WHERE snapshot_key = 'dashboard'
+            LIMIT 1
+            """
+        ).fetchone()
+    if not row:
+        return None
+    return (
+        str(row["updated_at"] or ""),
+        int(row["row_count"] or 0),
+        int(row["source_count"] or 0),
+    )
+
+
+def ensure_dashboard_snapshot_from_supabase_if_needed() -> bool:
+    global _SNAPSHOT_BOOTSTRAPPED, _LAST_REMOTE_META_CHECK_AT, _REMOTE_META_SIGNATURE
+
+    local_signature = _local_dashboard_snapshot_signature()
+    if not is_supabase_enabled():
+        _SNAPSHOT_BOOTSTRAPPED = True
+        return local_signature is not None
+
+    refresh_interval_seconds = _supabase_refresh_interval_seconds()
+    now = time.monotonic()
+    should_probe_remote = (
+        local_signature is None
+        or not _SNAPSHOT_BOOTSTRAPPED
+        or refresh_interval_seconds <= 0
+        or (now - _LAST_REMOTE_META_CHECK_AT) >= refresh_interval_seconds
+    )
+
+    if not should_probe_remote:
+        return local_signature is not None
+
+    started_at = time.perf_counter()
+    try:
+        remote_meta = fetch_dashboard_meta_state()
+        _LAST_REMOTE_META_CHECK_AT = now
+        if not remote_meta:
+            return local_signature is not None
+
+        remote_signature = (
+            str(remote_meta.get("updated_at") or ""),
+            int(remote_meta.get("row_count") or 0),
+            int(remote_meta.get("source_count") or 0),
+        )
+        _REMOTE_META_SIGNATURE = remote_signature
+
+        if local_signature is not None and local_signature == remote_signature:
+            _SNAPSHOT_BOOTSTRAPPED = True
+            _emit_supabase_trace(
+                f"snapshot_refresh_no_change elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+            )
+            return True
+
+        remote_state = fetch_dashboard_snapshot_state()
+        payload = remote_state.get("payload") if remote_state else None
+        if not isinstance(payload, dict):
+            return local_signature is not None
+        snapshot_meta = payload.get("snapshotMeta")
+        if not isinstance(snapshot_meta, dict):
+            payload["snapshotMeta"] = {}
+            snapshot_meta = payload["snapshotMeta"]
+        if not snapshot_meta.get("updatedAt"):
+            snapshot_meta["updatedAt"] = str(
+                remote_state.get("updated_at") or ""
+            )
+        if snapshot_meta.get("rowCount") is None:
+            snapshot_meta["rowCount"] = int(remote_state.get("row_count") or 0)
+        if snapshot_meta.get("sourceCount") is None:
+            snapshot_meta["sourceCount"] = int(remote_state.get("source_count") or 0)
+        if not snapshot_meta.get("algorithmVersion"):
+            snapshot_meta["algorithmVersion"] = str(
+                remote_state.get("algorithm_version") or ""
+            )
+
+        with get_conn() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO dashboard_snapshots (
+                    snapshot_key, updated_at, row_count, source_count, algorithm_version, payload_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "dashboard",
+                    str(snapshot_meta.get("updatedAt") or ""),
+                    int(snapshot_meta.get("rowCount") or 0),
+                    int(snapshot_meta.get("sourceCount") or 0),
+                    str(snapshot_meta.get("algorithmVersion") or ""),
+                    json.dumps(payload, ensure_ascii=False),
+                ),
+            )
+        _REMOTE_META_SIGNATURE = (
+            str(snapshot_meta.get("updatedAt") or ""),
+            int(snapshot_meta.get("rowCount") or 0),
+            int(snapshot_meta.get("sourceCount") or 0),
+        )
+        _emit_supabase_trace(
+            f"snapshot_bootstrap_done elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+        )
+        return True
+    except Exception as exc:
+        print(f"[Supabase] Snapshot bootstrap skipped: {exc}")
+        return local_signature is not None
+    finally:
+        _SNAPSHOT_BOOTSTRAPPED = True
+
+
+def ensure_full_raw_state_from_supabase_if_enabled(force: bool = False) -> None:
     global _SUPABASE_BOOTSTRAPPED, _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT
-    if _SUPABASE_BOOTSTRAPPED:
-        return
+
     if not is_supabase_enabled():
         _SUPABASE_BOOTSTRAPPED = True
         return
+    if _SUPABASE_BOOTSTRAPPED and not force:
+        return
+
     started_at = time.perf_counter()
     try:
         hydrate_sqlite_from_supabase(DB_PATH)
@@ -93,10 +226,12 @@ def _bootstrap_from_supabase_if_needed() -> None:
 
 
 def ensure_fresh_from_supabase_if_enabled() -> None:
-    global _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT
+    global _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT, _SUPABASE_BOOTSTRAPPED
 
     if not is_supabase_enabled():
         return
+
+    ensure_full_raw_state_from_supabase_if_enabled()
 
     refresh_interval_seconds = _supabase_refresh_interval_seconds()
     now = time.monotonic()
@@ -138,6 +273,7 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
         print(f"[Supabase] Refresh hydrate skipped: {exc}")
         return
 
+    _SUPABASE_BOOTSTRAPPED = True
     _REMOTE_META_SIGNATURE = remote_signature
     _emit_supabase_trace(
         f"refresh_hydrated elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
@@ -160,6 +296,35 @@ def _sync_to_supabase_if_enabled(required: bool = False) -> bool:
         print(f"[Supabase] Sync failed: {exc}")
         if required:
             raise RuntimeError(f"Supabase sync failed: {exc}") from exc
+        return False
+
+
+def _sync_dashboard_snapshot_to_supabase_if_enabled(
+    snapshot_payload: dict,
+    required: bool = False,
+) -> bool:
+    global _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT, _SNAPSHOT_BOOTSTRAPPED
+
+    if not is_supabase_enabled():
+        return True
+    try:
+        ok = bool(sync_dashboard_snapshot_to_supabase(snapshot_payload))
+        if ok:
+            snapshot_meta = snapshot_payload.get("snapshotMeta") or {}
+            _REMOTE_META_SIGNATURE = (
+                str(snapshot_meta.get("updatedAt") or ""),
+                int(snapshot_meta.get("rowCount") or 0),
+                int(snapshot_meta.get("sourceCount") or 0),
+            )
+            _LAST_REMOTE_META_CHECK_AT = time.monotonic()
+            _SNAPSHOT_BOOTSTRAPPED = True
+        if required and not ok:
+            raise RuntimeError("Supabase dashboard snapshot sync was not completed.")
+        return ok
+    except Exception as exc:
+        print(f"[Supabase] Dashboard snapshot sync failed: {exc}")
+        if required:
+            raise RuntimeError(f"Supabase dashboard snapshot sync failed: {exc}") from exc
         return False
 
 
@@ -243,6 +408,14 @@ def init_db() -> None:
                 last_sync_pages INTEGER DEFAULT 0,
                 is_active INTEGER NOT NULL DEFAULT 1
             );
+
+            CREATE TABLE IF NOT EXISTS dashboard_snapshots (
+                snapshot_key TEXT PRIMARY KEY,
+                updated_at TEXT NOT NULL,
+                row_count INTEGER NOT NULL DEFAULT 0,
+                source_count INTEGER NOT NULL DEFAULT 0,
+                algorithm_version TEXT NOT NULL DEFAULT '',
+                payload_json TEXT NOT NULL
+            );
             """
         )
-    _bootstrap_from_supabase_if_needed()

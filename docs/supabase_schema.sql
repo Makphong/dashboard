@@ -46,5 +46,13 @@ create table if not exists public.dashboard_meta_state (
   id text primary key,
   updated_at timestamptz not null,
   row_count integer not null default 0,
-  source_count integer not null default 0
+  source_count integer not null default 0,
+  algorithm_version text not null default '',
+  payload_json text
 );
+
+alter table public.dashboard_meta_state
+  add column if not exists algorithm_version text not null default '';
+
+alter table public.dashboard_meta_state
+  add column if not exists payload_json text;

@@ -13,12 +13,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import parse_qs, urlparse
 
 from ...infrastructure.db.sqlite_store import (
+    _sync_dashboard_snapshot_to_supabase_if_enabled,
     _sync_source_to_supabase_if_enabled,
     _sync_to_supabase_if_enabled,
+    ensure_full_raw_state_from_supabase_if_enabled,
     get_conn,
 )
 from ..segmentation import engine as segmentation_engine
 from ..analytics import user_performance as analytics_service
+from ..dashboard_snapshot import clear_local_dashboard_snapshot, rebuild_dashboard_snapshot
 from ...infrastructure.parsers import tabular_parser
 
 _GSHEET_TAB_CACHE_TTL_SECONDS = 15 * 60
@@ -59,6 +62,7 @@ def utc_now_iso() -> str:
 def invalidate_runtime_caches() -> None:
     segmentation_engine.clear_normalized_events_cache()
     analytics_service.clear_user_performance_cache()
+    clear_local_dashboard_snapshot()
 
 def clear_source_by_file_name(conn: sqlite3.Connection, file_name: str) -> str | None:
     row = conn.execute(
@@ -265,6 +269,7 @@ def _ingest_gsheet_pages(spreadsheet_id: str, all_pages: list[tuple[str, list[di
     return {"total_rows": total_rows, "total_pages": len(all_pages)}
 
 def connect_gsheet(url: str) -> dict:
+    ensure_full_raw_state_from_supabase_if_enabled()
     spreadsheet_id = _extract_gsheet_id(url)
     if not spreadsheet_id:
         raise ValueError("Invalid Google Sheet URL.")
@@ -283,10 +288,13 @@ def connect_gsheet(url: str) -> dict:
             "INSERT INTO connected_sheets (connection_id, url, spreadsheet_id, label, connected_at, last_sync_at, last_sync_rows, last_sync_pages, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
             (connection_id, url, spreadsheet_id, label, now, now, result["total_rows"], result["total_pages"]),
         )
+    snapshot_payload = rebuild_dashboard_snapshot(sync_remote=False)
     _sync_to_supabase_if_enabled(required=True)
+    _sync_dashboard_snapshot_to_supabase_if_enabled(snapshot_payload, required=False)
     return {"connection_id": connection_id, "spreadsheet_id": spreadsheet_id, "label": label, "total_rows": result["total_rows"], "total_pages": result["total_pages"], "connected_at": now}
 
 def sync_all_gsheets() -> list[dict]:
+    ensure_full_raw_state_from_supabase_if_enabled()
     with get_conn() as conn:
         rows = conn.execute("SELECT connection_id, url, spreadsheet_id, label FROM connected_sheets WHERE is_active = 1").fetchall()
     if not rows: return []
@@ -307,10 +315,13 @@ def sync_all_gsheets() -> list[dict]:
             results.append({"connection_id": connection_id, "status": "ok", "total_rows": result["total_rows"], "synced_at": now})
         except Exception as exc:
             results.append({"connection_id": connection_id, "status": "error", "error": str(exc)})
+    snapshot_payload = rebuild_dashboard_snapshot(sync_remote=False)
     _sync_to_supabase_if_enabled(required=True)
+    _sync_dashboard_snapshot_to_supabase_if_enabled(snapshot_payload, required=False)
     return results
 
 def disconnect_gsheet(connection_id: str) -> None:
+    ensure_full_raw_state_from_supabase_if_enabled()
     with get_conn() as conn:
         row = conn.execute("SELECT spreadsheet_id FROM connected_sheets WHERE connection_id = ?", (connection_id,)).fetchone()
         if row:
@@ -318,7 +329,9 @@ def disconnect_gsheet(connection_id: str) -> None:
             clear_source_by_file_name(conn, file_name)
         conn.execute("DELETE FROM connected_sheets WHERE connection_id = ?", (connection_id,))
     invalidate_runtime_caches()
+    snapshot_payload = rebuild_dashboard_snapshot(sync_remote=False)
     _sync_to_supabase_if_enabled(required=True)
+    _sync_dashboard_snapshot_to_supabase_if_enabled(snapshot_payload, required=False)
 
 def list_gsheet_connections() -> list[dict]:
     with get_conn() as conn:
@@ -326,6 +339,7 @@ def list_gsheet_connections() -> list[dict]:
     return [{"connectionId": r["connection_id"], "url": r["url"], "spreadsheetId": r["spreadsheet_id"], "label": r["label"], "connectedAt": r["connected_at"], "lastSyncAt": r["last_sync_at"], "lastSyncRows": r["last_sync_rows"], "lastSyncPages": r["last_sync_pages"]} for r in rows]
 
 def ingest_file(file_name: str, payload: bytes) -> dict:
+    ensure_full_raw_state_from_supabase_if_enabled()
     pages = tabular_parser.parse_uploaded_file(file_name, payload)
     now = utc_now_iso()
     source_id = uuid.uuid4().hex
@@ -344,11 +358,13 @@ def ingest_file(file_name: str, payload: bytes) -> dict:
             total_rows += len(rows)
         conn.execute("UPDATE source_files SET total_rows = ?, total_pages = ? WHERE source_id = ?", (total_rows, len(pages), source_id))
     invalidate_runtime_caches()
+    snapshot_payload = rebuild_dashboard_snapshot(sync_remote=False)
     _sync_source_to_supabase_if_enabled(
         source_id=source_id,
         removed_source_id=removed_source_id,
         required=True,
     )
+    _sync_dashboard_snapshot_to_supabase_if_enabled(snapshot_payload, required=False)
     return {"source_id": source_id, "file_name": file_name, "total_rows": total_rows, "total_pages": len(pages), "pages": [name for name, _ in pages], "uploaded_at": now}
 
 def list_sources() -> list[dict]:
@@ -368,9 +384,12 @@ def list_sources() -> list[dict]:
     return result
 
 def delete_source(source_id: str) -> None:
+    ensure_full_raw_state_from_supabase_if_enabled()
     with get_conn() as conn:
         conn.execute("DELETE FROM unified_rows WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM source_pages WHERE source_id = ?", (source_id,))
         conn.execute("DELETE FROM source_files WHERE source_id = ?", (source_id,))
     invalidate_runtime_caches()
+    snapshot_payload = rebuild_dashboard_snapshot(sync_remote=False)
     _sync_to_supabase_if_enabled(required=True)
+    _sync_dashboard_snapshot_to_supabase_if_enabled(snapshot_payload, required=False)

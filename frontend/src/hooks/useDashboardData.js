@@ -6,6 +6,7 @@ import { useDashboardFilters } from '../features/dashboard/hooks/useDashboardFil
 import { useDashboardMetrics } from '../features/dashboard/hooks/useDashboardMetrics.js';
 
 const IDLE_SYNC_DELAY_MS = 1200;
+const AUTO_SYNC_STALE_MS = 15 * 60 * 1000;
 
 function scheduleIdleTask(callback, timeout = IDLE_SYNC_DELAY_MS) {
   if (typeof window === 'undefined') return () => {};
@@ -17,6 +18,21 @@ function scheduleIdleTask(callback, timeout = IDLE_SYNC_DELAY_MS) {
 
   const handle = window.setTimeout(callback, timeout);
   return () => window.clearTimeout(handle);
+}
+
+function shouldAutoSyncConnections(connections) {
+  if (!Array.isArray(connections) || connections.length === 0) return false;
+
+  const now = Date.now();
+  return connections.some((connection) => {
+    const lastSyncAt = String(connection?.lastSyncAt || '').trim();
+    if (!lastSyncAt) return true;
+
+    const parsedAt = Date.parse(lastSyncAt.endsWith('Z') ? lastSyncAt : `${lastSyncAt}Z`);
+    if (Number.isNaN(parsedAt)) return true;
+
+    return (now - parsedAt) >= AUTO_SYNC_STALE_MS;
+  });
 }
 
 export function useDashboardData() {
@@ -160,6 +176,7 @@ export function useDashboardData() {
 
   useEffect(() => {
     if (!isInitialLoadDone) return undefined;
+    if (!shouldAutoSyncConnections(gsheetConnections)) return undefined;
 
     const cancelIdleTask = scheduleIdleTask(() => {
       syncGSheet()
@@ -168,7 +185,7 @@ export function useDashboardData() {
     });
 
     return cancelIdleTask;
-  }, [isInitialLoadDone]);
+  }, [gsheetConnections, isInitialLoadDone]);
 
   return {
     sources,

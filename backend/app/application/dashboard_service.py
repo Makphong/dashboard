@@ -11,11 +11,14 @@ from urllib.parse import unquote, urlparse
 from ..config.constants.constants_paths import DB_PATH, PROJECT_ROOT
 from ..config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
 from ..infrastructure.db.sqlite_store import (
+    ensure_dashboard_snapshot_from_supabase_if_needed,
     ensure_fresh_from_supabase_if_enabled,
+    ensure_full_raw_state_from_supabase_if_enabled,
     init_db,
 )
 from ..infrastructure.parsers import tabular_parser
 from ..services.analytics import user_performance as analytics_service
+from ..services import dashboard_snapshot as dashboard_snapshot_service
 from ..services.segmentation import engine as segmentation_engine
 from ..services.sync import data_manager
 
@@ -47,13 +50,19 @@ def refresh_runtime_data() -> None:
     ensure_fresh_from_supabase_if_enabled()
 
 
+def refresh_dashboard_snapshot_data() -> None:
+    ensure_dashboard_snapshot_from_supabase_if_needed()
+
+
 # Analytics service exports
 def compute_user_performance() -> dict:
+    ensure_full_raw_state_from_supabase_if_enabled()
     refresh_runtime_data()
     return analytics_service.compute_user_performance()
 
 
 def build_debug_snapshot() -> dict:
+    ensure_full_raw_state_from_supabase_if_enabled()
     refresh_runtime_data()
     return analytics_service.build_debug_snapshot()
 
@@ -63,32 +72,34 @@ def build_health_payload() -> dict:
 
 # Response payload helpers
 def api_sources_payload() -> dict:
-    refresh_runtime_data()
-    return {"sources": list_sources()}
+    payload = api_dashboard_payload(include_debug=False)
+    return {"sources": payload.get("sources", [])}
 
 def api_gsheet_connections_payload() -> dict:
-    refresh_runtime_data()
-    return {"connections": list_gsheet_connections()}
+    payload = api_dashboard_payload(include_debug=False)
+    return {"connections": payload.get("connections", [])}
 
 def api_dashboard_payload(include_debug: bool = False) -> dict:
-    refresh_runtime_data()
+    refresh_dashboard_snapshot_data()
+    payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
+    if payload is None:
+        ensure_full_raw_state_from_supabase_if_enabled()
+        refresh_runtime_data()
+        payload = dashboard_snapshot_service.rebuild_dashboard_snapshot(sync_remote=False)
+
     payload = {
-        "sources": list_sources(),
-        "performance": analytics_service.compute_user_performance(),
-        "connections": list_gsheet_connections(),
+        **payload,
         "healthInfo": analytics_service.build_health_payload(),
     }
     if include_debug:
-        payload["debugInfo"] = analytics_service.build_debug_snapshot()
+        payload["debugInfo"] = build_debug_snapshot()
     return payload
 
 def api_upload_payload(files: list[tuple[str, bytes]]) -> dict:
-    refresh_runtime_data()
     uploaded = [ingest_file(name, binary) for name, binary in files]
     return {"uploaded": uploaded}
 
 def api_connect_gsheet_payload(url: str) -> dict:
-    refresh_runtime_data()
     result = connect_gsheet(url)
     return {
         "connected": result,
@@ -97,7 +108,6 @@ def api_connect_gsheet_payload(url: str) -> dict:
     }
 
 def api_sync_gsheet_payload() -> dict:
-    refresh_runtime_data()
     results = sync_all_gsheets()
     return {
         "synced": results,
@@ -106,12 +116,10 @@ def api_sync_gsheet_payload() -> dict:
     }
 
 def api_delete_source_payload(source_id: str) -> dict:
-    refresh_runtime_data()
     delete_source(source_id)
     return {"ok": True, **api_sources_payload()}
 
 def api_delete_gsheet_payload(connection_id: str) -> dict:
-    refresh_runtime_data()
     disconnect_gsheet(connection_id)
     return {
         "ok": True,

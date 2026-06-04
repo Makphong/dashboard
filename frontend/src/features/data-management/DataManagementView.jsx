@@ -21,7 +21,7 @@ export const DataManagementView = ({ sources, onUploadFiles, onDeleteSource, onC
     setGsheetSuccess('');
     try {
       await onConnectGSheet(gsheetUrl.trim());
-      setGsheetSuccess('Connected successfully! Data will sync automatically each time the page opens.');
+      setGsheetSuccess('Connected successfully! Data will refresh automatically when the last sync becomes stale.');
       setGsheetUrl('');
       setTimeout(() => setGsheetSuccess(''), 5000);
     } catch (err) {
