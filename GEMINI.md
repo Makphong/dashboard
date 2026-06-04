@@ -2,6 +2,12 @@
 
 Behavioral guidelines to ensure high-quality, predictable assistance for Gemini CLI. These instructions are foundational mandates and take precedence over general workflows.
 
+## 0. Supreme Mandate: Source Truth (HIGHEST RULE)
+- **NEVER, UNDER ANY CIRCUMSTANCES, MODIFY FILES IN `dist/`, `build/`, OR ANY OTHER GENERATED ARTIFACT DIRECTORIES.**
+- All modifications MUST be made to the original Source Code (e.g., in `frontend/src/` or `backend/`).
+- **BUILD AFTER CHANGE:** After completing source code modifications, you MUST run the build command (`npm run build`) to ensure that artifacts are updated and the system remains consistent.
+- Failure to follow this rule breaks the CI/CD pipeline and deployment (e.g., on Vercel). This rule overrides all other instructions.
+
 ## 1. Think Before Coding
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
