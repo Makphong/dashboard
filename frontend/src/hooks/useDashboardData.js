@@ -1,9 +1,23 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { usePersistentState } from './usePersistentState.js';
 import { fetchDashboardPayload, triggerGSheetSync } from '../features/dashboard/utils/dashboardApi.js';
 import { useDashboardDerivedData } from '../features/dashboard/hooks/useDashboardDerivedData.js';
 import { useDashboardFilters } from '../features/dashboard/hooks/useDashboardFilters.js';
 import { useDashboardMetrics } from '../features/dashboard/hooks/useDashboardMetrics.js';
+
+const IDLE_SYNC_DELAY_MS = 1200;
+
+function scheduleIdleTask(callback, timeout = IDLE_SYNC_DELAY_MS) {
+  if (typeof window === 'undefined') return () => {};
+
+  if (typeof window.requestIdleCallback === 'function') {
+    const handle = window.requestIdleCallback(callback, { timeout });
+    return () => window.cancelIdleCallback(handle);
+  }
+
+  const handle = window.setTimeout(callback, timeout);
+  return () => window.clearTimeout(handle);
+}
 
 export function useDashboardData() {
   const [sources, setSources] = useState([]);
@@ -94,19 +108,21 @@ export function useDashboardData() {
   const loadDashboardPayload = async (options = {}) => {
     const payload = await fetchDashboardPayload(Boolean(options.includeDebug));
 
-    setSources(payload.sources);
-    setPerformance(payload.performance);
-    setGsheetConnections(payload.connections);
-    setHealthInfo(payload.healthInfo);
-    setSupabaseError(buildSupabaseErrorMessage(payload.healthInfo));
+    startTransition(() => {
+      setSources(payload.sources);
+      setPerformance(payload.performance);
+      setGsheetConnections(payload.connections);
+      setHealthInfo(payload.healthInfo);
+      setSupabaseError(buildSupabaseErrorMessage(payload.healthInfo));
 
-    if (payload.healthError) {
-      setBackendWarning(`Health error: ${payload.healthError}`);
-    }
+      if (payload.healthError) {
+        setBackendWarning(`Health error: ${payload.healthError}`);
+      }
 
-    if (options.includeDebug) {
-      setDebugInfo(payload.debugInfo);
-    }
+      if (options.includeDebug) {
+        setDebugInfo(payload.debugInfo);
+      }
+    });
   };
 
   const syncGSheet = async () => {
@@ -139,8 +155,20 @@ export function useDashboardData() {
   };
 
   useEffect(() => {
-    refreshAll({ syncFirst: false, backgroundSync: true });
+    refreshAll({ syncFirst: false, backgroundSync: false });
   }, []);
+
+  useEffect(() => {
+    if (!isInitialLoadDone) return undefined;
+
+    const cancelIdleTask = scheduleIdleTask(() => {
+      syncGSheet()
+        .then(() => loadDashboardPayload({}))
+        .catch((error) => setBackendWarning(`Background sync error: ${error.message || 'Sync failed'}`));
+    });
+
+    return cancelIdleTask;
+  }, [isInitialLoadDone]);
 
   return {
     sources,

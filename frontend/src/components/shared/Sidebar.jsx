@@ -23,7 +23,7 @@ export const Sidebar = React.memo(({ isMobileOpen, setMobileOpen, isCollapsed, t
       <div className="flex items-center gap-2 min-w-max">
         <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center">
           <img 
-            src="https://upload.wikimedia.org/wikipedia/en/f/f0/Krung_Thai_Bank_logo.svg" 
+            src="/krung-thai-bank-logo.svg"
             alt="KTB Logo" 
             className="w-8 h-8 object-contain block"
           />

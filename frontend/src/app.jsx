@@ -10,17 +10,6 @@ const ExpandedVisualizationModal = lazy(() => import('./features/dashboard/compo
 const ExportConfirmModal = lazy(() => import('./features/dashboard/components/ExportConfirmModal.jsx').then((module) => ({ default: module.ExportConfirmModal })));
 const SegmentDetailPopup = lazy(() => import('./features/dashboard/components/SegmentDetailPopup.jsx').then((module) => ({ default: module.SegmentDetailPopup })));
 
-function FullScreenLoader({ label = 'Loading dashboard...' }) {
-  return (
-    <div className="h-screen w-screen bg-[#fbfdff] flex items-center justify-center">
-      <div className="text-center">
-        <div className="mx-auto mb-3 h-9 w-9 rounded-full border-4 border-slate-200 border-t-[#00a4e4] animate-spin" />
-        <p className="text-sm font-semibold text-slate-600">{label}</p>
-      </div>
-    </div>
-  );
-}
-
 function PanelLoader() {
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
@@ -31,6 +20,19 @@ function PanelLoader() {
         ))}
       </div>
       <div className="h-[28rem] rounded-2xl border border-[#d7e8f6] bg-white shadow-ktb animate-pulse" />
+    </div>
+  );
+}
+
+function DataManagementLoader() {
+  return (
+    <div className="max-w-[1600px] mx-auto space-y-6">
+      <div className="h-10 w-56 rounded-2xl bg-slate-100 animate-pulse" />
+      <div className="h-40 rounded-2xl bg-slate-100 animate-pulse" />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="h-72 rounded-2xl bg-slate-100 animate-pulse" />
+        <div className="h-72 rounded-2xl bg-slate-100 animate-pulse" />
+      </div>
     </div>
   );
 }
@@ -71,13 +73,14 @@ function App() {
     );
   }
 
-  if (!dashboard.isInitialLoadDone) return <FullScreenLoader />;
-
   return (
     <>
       <DashboardLayout dashboard={dashboard} controller={controller}>
-        <Suspense fallback={<PanelLoader />}>
-          {controller.activeView === 'data-management' ? (
+        {!dashboard.isInitialLoadDone ? (
+          controller.activeView === 'data-management' ? <DataManagementLoader /> : <PanelLoader />
+        ) : (
+          <Suspense fallback={controller.activeView === 'data-management' ? <DataManagementLoader /> : <PanelLoader />}>
+            {controller.activeView === 'data-management' ? (
             <DataManagementView
               sources={dashboard.sources}
               onUploadFiles={controller.handleUploadFiles}
@@ -89,33 +92,34 @@ function App() {
               syncing={dashboard.syncing}
               healthInfo={dashboard.healthInfo}
             />
-          ) : controller.activeView === 'system-performance' ? (
-            <SystemPerformanceView segments={dashboard.ganttVisibleSegments} flowRows={dashboard.flowRows} />
-          ) : (
-            <DashboardView
-              dashboard={dashboard}
-              workloadVisibleRows={controller.workloadVisibleRows}
-              showProcessBreakdownIdle={controller.showProcessBreakdownIdle}
-              setShowProcessBreakdownIdle={controller.setShowProcessBreakdownIdle}
-              showProcessBreakdownLabels={controller.showProcessBreakdownLabels}
-              setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
-              mergeReviewAndEdit={controller.mergeReviewAndEdit}
-              setMergeReviewAndEdit={controller.setMergeReviewAndEdit}
-              ganttSingleLaneMode={controller.ganttSingleLaneMode}
-              setGanttSingleLaneMode={controller.setGanttSingleLaneMode}
-              showSystemLane={controller.showSystemLane}
-              setShowSystemLane={controller.setShowSystemLane}
-              showStarMarkers={controller.showStarMarkers}
-              ganttCollapseGaps={controller.ganttCollapseGaps}
-              setGanttCollapseGaps={controller.setGanttCollapseGaps}
-              showGanttLegend={controller.showGanttLegend}
-              setShowGanttLegend={controller.setShowGanttLegend}
-              setSelectedGanttSegment={controller.setSelectedGanttSegment}
-              setExpandedVisualizationId={controller.setExpandedVisualizationId}
-              setShowExportConfirm={controller.setShowExportConfirm}
-            />
-          )}
-        </Suspense>
+            ) : controller.activeView === 'system-performance' ? (
+              <SystemPerformanceView segments={dashboard.ganttVisibleSegments} flowRows={dashboard.flowRows} />
+            ) : (
+              <DashboardView
+                dashboard={dashboard}
+                workloadVisibleRows={controller.workloadVisibleRows}
+                showProcessBreakdownIdle={controller.showProcessBreakdownIdle}
+                setShowProcessBreakdownIdle={controller.setShowProcessBreakdownIdle}
+                showProcessBreakdownLabels={controller.showProcessBreakdownLabels}
+                setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
+                mergeReviewAndEdit={controller.mergeReviewAndEdit}
+                setMergeReviewAndEdit={controller.setMergeReviewAndEdit}
+                ganttSingleLaneMode={controller.ganttSingleLaneMode}
+                setGanttSingleLaneMode={controller.setGanttSingleLaneMode}
+                showSystemLane={controller.showSystemLane}
+                setShowSystemLane={controller.setShowSystemLane}
+                showStarMarkers={controller.showStarMarkers}
+                ganttCollapseGaps={controller.ganttCollapseGaps}
+                setGanttCollapseGaps={controller.setGanttCollapseGaps}
+                showGanttLegend={controller.showGanttLegend}
+                setShowGanttLegend={controller.setShowGanttLegend}
+                setSelectedGanttSegment={controller.setSelectedGanttSegment}
+                setExpandedVisualizationId={controller.setExpandedVisualizationId}
+                setShowExportConfirm={controller.setShowExportConfirm}
+              />
+            )}
+          </Suspense>
+        )}
       </DashboardLayout>
 
       <Suspense fallback={null}>

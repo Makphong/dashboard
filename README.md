@@ -32,6 +32,7 @@
    `npm install`
 2. Build frontend:
    `npm run build`
+   optional bundle analysis: `npm run analyze`
 3. Start server:
    `bash scripts/start.sh` (Linux/macOS)
    or `.\scripts\start.ps1` (Windows)
