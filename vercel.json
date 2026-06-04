@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "frontend/dist",
   "functions": {
     "api/**/*.py": {
       "maxDuration": 60
@@ -12,36 +14,24 @@
       "dest": "/api/index.py"
     },
     {
-      "src": "/frontend/src/app.jsx",
-      "dest": "/api/index.py"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
-      "src": "/frontend/src/(.*\\.(?:js|jsx|mjs|css|json|map))",
-      "dest": "/frontend/src/$1"
+      "src": "/fonts/(.*)",
+      "dest": "/fonts/$1"
     },
     {
-      "src": "/fonts/(.*\\.ttf)",
-      "dest": "/frontend/public/fonts/$1"
-    },
-    {
-      "src": "/favicon\\.ico",
-      "dest": "/frontend/public/krung-thai-bank-logo.svg"
-    },
-    {
-      "src": "/(robots\\.txt|manifest\\.webmanifest)",
-      "dest": "/frontend/public/$1"
-    },
-    {
-      "src": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico))",
-      "dest": "/frontend/public/$1"
+      "src": "/(.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|mjs|map))",
+      "dest": "/$1"
     },
     {
       "src": "/",
-      "dest": "/frontend/public/index.html"
+      "dest": "/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/public/index.html"
+      "dest": "/index.html"
     }
   ]
 }
