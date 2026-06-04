@@ -1,4 +1,4 @@
-﻿# Dashboard (Vercel + Supabase Ready)
+﻿# Dashboard (Vercel + Supabase Ready) 
 
 ## Project Structure  
 
