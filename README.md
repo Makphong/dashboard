@@ -83,7 +83,7 @@ When Supabase env vars are present:
 Default SQLite path is `data/local_dashboard.db` (with fallback to legacy `local_dashboard.db`).
 Set `LOCAL_DB_PATH` when you want to use another location.
 
-## Deploy on Vercel
+## Deploy on Vercel 
 
 1. Push repository to GitHub.
 2. Import project in Vercel.
