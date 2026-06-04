@@ -41,6 +41,15 @@ export const GanttTimelineChart = ({
   const bodyScrollRef = useRef(null);
   const verticalScrollRef = useRef(null);
   const dragRef = useRef({ active: false, startX: 0, startScrollLeft: 0 });
+  const touchRef = useRef({
+    mode: null,
+    startX: 0,
+    startScrollLeft: 0,
+    startDistance: 0,
+    startZoom: 1,
+    anchorX: 0,
+    anchorTime: 0,
+  });
   const zoomScaleRef = useRef(1);
   const pendingZoomAnchorRef = useRef(null);
   const scrollRequestRef = useRef(null);
@@ -220,6 +229,89 @@ export const GanttTimelineChart = ({
     dragRef.current.active = false;
   };
 
+  const onTouchStart = (event) => {
+    if (!bodyScrollRef.current) return;
+
+    if (event.touches.length >= 2) {
+      const [touchA, touchB] = event.touches;
+      const distance = Math.hypot(touchB.clientX - touchA.clientX, touchB.clientY - touchA.clientY);
+      const rect = bodyScrollRef.current.getBoundingClientRect();
+      const anchorX = ((touchA.clientX + touchB.clientX) / 2) - rect.left;
+      const absoluteX = bodyScrollRef.current.scrollLeft + anchorX;
+      const anchorTime = displayMinTs + ((absoluteX - timelinePadLeft) / timelineWidth) * displaySpanMs;
+
+      touchRef.current = {
+        mode: 'pinch',
+        startX: 0,
+        startScrollLeft: bodyScrollRef.current.scrollLeft,
+        startDistance: Math.max(distance, 1),
+        startZoom: zoomScaleRef.current,
+        anchorX,
+        anchorTime,
+      };
+      event.preventDefault();
+      return;
+    }
+
+    if (event.touches.length === 1) {
+      touchRef.current = {
+        mode: 'drag',
+        startX: event.touches[0].clientX,
+        startScrollLeft: bodyScrollRef.current.scrollLeft,
+        startDistance: 0,
+        startZoom: zoomScaleRef.current,
+        anchorX: 0,
+        anchorTime: 0,
+      };
+    }
+  };
+
+  const onTouchMove = (event) => {
+    if (!bodyScrollRef.current) return;
+
+    if (touchRef.current.mode === 'pinch' && event.touches.length >= 2) {
+      const [touchA, touchB] = event.touches;
+      const distance = Math.hypot(touchB.clientX - touchA.clientX, touchB.clientY - touchA.clientY);
+      const ratio = Math.max(0.5, Math.min(3, distance / Math.max(touchRef.current.startDistance, 1)));
+      const nextZoom = Math.max(
+        GANTT_MIN_ZOOM_SCALE,
+        Math.min(GANTT_MAX_ZOOM_SCALE, touchRef.current.startZoom * ratio)
+      );
+
+      pendingZoomAnchorRef.current = {
+        anchorX: touchRef.current.anchorX,
+        time: touchRef.current.anchorTime,
+      };
+      zoomScaleRef.current = nextZoom;
+      setZoomScale(nextZoom);
+      event.preventDefault();
+      return;
+    }
+
+    if (touchRef.current.mode === 'drag' && event.touches.length === 1) {
+      const touch = event.touches[0];
+      bodyScrollRef.current.scrollLeft = touchRef.current.startScrollLeft - (touch.clientX - touchRef.current.startX);
+      event.preventDefault();
+    }
+  };
+
+  const onTouchEnd = (event) => {
+    if (event.touches.length >= 2) return;
+    if (event.touches.length === 1 && bodyScrollRef.current) {
+      touchRef.current = {
+        mode: 'drag',
+        startX: event.touches[0].clientX,
+        startScrollLeft: bodyScrollRef.current.scrollLeft,
+        startDistance: 0,
+        startZoom: zoomScaleRef.current,
+        anchorX: 0,
+        anchorTime: 0,
+      };
+      return;
+    }
+    touchRef.current.mode = null;
+  };
+
   useEffect(() => {
     const viewport = bodyScrollRef.current;
     if (!viewport) return;
@@ -341,8 +433,13 @@ export const GanttTimelineChart = ({
               onMouseDown={onDragStart}
               onMouseMove={onDragMove}
               onMouseUp={onDragEnd}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              onTouchCancel={onTouchEnd}
               onMouseLeave={() => { onDragEnd(); setHoveredSegment(null); }}
               className="flex-1 overflow-x-auto no-scrollbar cursor-default"
+              style={{ touchAction: 'pan-y' }}
             >
               <GanttBarsSvg
                 timelineSvgWidth={timelineSvgWidth}

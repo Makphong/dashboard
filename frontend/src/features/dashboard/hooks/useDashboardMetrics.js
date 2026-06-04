@@ -18,14 +18,22 @@ export function useDashboardMetrics(params) {
     selectedSegmentTypes,
   } = params;
 
+  const masterFilteredSegments = useMemo(() => {
+    return filteredBaseSegments.filter((segment) => {
+      const segmentGroup = toSegmentGroup(segment.segmentType);
+      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return false;
+      return true;
+    });
+  }, [filteredBaseSegments, selectedSegmentTypes]);
+
   const kpiData = useMemo(() => {
-    const kpis = ganttVisibleSegments.length > 0 ? buildKpisFromSegments(ganttVisibleSegments) : null;
+    const kpis = masterFilteredSegments.length > 0 ? buildKpisFromSegments(masterFilteredSegments) : null;
     return kpis ? buildKpiData(kpis) : initialKpiData;
-  }, [ganttVisibleSegments]);
+  }, [masterFilteredSegments]);
 
-  const flowRows = useMemo(() => calculateFlowRows(ganttVisibleSegments), [ganttVisibleSegments]);
+  const flowRows = useMemo(() => calculateFlowRows(masterFilteredSegments), [masterFilteredSegments]);
 
-  const userStatsRows = useMemo(() => calculateUserStatsRows(ganttVisibleSegments), [ganttVisibleSegments]);
+  const userStatsRows = useMemo(() => calculateUserStatsRows(masterFilteredSegments), [masterFilteredSegments]);
 
   const contributionRows = useMemo(() => userStatsRows.map((row) => ({ ...row })), [userStatsRows]);
 

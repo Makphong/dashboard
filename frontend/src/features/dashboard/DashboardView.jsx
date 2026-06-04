@@ -214,14 +214,14 @@ export const DashboardView = React.memo(({
         {kpiData.map((kpi, idx) => (
           <div 
             key={kpi.id} 
-            className={`relative bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}
+            className={`relative min-w-0 bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}
           >
             <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4 relative z-10`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
-            <div className="text-slate-500 text-sm font-semibold mb-1 relative z-10">{kpi.label}</div>
-            <div className="text-3xl font-extrabold text-[#17335f] relative z-10">{kpi.value}</div>
-            <div className="relative z-10">
+            <div className="truncate text-slate-500 text-sm font-semibold mb-1 relative z-10">{kpi.label}</div>
+            <div className="min-w-0 whitespace-nowrap text-[1.7rem] leading-none lg:text-[2rem] font-extrabold text-[#17335f] relative z-10">{kpi.value}</div>
+            <div className="relative z-10 min-w-0">
               <KpiSubtext text={kpi.subtext} />
             </div>
           </div>
