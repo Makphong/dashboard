@@ -1,17 +1,9 @@
 import { useMemo, useState } from 'react';
 import { usePersistentState } from './usePersistentState.js';
 import { requestJson } from '../lib/api.js';
-import {
-  downloadExcelTable,
-  formatDuration,
-  toExcelDateTime,
-  toGanttSegmentTypeLabel,
-  toTimelineLane,
-} from '../lib/utils.js';
 
 export function useAppController(dashboard) {
   const {
-    ganttVisibleSegments,
     workloadContributors,
     showWorkloadSystem,
     refreshAll,
@@ -22,7 +14,6 @@ export function useAppController(dashboard) {
   const [openDropdown, setOpenDropdown] = useState('');
   const [expandedVisualizationId, setExpandedVisualizationId] = useState('');
   const [selectedGanttSegment, setSelectedGanttSegment] = useState(null);
-  const [showExportConfirm, setShowExportConfirm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = usePersistentState('sidebar_collapsed', false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -102,35 +93,6 @@ export function useAppController(dashboard) {
     }
   };
 
-  const exportTimelineExcel = () => {
-    if (ganttVisibleSegments.length === 0) return;
-
-    const columns = [
-      { key: 'no', label: 'No.' },
-      { key: 'lane', label: 'Lane' },
-      { key: 'userName', label: 'User' },
-      { key: 'segmentLabel', label: 'Segment' },
-      { key: 'start', label: 'Start' },
-      { key: 'end', label: 'End' },
-      { key: 'duration', label: 'Duration' },
-    ];
-    const rows = ganttVisibleSegments.map((segment, idx) => ({
-      no: idx + 1,
-      lane: toTimelineLane(segment.segmentType, segment.userName),
-      userName: segment.userName,
-      segmentLabel: toGanttSegmentTypeLabel(segment.segmentType),
-      start: toExcelDateTime(segment.start),
-      end: toExcelDateTime(segment.end),
-      duration: formatDuration(segment.durationSeconds),
-    }));
-    downloadExcelTable('timeline-export.xls', 'Timeline', columns, rows);
-  };
-
-  const confirmExportTimeline = () => {
-    setShowExportConfirm(false);
-    exportTimelineExcel();
-  };
-
   return {
     activeView,
     setActiveView,
@@ -140,8 +102,6 @@ export function useAppController(dashboard) {
     setExpandedVisualizationId,
     selectedGanttSegment,
     setSelectedGanttSegment,
-    showExportConfirm,
-    setShowExportConfirm,
     uploading,
     isSidebarCollapsed,
     setIsSidebarCollapsed,
@@ -176,6 +136,5 @@ export function useAppController(dashboard) {
     handleDeleteSource,
     handleConnectGSheet,
     handleDisconnectGSheet,
-    confirmExportTimeline,
   };
 }

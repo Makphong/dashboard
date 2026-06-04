@@ -10,9 +10,9 @@ const GANTT_TICK_STEP_CANDIDATES_MS = [
 
 export function buildGanttLegendItems(showIdleLane, showSystemLane, showStarMarkers) {
   const items = GANTT_DRILL_GROUPS.filter((item) => {
-    if (item.key === 'Reprocessing' || item.key === 'ReviewAutoClose' || item.key === 'EditAndComplete') return false;
+    if (item.key === 'ReviewAutoClose' || item.key === 'EditAndComplete') return false;
     if (!showIdleLane && item.key === 'Idle') return false;
-    if (!showSystemLane && item.key === 'Processing') return false;
+    if (!showSystemLane && (item.key === 'Processing' || item.key === 'Reprocessing')) return false;
     return true;
   });
 

@@ -2,7 +2,6 @@ import {
   SEGMENT_TYPE_SHORT_LABELS,
   GANTT_SEGMENT_DISPLAY_LABELS,
   PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES,
-  REPROCESSING_SEGMENT_MERGE_GAP_MS,
   MARKER_STAR_MIN_GAP_PX
 } from './constants.js';
 
@@ -66,25 +65,26 @@ export function mergeContinuousReprocessingSegments(sortedSegments) {
         || String(segment.segmentType || '') === 'SYSTEM_SCHEDULED_REPROCESSING',
     };
 
-    const previous = merged[merged.length - 1];
-    if (!previous) {
+    if (merged.length === 0) {
       merged.push(segmentCopy);
       return;
     }
 
-    const sameContext = String(previous.contextKey || '') === String(segmentCopy.contextKey || '');
-    const shouldMerge = sameContext
-      && isReprocessingSegmentType(previous.segmentType)
-      && isReprocessingSegmentType(segmentCopy.segmentType)
-      && segmentCopy.startTs <= previous.endTs + REPROCESSING_SEGMENT_MERGE_GAP_MS;
+    const mergeTargetIndex = isReprocessingSegmentType(segmentCopy.segmentType)
+      ? merged.findIndex((candidate) => isReprocessingSegmentType(candidate.segmentType))
+      : -1;
 
-    if (!shouldMerge) {
+    if (mergeTargetIndex < 0) {
       merged.push(segmentCopy);
       return;
     }
 
+    const previous = merged[mergeTargetIndex];
+    const previousEndTs = previous.endTs;
+    previous.startTs = Math.min(previous.startTs, segmentCopy.startTs);
+    if (segmentCopy.startTs <= previous.startTs) previous.start = segmentCopy.start;
     previous.endTs = Math.max(previous.endTs, segmentCopy.endTs);
-    if (segmentCopy.endTs >= previous.endTs) previous.end = segmentCopy.end;
+    if (segmentCopy.endTs >= previousEndTs) previous.end = segmentCopy.end;
     previous.durationSeconds = Math.max(0, Math.round((previous.endTs - previous.startTs) / 1000));
     previous.segmentType = 'SYSTEM_SCHEDULED_REPROCESSING';
     previous.drillGroup = 'Reprocessing';
@@ -96,7 +96,7 @@ export function mergeContinuousReprocessingSegments(sortedSegments) {
     ];
   });
 
-  return merged;
+  return merged.sort((a, b) => a.startTs - b.startTs);
 }
 
 export function toDrillGroup(segmentType) {

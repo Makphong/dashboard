@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef, useState, memo } from 'react';
-import { FileSpreadsheet, FileText, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
+import { FileText, LayoutDashboard, Maximize2, RefreshCw, Search, SlidersHorizontal, Users, Clock } from 'lucide-react';
 import { EmptyState } from '../../components/shared/EmptyState.jsx';
 import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
@@ -61,7 +61,6 @@ export const DashboardView = React.memo(({
   setShowGanttLegend,
   setSelectedGanttSegment,
   setExpandedVisualizationId,
-  setShowExportConfirm
 }) => {
   const {
     kpiData,
@@ -232,7 +231,7 @@ export const DashboardView = React.memo(({
 
       <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2 ${showTimelineFilterMenu ? 'z-[120]' : 'z-10'}`}>
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => setShowExportConfirm(true)} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white"><FileSpreadsheet className="w-4 h-4" /></button>
+          <button onClick={() => setExpandedVisualizationId('gantt-detail')} className="p-1.5 border rounded-md text-slate-400 hover:text-slate-600 bg-white" title="View details"><FileText className="w-4 h-4" /></button>
           <div className="relative" ref={timelineFilterRef}>
             <button onClick={() => setShowTimelineFilterMenu(!showTimelineFilterMenu)} className={`p-1.5 border rounded-md transition-colors bg-white ${showTimelineFilterMenu ? 'text-blue-600 border-blue-200' : 'text-slate-400 hover:text-slate-600'}`}><SlidersHorizontal className="w-4 h-4" /></button>
             {showTimelineFilterMenu && (

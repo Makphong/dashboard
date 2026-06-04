@@ -7,7 +7,6 @@ const DashboardView = lazy(() => import('./features/dashboard/DashboardView.jsx'
 const DataManagementView = lazy(() => import('./features/data-management/DataManagementView.jsx').then((module) => ({ default: module.DataManagementView })));
 const SystemPerformanceView = lazy(() => import('./features/dashboard/views/SystemPerformanceView.jsx').then((module) => ({ default: module.SystemPerformanceView })));
 const ExpandedVisualizationModal = lazy(() => import('./features/dashboard/components/ExpandedVisualizationModal.jsx').then((module) => ({ default: module.ExpandedVisualizationModal })));
-const ExportConfirmModal = lazy(() => import('./features/dashboard/components/ExportConfirmModal.jsx').then((module) => ({ default: module.ExportConfirmModal })));
 const SegmentDetailPopup = lazy(() => import('./features/dashboard/components/SegmentDetailPopup.jsx').then((module) => ({ default: module.SegmentDetailPopup })));
 
 function PanelLoader() {
@@ -115,7 +114,6 @@ function App() {
                 setShowGanttLegend={controller.setShowGanttLegend}
                 setSelectedGanttSegment={controller.setSelectedGanttSegment}
                 setExpandedVisualizationId={controller.setExpandedVisualizationId}
-                setShowExportConfirm={controller.setShowExportConfirm}
               />
             )}
           </Suspense>
@@ -151,14 +149,6 @@ function App() {
                 showGanttLegend: controller.showGanttLegend,
               },
             }}
-          />
-        ) : null}
-        {controller.showExportConfirm ? (
-          <ExportConfirmModal
-            isOpen={controller.showExportConfirm}
-            onClose={() => controller.setShowExportConfirm(false)}
-            onConfirm={controller.confirmExportTimeline}
-            count={dashboard.ganttVisibleSegments.length}
           />
         ) : null}
       </Suspense>

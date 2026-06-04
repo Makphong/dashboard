@@ -1,7 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { ChevronDown, Clock, User, X } from 'lucide-react';
 import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
-import { toDrillGroup } from '../../../lib/segmentUtils.js';
+import { mergeContinuousReprocessingSegments, toDrillGroup } from '../../../lib/segmentUtils.js';
 import { buildAverageTransitionTimeData } from '../utils/transitionMetrics.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
 
@@ -21,6 +21,124 @@ function buildChartAnimationKey(rows, fields) {
     const values = fields.map((field) => String(row?.[field] ?? ''));
     return `${rowId}:${values.join(':')}`;
   }).join('|');
+}
+
+const POINT_IN_TIME_SEGMENT_TYPES = new Set([
+  'AUTO_TIMEOUT_MARKER',
+  'COMPLETE_BY_REVIEW_MARKER',
+  'COMPLETE_BY_EDIT_MARKER',
+  'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER',
+  'REOPEN_MARKER',
+  'REOPEN_TO_REVIEW_HANDOFF_MARKER',
+]);
+
+function isTimelineDurationSegment(segment) {
+  const segmentType = String(segment?.segmentType || '');
+  if (POINT_IN_TIME_SEGMENT_TYPES.has(segmentType)) return false;
+
+  const rawStartTs = Date.parse(String(segment?.start || ''));
+  const rawEndTs = Date.parse(String(segment?.end || ''));
+  if (Number.isFinite(rawStartTs) && Number.isFinite(rawEndTs)) return rawEndTs > rawStartTs;
+
+  const startTs = Number(segment?.startTs);
+  const endTs = Number(segment?.endTs);
+  return Number.isFinite(startTs) && Number.isFinite(endTs) && endTs > startTs;
+}
+
+function toTimelineDetailCountKey(segmentType) {
+  const drillGroup = toDrillGroup(segmentType);
+  if (drillGroup === 'Uploading') return 'Uploading';
+  if (drillGroup === 'Processing') return 'Processing';
+  if (drillGroup === 'Reprocessing') return 'Reprocessing';
+  if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') return 'Review';
+  if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') return 'Edit';
+  return '';
+}
+
+function toTimelineBarLabel(segmentType) {
+  const drillGroup = toDrillGroup(segmentType);
+  if (drillGroup === 'Processing') return 'First Spread';
+  if (drillGroup === 'Reprocessing') return 'Second Spread';
+  return toGanttSegmentTypeLabel(segmentType);
+}
+
+function buildTimelineDetailData(segments) {
+  const rawBars = (Array.isArray(segments) ? segments : [])
+    .filter((segment) => isTimelineDurationSegment(segment))
+    .map((segment, index) => {
+      const countKey = toTimelineDetailCountKey(segment.segmentType);
+      return {
+        id: segment.id || `timeline-bar-${index}`,
+        countKey,
+        lane: toTimelineLane(segment.segmentType, segment.userName),
+        userName: segment.userName || 'System',
+        activity: toTimelineBarLabel(segment.segmentType),
+        segmentType: String(segment.segmentType || 'UNKNOWN'),
+        start: segment.start,
+        end: segment.end,
+        startTs: Number(segment.startTs) || Date.parse(String(segment.start || '')) || 0,
+        durationSeconds: Number(segment.durationSeconds) || 0,
+        documentLabel: segment.documentLabel || (segment.pageName ? `${segment.fileName || 'Unknown File'} / ${segment.pageName}` : (segment.fileName || 'Unknown File')),
+      };
+    })
+    .sort((a, b) => a.startTs - b.startTs);
+
+  const barsByLane = new Map();
+  rawBars.forEach((bar) => {
+    if (!barsByLane.has(bar.lane)) barsByLane.set(bar.lane, []);
+    barsByLane.get(bar.lane).push(bar);
+  });
+
+  const bars = Array.from(barsByLane.values())
+    .flatMap((laneBars) => mergeContinuousReprocessingSegments(laneBars))
+    .map((bar) => ({
+      ...bar,
+      countKey: toTimelineDetailCountKey(bar.segmentType),
+      activity: toTimelineBarLabel(bar.segmentType),
+    }))
+    .sort((a, b) => a.startTs - b.startTs);
+
+  const summaryCounts = { Uploading: 0, Processing: 0, Reprocessing: 0, Review: 0, Edit: 0 };
+  const sourceMap = new Map();
+
+  bars.forEach((bar) => {
+    if (bar.countKey) summaryCounts[bar.countKey] += 1;
+
+    const sourceKey = bar.activity;
+    if (!sourceMap.has(sourceKey)) {
+      sourceMap.set(sourceKey, {
+        key: sourceKey,
+        activity: bar.activity,
+        segmentTypes: new Set(),
+        count: 0,
+        totalSeconds: 0,
+      });
+    }
+    const source = sourceMap.get(sourceKey);
+    source.segmentTypes.add(bar.segmentType);
+    source.count += 1;
+    source.totalSeconds += bar.durationSeconds;
+  });
+
+  return {
+    bars,
+    summaryCards: [
+      { key: 'Uploading', label: 'Uploading', count: summaryCounts.Uploading, accentClass: 'text-[#6d28d9]' },
+      { key: 'Processing', label: 'First Spread', count: summaryCounts.Processing, accentClass: 'text-[#0f172a]' },
+      { key: 'Reprocessing', label: 'Second Spread', count: summaryCounts.Reprocessing, accentClass: 'text-[#3730a3]' },
+      { key: 'Review', label: 'Review', count: summaryCounts.Review, accentClass: 'text-[#0f766e]' },
+      { key: 'Edit', label: 'Edit', count: summaryCounts.Edit, accentClass: 'text-[#9a3412]' },
+    ],
+    sourceRows: Array.from(sourceMap.values())
+      .map((row) => ({
+        ...row,
+        segmentType: Array.from(row.segmentTypes).sort((a, b) => a.localeCompare(b)).join(', '),
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.activity.localeCompare(b.activity);
+      }),
+  };
 }
 
 function buildUserGroups(segments, workloadVisibleRows) {
@@ -239,6 +357,72 @@ function buildTransitionBreakdownGroups(segments) {
     }))
     .filter((group) => group.activities.length > 0);
 }
+
+const TimelineDetailView = React.memo(({ segments }) => {
+  const { bars, summaryCards, sourceRows } = React.useMemo(
+    () => buildTimelineDetailData(segments),
+    [segments]
+  );
+
+  if (bars.length === 0) {
+    return (
+      <div className="min-h-[320px] flex items-center justify-center rounded-[2rem] border border-dashed border-slate-200 bg-slate-50 text-slate-500">
+        No timeline bar details available for the current filters.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <div className="grid gap-3 md:grid-cols-5">
+          {summaryCards.map((card) => (
+            <div key={card.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">{card.label}</div>
+              <div className={`mt-2 text-3xl font-extrabold leading-none ${card.accentClass}`}>{card.count}</div>
+              <div className="mt-2 text-xs font-medium text-slate-500">bars</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-[1.5rem] bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Source detail</div>
+          <div className="text-xl font-bold text-[#17335f]">Bars in the current timeline</div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-white">
+              <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                <th className="px-5 py-3">No.</th>
+                <th className="px-5 py-3">Lane</th>
+                <th className="px-5 py-3">Bar</th>
+                <th className="px-5 py-3">Source</th>
+                <th className="px-5 py-3">Start</th>
+                <th className="px-5 py-3">End</th>
+                <th className="px-5 py-3">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bars.map((bar, index) => (
+                <tr key={bar.id} className="border-b border-slate-100 last:border-b-0">
+                  <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
+                  <td className="px-5 py-4 font-semibold text-[#17335f]">{bar.lane}</td>
+                  <td className="px-5 py-4 font-semibold text-[#17335f]">{bar.activity}</td>
+                  <td className="px-5 py-4 text-slate-600">{bar.documentLabel}</td>
+                  <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(bar.start)}</td>
+                  <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(bar.end)}</td>
+                  <td className="px-5 py-4 font-bold text-[#00a4e4]">{formatDuration(bar.durationSeconds)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+});
 
 const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
   const [openUser, setOpenUser] = React.useState('');
@@ -789,7 +973,9 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
 export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose, data }) => {
   if (!visualizationId) return null;
 
-  const modalTitle = visualizationId === 'donut-detail'
+  const modalTitle = visualizationId === 'gantt-detail'
+    ? 'Timeline Source Details'
+    : visualizationId === 'donut-detail'
     ? 'Visualization Source Details'
     : visualizationId === 'contribution-detail'
       ? 'User Breakdown Details'
@@ -798,7 +984,9 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         : visualizationId === 'matrix-detail'
           ? 'Average Transition Time Details'
       : 'Full View Analysis';
-  const modalSubtitle = visualizationId === 'donut-detail'
+  const modalSubtitle = visualizationId === 'gantt-detail'
+    ? 'Bars Counted From Interval Segments Only'
+    : visualizationId === 'donut-detail'
     ? 'User Activity Timeline'
     : visualizationId === 'contribution-detail'
       ? 'Review And Edit Summary'
@@ -929,6 +1117,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
             )}
             {visualizationId === 'donut' && <DonutWorkloadChart key={donutAnimationKey} rows={workloadVisibleRows} expanded />}
           </Suspense>
+          {visualizationId === 'gantt-detail' && <TimelineDetailView segments={ganttVisibleSegments} />}
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView
               segments={ganttVisibleSegments}
