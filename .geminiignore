@@ -1,5 +1,5 @@
 # =================================================================
-# GEMINI CLI SUPREME IGNORE RULES
+# AI SUPREME IGNORE RULES (SYNCHRONIZED)
 # Target: Maximum Token Efficiency & Absolute Source Integrity
 # =================================================================
 
@@ -142,6 +142,7 @@ _build/
 *.md
 !GEMINI.md
 !README.md
+!Agents.md
 
 # [TESTING & COVERAGE]
 coverage/
@@ -155,7 +156,12 @@ junit.xml
 .terraform/
 capistrano.log
 
-# [SELF PRESERVATION]
+# [CROSS-AI PARITY & SECURITY]
+.env
+.env.*
+.gemini/
 .geminiignore
+.codexignore
 GEMINI.md
+Agents.md
 MEMORY.md

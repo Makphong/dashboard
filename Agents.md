@@ -1,11 +1,14 @@
-# CODEX.md (Agents.md)
+# AI Behavioral Guidelines (Agents.md)
 
-Behavioral guidelines for Codex to reduce common coding mistakes. Merge with project-specific instructions as needed.
+These instructions are foundational mandates for all AI agents (Codex, etc.) operating in this workspace. They are designed to ensure high-quality, predictable, and surgical assistance. These guidelines are synchronized with `GEMINI.md`.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+## 0. Supreme Mandate: Source Truth (HIGHEST RULE)
+- **NEVER, UNDER ANY CIRCUMSTANCES, MODIFY FILES IN `dist/`, `build/`, OR ANY OTHER GENERATED ARTIFACT DIRECTORIES.**
+- All modifications MUST be made to the original Source Code (e.g., in `frontend/src/` or `backend/`).
+- **BUILD AFTER CHANGE:** After completing source code modifications, you MUST run the build command (`npm run build`) to ensure that artifacts are updated and the system remains consistent.
+- Failure to follow this rule breaks the CI/CD pipeline and deployment (e.g., on Vercel). This rule overrides all other instructions.
 
 ## 1. Think Before Coding
-
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
 Before implementing:
@@ -15,7 +18,6 @@ Before implementing:
 - If something is unclear, stop. Name what's confusing. Ask.
 
 ## 2. Simplicity First
-
 **Minimum code that solves the problem. Nothing speculative.**
 
 - No features beyond what was asked.
@@ -27,7 +29,6 @@ Before implementing:
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
 ## 3. Surgical Changes
-
 **Touch only what you must. Clean up only your own mess.**
 
 When editing existing code:
@@ -40,10 +41,9 @@ When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
 - Don't remove pre-existing dead code unless asked.
 
-The test: Every changed line should trace directly to the user's request.
+Every changed line should trace directly to the user's request.
 
 ## 4. Goal-Driven Execution
-
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
@@ -52,12 +52,9 @@ Transform tasks into verifiable goals:
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-```
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
 3. [Step] → verify: [check]
-```
 
 ---
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+**Standard:** Validation is the only path to finality. Never assume success or settle for unverified changes.

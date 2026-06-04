@@ -1,61 +1,107 @@
-# AI Ignore Rules
-# Purpose: prevent AI from spending input tokens on non-essential files.
-# Syntax follows gitignore-style patterns.
+# =================================================================
+# AI SUPREME IGNORE RULES (SYNCHRONIZED)
+# Target: Maximum Token Efficiency & Absolute Source Integrity
+# =================================================================
 
-docs/
+# [OS & SYSTEM]
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.stackdump
+.localized
 
-# VCS and editor metadata
+# [VCS & EDITORS]
 .git/
+.hg/
+.svn/
 .vscode/
 .idea/
-*.code-workspace
 .agents/
+*.code-workspace
+.editorconfig
+.gitignore
+.npmrc
+.yarnrc
 
-# Python cache and virtual environments
-__pycache__/
+# [BUILD ARTIFACTS - THE FORBIDDEN ZONES]
+dist/
+build/
+out/
+target/
+bin/
+obj/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+.nx/
+.vite-inspect/
+frontend/dist/
+public/dist/
+public/assets/
+*.bak
+*.tmp
+*.temp
+
+# [DEPENDENCIES & PACKAGE MANAGERS]
+node_modules/
+bower_components/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+composer.lock
+vendor/
+.pnp.*
+
+# [PYTHON & BACKEND SPECIFIC]
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 .venv/
 venv/
 env/
+.env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .tox/
 .nox/
+.coverage
+htmlcov/
+*.egg-info/
+.eggs/
+nosetests.xml
+coverage.xml
+*.lprof
 
-# Node/package artifacts (future-safe)
-node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Build and coverage outputs
-build/
-dist/
-out/
-.next/
-.cache/
-coverage/
-*.map
-
-# Local databases and large data artifacts
-/local_dashboard.db
-/data/local_dashboard.db
-artifacts/
-data/*.db
+# [DATA, DATABASES & HEAVY STORAGE]
+data/
+storage/
+uploads/
+**/logs/
+*.log
 *.db
 *.sqlite
 *.sqlite3
 *.parquet
 *.feather
+*.csv
+*.xlsx
+*.xls
+*.ods
+*.json
+!package.json
+!vercel.json
+!postcss.config.json
+!tailwind.config.json
+!tsconfig.json
+!*.schema.json
 
-# Binary/media assets (usually not needed for logic reasoning)
+# [MEDIA & BINARIES]
 *.png
 *.jpg
 *.jpeg
@@ -70,8 +116,9 @@ data/*.db
 *.mov
 *.avi
 *.webm
-
-# Archives/binaries
+*.flv
+*.mkv
+*.pdf
 *.zip
 *.tar
 *.gz
@@ -83,19 +130,38 @@ data/*.db
 *.dylib
 *.bin
 
-# Runtime temp/log folders
-logs/
-tmp/
-temp/
-*.log
+# [FONTS & DOCUMENTS]
+*.ttf
+*.woff
+*.woff2
+*.eot
+*.otf
+docs/
+site/
+_build/
+*.md
+!GEMINI.md
+!README.md
+!Agents.md
 
-# Deployment metadata
+# [TESTING & COVERAGE]
+coverage/
+test-results/
+.nyc_output/
+junit.xml
+
+# [DEPLOYMENT & CLOUD]
 .vercel/
+.serverless/
+.terraform/
+capistrano.log
 
-# Cross-tool ignore rules
-# Make Codex ignore Gemini-specific config files.
-GEMINI.md
-.geminiignore
-.codex/
+# [CROSS-AI PARITY & SECURITY]
+.env
+.env.*
+.gemini/
 .geminiignore
 .codexignore
+GEMINI.md
+Agents.md
+MEMORY.md
