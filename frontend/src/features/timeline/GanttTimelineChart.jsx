@@ -70,9 +70,27 @@ export const GanttTimelineChart = ({
         viewH: verticalScrollRef.current?.clientHeight || 600,
       }));
     };
+
     updateSize();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateSize);
+      return () => window.removeEventListener('resize', updateSize);
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateSize();
+    });
+
+    if (containerRef.current) observer.observe(containerRef.current);
+    if (bodyScrollRef.current) observer.observe(bodyScrollRef.current);
+    if (verticalScrollRef.current) observer.observe(verticalScrollRef.current);
+
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, []);
 
   useEffect(() => {
