@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import sqlite3
+import time
 
 from ...config.constants.constants_paths import DB_PATH
 from ..supabase_sync import (
@@ -13,6 +15,17 @@ from ..supabase_sync import (
 
 _SUPABASE_BOOTSTRAPPED = False
 _REMOTE_META_SIGNATURE: tuple[str, int, int] | None = None
+_LAST_REMOTE_META_CHECK_AT = 0.0
+
+
+def _supabase_refresh_interval_seconds() -> float:
+    raw = os.getenv("SUPABASE_REFRESH_INTERVAL_SECONDS", "").strip()
+    if not raw:
+        return 60.0
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 60.0
 
 
 def get_conn() -> sqlite3.Connection:
@@ -40,7 +53,7 @@ def current_unified_rows_signature(
 
 
 def _bootstrap_from_supabase_if_needed() -> None:
-    global _SUPABASE_BOOTSTRAPPED, _REMOTE_META_SIGNATURE
+    global _SUPABASE_BOOTSTRAPPED, _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT
     if _SUPABASE_BOOTSTRAPPED:
         return
     if not is_supabase_enabled():
@@ -54,6 +67,7 @@ def _bootstrap_from_supabase_if_needed() -> None:
             int(remote_state.get("row_count") or 0),
             int(remote_state.get("source_count") or 0),
         )
+        _LAST_REMOTE_META_CHECK_AT = time.monotonic()
     except Exception as exc:
         print(f"[Supabase] Bootstrap skipped: {exc}")
     finally:
@@ -61,13 +75,19 @@ def _bootstrap_from_supabase_if_needed() -> None:
 
 
 def ensure_fresh_from_supabase_if_enabled() -> None:
-    global _REMOTE_META_SIGNATURE
+    global _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT
 
     if not is_supabase_enabled():
         return
 
+    refresh_interval_seconds = _supabase_refresh_interval_seconds()
+    now = time.monotonic()
+    if refresh_interval_seconds > 0 and (now - _LAST_REMOTE_META_CHECK_AT) < refresh_interval_seconds:
+        return
+
     try:
         remote_state = fetch_dashboard_meta_state()
+        _LAST_REMOTE_META_CHECK_AT = now
     except Exception as exc:
         print(f"[Supabase] Metadata read skipped: {exc}")
         return
@@ -94,10 +114,14 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
 
 
 def _sync_to_supabase_if_enabled(required: bool = False) -> bool:
+    global _LAST_REMOTE_META_CHECK_AT
+
     if not is_supabase_enabled():
         return True
     try:
         ok = bool(sync_sqlite_to_supabase(DB_PATH))
+        if ok:
+            _LAST_REMOTE_META_CHECK_AT = time.monotonic()
         if required and not ok:
             raise RuntimeError("Supabase sync was not completed.")
         return ok
@@ -113,7 +137,7 @@ def _sync_source_to_supabase_if_enabled(
     removed_source_id: str | None = None,
     required: bool = False,
 ) -> bool:
-    global _REMOTE_META_SIGNATURE
+    global _REMOTE_META_SIGNATURE, _LAST_REMOTE_META_CHECK_AT
 
     if not is_supabase_enabled():
         return True
@@ -132,6 +156,7 @@ def _sync_source_to_supabase_if_enabled(
                 int(remote_state.get("row_count") or 0),
                 int(remote_state.get("source_count") or 0),
             )
+            _LAST_REMOTE_META_CHECK_AT = time.monotonic()
         if required and not ok:
             raise RuntimeError("Supabase source sync was not completed.")
         return ok
