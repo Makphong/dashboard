@@ -142,7 +142,7 @@ _build/
 *.md
 !GEMINI.md
 !README.md
-!Agents.md
+!AGENTS.md
 
 # [TESTING & COVERAGE]
 coverage/
@@ -163,5 +163,5 @@ capistrano.log
 .geminiignore
 .codexignore
 GEMINI.md
-Agents.md
+AGENTS.md
 MEMORY.md

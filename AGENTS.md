@@ -1,6 +1,17 @@
-# AI Behavioral Guidelines (Agents.md)
+# AGENTS.md
 
 These instructions are foundational mandates for all AI agents (Codex, etc.) operating in this workspace. They are designed to ensure high-quality, predictable, and surgical assistance. These guidelines are synchronized with `GEMINI.md`.
+
+## Required Startup Order
+Before reading, editing, or reasoning about any other repository file, the agent must read these two files in this exact order:
+
+1. `AGENTS.md`
+2. `.codexignore`
+
+This startup order is mandatory for every new task, even if the agent has worked in this repository before.
+
+## Non-Negotiable Rule
+- Do not inspect or modify any other project file until both files above have been read.
 
 ## 0. Supreme Mandate: Source Truth (HIGHEST RULE)
 - **NEVER, UNDER ANY CIRCUMSTANCES, MODIFY FILES IN `dist/`, `build/`, OR ANY OTHER GENERATED ARTIFACT DIRECTORIES.**
@@ -13,7 +24,7 @@ These instructions are foundational mandates for all AI agents (Codex, etc.) ope
 
 Before implementing:
 - State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
+- If multiple interpretations exist, present them; don't pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
@@ -35,7 +46,7 @@ When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+- If you notice unrelated dead code, mention it; don't delete it.
 
 When your changes create orphans:
 - Remove imports/variables/functions that YOUR changes made unused.
@@ -47,14 +58,14 @@ Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
+- "Add validation" -> "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" -> "Write a test that reproduces it, then make it pass"
+- "Refactor X" -> "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+1. [Step] -> verify: [check]
+2. [Step] -> verify: [check]
+3. [Step] -> verify: [check]
 
 ---
 **Standard:** Validation is the only path to finality. Never assume success or settle for unverified changes.
