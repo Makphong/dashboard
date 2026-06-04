@@ -51,6 +51,16 @@ def _set_last_error(message: str) -> None:
     _last_error = message.strip()
 
 
+def _supabase_timeout_seconds() -> float:
+    raw = os.getenv("SUPABASE_HTTP_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return 12.0
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return 12.0
+
+
 def _clear_last_error() -> None:
     global _last_error
     _last_error = ""
@@ -187,7 +197,10 @@ def _supabase_request(
     request = urllib.request.Request(url, method=method, headers=headers, data=data)
     started_at = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=45) as response:
+        with urllib.request.urlopen(
+            request,
+            timeout=_supabase_timeout_seconds(),
+        ) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

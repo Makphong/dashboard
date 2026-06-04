@@ -80,8 +80,10 @@ def api_gsheet_connections_payload() -> dict:
     return {"connections": payload.get("connections", [])}
 
 def api_dashboard_payload(include_debug: bool = False) -> dict:
-    refresh_dashboard_snapshot_data()
     payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
+    if payload is None:
+        refresh_dashboard_snapshot_data()
+        payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
     if payload is None:
         ensure_full_raw_state_from_supabase_if_enabled()
         refresh_runtime_data()
