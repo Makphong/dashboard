@@ -70,6 +70,11 @@ def _mark_sync_failure(message: str) -> None:
     _set_last_error(message or "Supabase sync failed")
 
 
+def _is_missing_column_error(exc: Exception, column_name: str) -> bool:
+    message = str(exc)
+    return "42703" in message and f"column dashboard_meta_state.{column_name} does not exist" in message
+
+
 def _build_supabase_config() -> dict[str, Any]:
     base_url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
     service_key = (
@@ -326,15 +331,28 @@ def fetch_dashboard_snapshot_state() -> dict[str, Any] | None:
 
     started_at = time.perf_counter()
     try:
-        rows = _supabase_request(
-            "GET",
-            "dashboard_meta_state",
-            query={
-                "select": "updated_at,row_count,source_count,algorithm_version,payload_json",
-                "id": "eq.state",
-                "limit": "1",
-            },
-        )
+        try:
+            rows = _supabase_request(
+                "GET",
+                "dashboard_meta_state",
+                query={
+                    "select": "updated_at,row_count,source_count,algorithm_version,payload_json",
+                    "id": "eq.state",
+                    "limit": "1",
+                },
+            )
+        except Exception as exc:
+            if not _is_missing_column_error(exc, "algorithm_version"):
+                raise
+            rows = _supabase_request(
+                "GET",
+                "dashboard_meta_state",
+                query={
+                    "select": "updated_at,row_count,source_count,payload_json",
+                    "id": "eq.state",
+                    "limit": "1",
+                },
+            )
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
         raise
