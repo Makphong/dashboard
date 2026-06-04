@@ -18,6 +18,20 @@ _REMOTE_META_SIGNATURE: tuple[str, int, int] | None = None
 _LAST_REMOTE_META_CHECK_AT = 0.0
 
 
+def _supabase_trace_enabled() -> bool:
+    return os.getenv("SUPABASE_TRACE_TIMING", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _emit_supabase_trace(message: str) -> None:
+    if _supabase_trace_enabled():
+        print(f"[SupabaseTrace] {message}")
+
+
 def _supabase_refresh_interval_seconds() -> float:
     raw = os.getenv("SUPABASE_REFRESH_INTERVAL_SECONDS", "").strip()
     if not raw:
@@ -59,6 +73,7 @@ def _bootstrap_from_supabase_if_needed() -> None:
     if not is_supabase_enabled():
         _SUPABASE_BOOTSTRAPPED = True
         return
+    started_at = time.perf_counter()
     try:
         hydrate_sqlite_from_supabase(DB_PATH)
         remote_state = fetch_dashboard_meta_state() or {}
@@ -68,6 +83,9 @@ def _bootstrap_from_supabase_if_needed() -> None:
             int(remote_state.get("source_count") or 0),
         )
         _LAST_REMOTE_META_CHECK_AT = time.monotonic()
+        _emit_supabase_trace(
+            f"bootstrap_refresh_done elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+        )
     except Exception as exc:
         print(f"[Supabase] Bootstrap skipped: {exc}")
     finally:
@@ -83,8 +101,12 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
     refresh_interval_seconds = _supabase_refresh_interval_seconds()
     now = time.monotonic()
     if refresh_interval_seconds > 0 and (now - _LAST_REMOTE_META_CHECK_AT) < refresh_interval_seconds:
+        _emit_supabase_trace(
+            f"refresh_skipped reason=interval remaining_ms={max(0.0, (refresh_interval_seconds - (now - _LAST_REMOTE_META_CHECK_AT)) * 1000):.1f}"
+        )
         return
 
+    started_at = time.perf_counter()
     try:
         remote_state = fetch_dashboard_meta_state()
         _LAST_REMOTE_META_CHECK_AT = now
@@ -93,6 +115,9 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
         return
 
     if not remote_state:
+        _emit_supabase_trace(
+            f"refresh_meta_empty elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+        )
         return
 
     remote_signature = (
@@ -102,6 +127,9 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
     )
 
     if _REMOTE_META_SIGNATURE == remote_signature:
+        _emit_supabase_trace(
+            f"refresh_no_change elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+        )
         return
 
     try:
@@ -111,6 +139,9 @@ def ensure_fresh_from_supabase_if_enabled() -> None:
         return
 
     _REMOTE_META_SIGNATURE = remote_signature
+    _emit_supabase_trace(
+        f"refresh_hydrated elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+    )
 
 
 def _sync_to_supabase_if_enabled(required: bool = False) -> bool:

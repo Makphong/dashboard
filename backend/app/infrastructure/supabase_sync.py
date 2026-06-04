@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +28,20 @@ _TABLE_DELETE_FILTERS = {
 _client_config: dict[str, Any] | None = None
 _enabled_cache: bool | None = None
 _last_error: str = ""
+
+
+def _supabase_trace_enabled() -> bool:
+    return os.getenv("SUPABASE_TRACE_TIMING", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _emit_supabase_trace(message: str) -> None:
+    if _supabase_trace_enabled():
+        print(f"[SupabaseTrace] {message}")
 
 
 def _set_last_error(message: str) -> None:
@@ -168,6 +183,7 @@ def _supabase_request(
         headers["Content-Type"] = "application/json"
 
     request = urllib.request.Request(url, method=method, headers=headers, data=data)
+    started_at = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=45) as response:
             raw = response.read()
@@ -180,6 +196,13 @@ def _supabase_request(
         message = f"Supabase {method} {path} failed: {type(exc).__name__}: {exc}"
         _set_last_error(message)
         raise RuntimeError(message) from exc
+    finally:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        payload_rows = len(payload) if isinstance(payload, list) else (1 if payload is not None else 0)
+        _emit_supabase_trace(
+            f"request method={method} path={path} elapsed_ms={elapsed_ms:.1f} "
+            f"query={query or {}} payload_rows={payload_rows}"
+        )
 
     if not raw:
         _clear_last_error()
@@ -211,9 +234,11 @@ def _chunk(items: list[dict[str, Any]], chunk_size: int = 300):
 
 
 def _fetch_all_rows(table_name: str, order: str | None = None) -> list[dict[str, Any]]:
+    started_at = time.perf_counter()
     page_size = 1000
     offset = 0
     rows: list[dict[str, Any]] = []
+    page_count = 0
 
     while True:
         query = {
@@ -224,15 +249,23 @@ def _fetch_all_rows(table_name: str, order: str | None = None) -> list[dict[str,
         if order:
             query["order"] = order
         page = _supabase_request("GET", table_name, query=query) or []
+        page_count += 1
         if not isinstance(page, list):
             raise RuntimeError(f"Unexpected Supabase response for table '{table_name}'")
         if not page:
             break
         rows.extend(page)
+        _emit_supabase_trace(
+            f"fetch_page table={table_name} page={page_count} offset={offset} rows={len(page)} total_rows={len(rows)}"
+        )
         if len(page) < page_size:
             break
         offset += len(page)
 
+    elapsed_ms = (time.perf_counter() - started_at) * 1000
+    _emit_supabase_trace(
+        f"fetch_table_done table={table_name} total_rows={len(rows)} pages={page_count} elapsed_ms={elapsed_ms:.1f}"
+    )
     return rows
 
 
@@ -241,6 +274,7 @@ def fetch_dashboard_meta_state() -> dict[str, Any] | None:
     if client is None:
         return None
 
+    started_at = time.perf_counter()
     try:
         rows = _supabase_request(
             "GET",
@@ -254,6 +288,10 @@ def fetch_dashboard_meta_state() -> dict[str, Any] | None:
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
         raise
+    finally:
+        _emit_supabase_trace(
+            f"fetch_dashboard_meta_state elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}"
+        )
 
     if not rows:
         return None
@@ -471,12 +509,20 @@ def hydrate_sqlite_from_supabase(db_path: Path) -> bool:
     if client is None:
         return False
 
+    total_started_at = time.perf_counter()
     try:
+        fetch_started_at = time.perf_counter()
         source_rows = _fetch_all_rows(_TABLES["source_files"], order="uploaded_at.desc")
         page_rows = _fetch_all_rows(_TABLES["source_pages"])
         unified_rows = _fetch_all_rows(_TABLES["unified_rows"], order="row_id.asc")
         connection_rows = _fetch_all_rows(
             _TABLES["connected_sheets"], order="connected_at.desc"
+        )
+        _emit_supabase_trace(
+            "hydrate_fetch_done "
+            f"source_files={len(source_rows)} source_pages={len(page_rows)} "
+            f"unified_rows={len(unified_rows)} connected_sheets={len(connection_rows)} "
+            f"elapsed_ms={(time.perf_counter() - fetch_started_at) * 1000:.1f}"
         )
     except Exception as exc:
         _set_last_error(f"{type(exc).__name__}: {exc}")
@@ -488,6 +534,7 @@ def hydrate_sqlite_from_supabase(db_path: Path) -> bool:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
+        sqlite_started_at = time.perf_counter()
         _create_empty_schema(conn)
         conn.executescript(
             """
@@ -577,8 +624,17 @@ def hydrate_sqlite_from_supabase(db_path: Path) -> bool:
             pass
 
         conn.commit()
+        _emit_supabase_trace(
+            "hydrate_sqlite_done "
+            f"source_files={len(source_rows)} source_pages={len(page_rows)} "
+            f"unified_rows={len(unified_rows)} connected_sheets={len(connection_rows)} "
+            f"elapsed_ms={(time.perf_counter() - sqlite_started_at) * 1000:.1f}"
+        )
     finally:
         conn.close()
 
+    _emit_supabase_trace(
+        f"hydrate_total_done elapsed_ms={(time.perf_counter() - total_started_at) * 1000:.1f}"
+    )
     _clear_last_error()
     return True
