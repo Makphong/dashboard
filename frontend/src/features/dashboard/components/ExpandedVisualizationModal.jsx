@@ -52,6 +52,7 @@ function toTimelineDetailCountKey(segmentType) {
   if (drillGroup === 'Reprocessing') return 'Reprocessing';
   if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') return 'Review';
   if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') return 'Edit';
+  if (drillGroup === 'Idle') return 'Idle';
   return '';
 }
 
@@ -98,7 +99,7 @@ function buildTimelineDetailData(segments) {
     }))
     .sort((a, b) => a.startTs - b.startTs);
 
-  const summaryCounts = { Uploading: 0, Processing: 0, Reprocessing: 0, Review: 0, Edit: 0 };
+  const summaryCounts = { Uploading: 0, Processing: 0, Reprocessing: 0, Review: 0, Edit: 0, Idle: 0 };
   const sourceMap = new Map();
 
   bars.forEach((bar) => {
@@ -128,6 +129,7 @@ function buildTimelineDetailData(segments) {
       { key: 'Reprocessing', label: 'Second Spread', count: summaryCounts.Reprocessing, accentClass: 'text-[#3730a3]' },
       { key: 'Review', label: 'Review', count: summaryCounts.Review, accentClass: 'text-[#0f766e]' },
       { key: 'Edit', label: 'Edit', count: summaryCounts.Edit, accentClass: 'text-[#9a3412]' },
+      { key: 'Idle', label: 'Idle', count: summaryCounts.Idle, accentClass: 'text-slate-500' },
     ],
     sourceRows: Array.from(sourceMap.values())
       .map((row) => ({
