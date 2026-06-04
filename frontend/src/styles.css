@@ -27,11 +27,18 @@
   --ktb-line: #d7e8f6;
 }
 
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   font-family: "Krungthai Fast Regular", "Noto Sans Thai", "Segoe UI", Tahoma, Arial, sans-serif;
   background:
     linear-gradient(180deg, rgba(0, 164, 228, 0.045) 0%, rgba(255, 255, 255, 0) 220px),
     #fbfdff;
+  overscroll-behavior-y: none;
 }
 
 .bg-blue-600 { background-color: var(--ktb-sky) !important; }
@@ -65,7 +72,6 @@ body {
 .to-indigo-50 { --tw-gradient-to: rgba(56, 96, 190, 0.10) var(--tw-gradient-to-position) !important; }
 .shadow-ktb {
   box-shadow: 0 10px 24px -22px rgba(56, 96, 190, 0.34), 0 1px 0 rgba(255, 255, 255, 0.72) inset;
-  will-change: transform;
 }
 
 .font-sans,
@@ -171,15 +177,35 @@ svg tspan.font-black {
 .animate-stagger-5 { animation: cardSlideUp 0.5s ease-out forwards; opacity: 0; animation-delay: 0.5s; }
 
 .animate-in,
-.transition-all,
-.transition-transform {
+.viz-overlay-enter,
+.viz-panel-enter,
+.card-rise-in,
+.confirm-overlay-enter,
+.confirm-panel-enter,
+.confirm-check-enter,
+.dropdown-slide-enter,
+.animate-stagger-1,
+.animate-stagger-2,
+.animate-stagger-3,
+.animate-stagger-4,
+.animate-stagger-5 {
   backface-visibility: hidden;
   perspective: 1000px;
   will-change: transform, opacity;
 }
 
-main {
-  contain: content;
+.app-scroll-shell {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.scroll-clarity-layer {
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {

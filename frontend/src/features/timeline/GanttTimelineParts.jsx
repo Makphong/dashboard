@@ -28,7 +28,7 @@ export const GanttLegend = ({ items }) => (
 );
 
 export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth, headerHeight, visibleTicks, getX }) => (
-  <div className="flex border-b border-slate-200 bg-slate-50/80 backdrop-blur-sm sticky top-0 z-20">
+  <div className="scroll-clarity-layer flex border-b border-slate-200 bg-slate-50/95 sticky top-0 z-20">
     <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 p-3 flex items-center">
       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lane</span>
     </div>

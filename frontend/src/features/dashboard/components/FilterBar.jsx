@@ -80,7 +80,7 @@ export function FilterBar({
   };
 
   return (
-    <header className="shrink-0 bg-white/90 backdrop-blur-md border-b border-[#d7e8f6] px-4 md:px-8 py-3 z-[80]">
+    <header className="scroll-clarity-layer shrink-0 bg-white/95 border-b border-[#d7e8f6] px-4 md:px-8 py-3 z-[80]">
       <div className="max-w-[1600px] mx-auto flex items-center gap-2 md:gap-3">
         <div className="flex-1 flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-0.5">
           <button
