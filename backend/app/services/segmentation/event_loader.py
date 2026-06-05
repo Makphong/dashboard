@@ -44,6 +44,7 @@ def fetch_normalized_events(
     invalid_counts: dict[str, int] = {}
 
     for db_row in rows:
+        sheet_key = f"{db_row['file_name']}::{db_row['page_name']}"
         try:
             raw = json.loads(db_row["data_json"])
         except json.JSONDecodeError:
@@ -54,7 +55,6 @@ def fetch_normalized_events(
             pick_field(raw, FIELD_ALIASES["event_time"], canonical)
         )
         if not event_time:
-            sheet_key = f"{db_row['file_name']}::{db_row['page_name']}"
             invalid_counts[sheet_key] = invalid_counts.get(sheet_key, 0) + 1
             continue
 

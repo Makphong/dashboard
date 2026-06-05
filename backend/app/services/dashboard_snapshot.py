@@ -22,6 +22,15 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _payload_matches_algorithm_version(payload: dict | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    snapshot_meta = payload.get("snapshotMeta")
+    if not isinstance(snapshot_meta, dict):
+        return False
+    return str(snapshot_meta.get("algorithmVersion") or "") == ALGORITHM_VERSION
+
+
 def _list_sources_from_conn() -> list[dict]:
     with get_conn() as conn:
         rows = conn.execute(
@@ -200,7 +209,7 @@ def fetch_remote_dashboard_snapshot() -> dict | None:
 
 def get_dashboard_snapshot_payload() -> dict | None:
     local_payload = load_local_dashboard_snapshot()
-    if local_payload is not None:
+    if _payload_matches_algorithm_version(local_payload):
         return local_payload
 
     remote_payload = None
@@ -209,7 +218,7 @@ def get_dashboard_snapshot_payload() -> dict | None:
             remote_payload = fetch_remote_dashboard_snapshot()
         except Exception:
             remote_payload = None
-    if remote_payload is not None:
+    if _payload_matches_algorithm_version(remote_payload):
         store_local_dashboard_snapshot(remote_payload)
         return remote_payload
 
