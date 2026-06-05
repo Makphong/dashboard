@@ -87,7 +87,7 @@ def api_dashboard_payload(include_debug: bool = False) -> dict:
     if payload is None:
         ensure_full_raw_state_from_supabase_if_enabled()
         refresh_runtime_data()
-        payload = dashboard_snapshot_service.rebuild_dashboard_snapshot(sync_remote=False)
+        payload = dashboard_snapshot_service.rebuild_dashboard_snapshot(sync_remote=True)
 
     payload = {
         **payload,
