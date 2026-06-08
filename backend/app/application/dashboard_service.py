@@ -6,7 +6,7 @@ import json
 import os
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from ..config.constants.constants_paths import DB_PATH, PROJECT_ROOT
 from ..config.constants.constants_runtime import APP_VERSION, SERVER_STARTED_AT
@@ -79,8 +79,17 @@ def api_gsheet_connections_payload() -> dict:
     payload = api_dashboard_payload(include_debug=False)
     return {"connections": payload.get("connections", [])}
 
-def api_dashboard_payload(include_debug: bool = False) -> dict:
-    payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
+def api_dashboard_payload(
+    include_debug: bool = False,
+    refresh_snapshot: bool = False,
+) -> dict:
+    payload = None
+    if refresh_snapshot:
+        ensure_full_raw_state_from_supabase_if_enabled()
+        refresh_runtime_data()
+        payload = dashboard_snapshot_service.rebuild_dashboard_snapshot(sync_remote=True)
+    else:
+        payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
     if payload is None:
         refresh_dashboard_snapshot_data()
         payload = dashboard_snapshot_service.get_dashboard_snapshot_payload()
@@ -164,13 +173,25 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def _handle_api_get(self, parsed) -> bool:
+        if parsed.path == "/api/dashboard":
+            query = parse_qs(parsed.query or "")
+            include_debug = str(query.get("includeDebug", [""])[0]).strip() in {"1", "true", "yes"}
+            refresh_snapshot = str(query.get("refreshSnapshot", [""])[0]).strip() in {"1", "true", "yes"}
+            json_response(
+                self,
+                api_dashboard_payload(
+                    include_debug=include_debug,
+                    refresh_snapshot=refresh_snapshot,
+                ),
+            )
+            return True
+
         routes = {
             "/api/health": build_health_payload,
             "/api/sources": api_sources_payload,
             "/api/debug": build_debug_snapshot,
             "/api/user-performance": compute_user_performance,
             "/api/gsheet/connections": api_gsheet_connections_payload,
-            "/api/dashboard": api_dashboard_payload,
         }
         if parsed.path in routes:
             json_response(self, routes[parsed.path]())

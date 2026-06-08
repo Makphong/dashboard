@@ -1,7 +1,10 @@
 import { requestJson } from '../../../lib/api.js';
 
-export async function fetchDashboardPayload(includeDebug = false) {
-  const query = includeDebug ? '?includeDebug=1' : '';
+export async function fetchDashboardPayload(options = {}) {
+  const params = new URLSearchParams();
+  if (options.includeDebug) params.set('includeDebug', '1');
+  if (options.refreshSnapshot) params.set('refreshSnapshot', '1');
+  const query = params.size > 0 ? `?${params.toString()}` : '';
   const payload = await requestJson(`/api/dashboard${query}`);
 
   return {
@@ -10,7 +13,7 @@ export async function fetchDashboardPayload(includeDebug = false) {
     connections: payload.connections || [],
     healthInfo: payload.healthInfo || null,
     healthError: '',
-    debugInfo: includeDebug ? (payload.debugInfo || null) : null,
+    debugInfo: options.includeDebug ? (payload.debugInfo || null) : null,
   };
 }
 

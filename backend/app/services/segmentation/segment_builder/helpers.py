@@ -149,7 +149,7 @@ def calculate_effective_user_duration(interval: dict, is_auto_timeout: bool) -> 
 
 
 def is_same_timestamp_reopen_to_review_handoff(interval: dict) -> bool:
-    if interval["duration_seconds"] != 0:
+    if interval["duration_seconds"] > 1:
         return False
     transitions = {
         (interval["start_event"]["from_status"], interval["start_event"]["to_status"]),

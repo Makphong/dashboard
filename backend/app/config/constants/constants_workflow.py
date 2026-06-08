@@ -27,7 +27,6 @@ USER_EDIT_CHANGE_TYPES = {
     "Mapped Account",
     "Remapped Account",
     "Unmapped Account",
-    "Spread Metadata",
 }
 
 SYSTEM_TIME_SEGMENT_TYPES = {

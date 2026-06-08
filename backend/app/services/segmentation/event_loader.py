@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bisect import bisect_left
 import json
 
 from ...config.constants.constants_parsing import FIELD_ALIASES
@@ -17,6 +18,50 @@ from .engine_utils import (
 
 _NORMALIZED_EVENTS_CACHE_SIGNATURE: tuple[int, int] | None = None
 _NORMALIZED_EVENTS_CACHE_VALUE: tuple[list[dict], dict[str, int]] | None = None
+
+
+def _is_sso_clapp_user(actor_name: str | None) -> bool:
+    return normalize_text(actor_name) == "ssoclappuser"
+
+
+def _is_disallowed_sheet_user(actor_name: str | None) -> bool:
+    normalized_name = str(actor_name or "").strip()
+    if not normalized_name:
+        return True
+
+    token = normalize_text(normalized_name)
+    if token in {"system", "idle", "unknownuser", "ssoclappuser", "user0"}:
+        return True
+
+    if token.startswith("user") and token[4:].isdigit():
+        return int(token[4:]) > 10
+
+    return False
+
+
+def _find_nearest_sheet_user(
+    sheet_candidates: list[tuple[int, str]], row_number: int
+) -> str | None:
+    if not sheet_candidates:
+        return None
+
+    candidate_row_numbers = [candidate_row for candidate_row, _ in sheet_candidates]
+    insert_at = bisect_left(candidate_row_numbers, row_number)
+    nearest_candidates: list[tuple[int, str]] = []
+
+    if insert_at < len(sheet_candidates):
+        nearest_candidates.append(sheet_candidates[insert_at])
+    if insert_at > 0:
+        nearest_candidates.append(sheet_candidates[insert_at - 1])
+
+    if not nearest_candidates:
+        return None
+
+    nearest_row, nearest_user = min(
+        nearest_candidates,
+        key=lambda candidate: (abs(candidate[0] - row_number), candidate[0]),
+    )
+    return nearest_user if nearest_row >= 0 else None
 
 
 def fetch_normalized_events(
@@ -42,6 +87,7 @@ def fetch_normalized_events(
 
     events: list[dict] = []
     invalid_counts: dict[str, int] = {}
+    sheet_user_candidates: dict[str, list[tuple[int, str]]] = {}
 
     for db_row in rows:
         sheet_key = f"{db_row['file_name']}::{db_row['page_name']}"
@@ -65,6 +111,13 @@ def fetch_normalized_events(
             str(actor_type_raw).strip() if actor_type_raw is not None else "",
             actor_name,
         )
+        resolved_actor_name = actor_name or (
+            "System" if actor_type == "System" else "Unknown User"
+        )
+        if not _is_disallowed_sheet_user(resolved_actor_name):
+            sheet_user_candidates.setdefault(sheet_key, []).append(
+                (int(db_row["row_number"]), resolved_actor_name)
+            )
 
         change_type_raw = pick_field(raw, FIELD_ALIASES["change_type"], canonical)
         if change_type_raw is None:
@@ -114,8 +167,7 @@ def fetch_normalized_events(
                 "page_name": db_row["page_name"],
                 "row_number": int(db_row["row_number"]),
                 "event_time": event_time,
-                "actor_name": actor_name
-                or ("System" if actor_type == "System" else "Unknown User"),
+                "actor_name": resolved_actor_name,
                 "actor_type": actor_type,
                 "document_id": document_id,
                 "change_type": change_type,
@@ -143,6 +195,21 @@ def fetch_normalized_events(
                 "raw": raw,
             }
         )
+
+    for sheet_key, candidates in sheet_user_candidates.items():
+        candidates.sort(key=lambda candidate: candidate[0])
+
+    for event in events:
+        if not _is_sso_clapp_user(event.get("actor_name")):
+            continue
+        sheet_key = f"{event['file_name']}::{event['page_name']}"
+        nearest_user = _find_nearest_sheet_user(
+            sheet_user_candidates.get(sheet_key, []),
+            int(event["row_number"]),
+        )
+        if nearest_user:
+            event["actor_name"] = nearest_user
+
     _NORMALIZED_EVENTS_CACHE_SIGNATURE = cache_signature
     _NORMALIZED_EVENTS_CACHE_VALUE = (events, invalid_counts)
     return [event.copy() for event in events], invalid_counts.copy()

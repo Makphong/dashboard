@@ -121,6 +121,24 @@ def _in_review_segments(interval: dict) -> list[dict]:
 
     if (
         interval["enter_actor_type"] == "User"
+        and interval["exit_to"] != COMPLETED_STATE
+        and user_edit_count > 0
+    ):
+        return [
+            build_segment(
+                interval,
+                "USER_EDITING_CORRECTION",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=interval["enter_actor"],
+                actor_type="User",
+                is_active_work=True,
+                is_idle=False,
+            )
+        ]
+
+    if (
+        interval["enter_actor_type"] == "User"
         and interval["exit_actor_type"] == "System"
         and interval["exit_to"] in PENDING_STATES
     ):
@@ -177,24 +195,6 @@ def _in_review_segments(interval: dict) -> list[dict]:
             build_segment(
                 interval,
                 "USER_COMPLETION_APPROVAL",
-                interval["start_event"],
-                interval["end_event"],
-                actor_name=interval["enter_actor"],
-                actor_type="User",
-                is_active_work=True,
-                is_idle=False,
-            )
-        ]
-
-    if (
-        interval["enter_actor_type"] == "User"
-        and interval["exit_to"] != COMPLETED_STATE
-        and user_edit_count > 0
-    ):
-        return [
-            build_segment(
-                interval,
-                "USER_EDITING_CORRECTION",
                 interval["start_event"],
                 interval["end_event"],
                 actor_name=interval["enter_actor"],

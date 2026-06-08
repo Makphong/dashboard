@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useAppController } from './hooks/useAppController.js';
 import { useDashboardData } from './hooks/useDashboardData.js';
 import { DashboardLayout } from './features/dashboard/DashboardLayout.jsx';
@@ -58,6 +58,21 @@ function App() {
       window.removeEventListener('orientationchange', updateOrientationState);
     };
   }, []);
+
+  const resolvedSelectedGanttSegment = useMemo(() => {
+    const selected = controller.selectedGanttSegment;
+    if (!selected) return null;
+
+    const latestMatch = (dashboard.ganttVisibleSegments || []).find((segment) =>
+      String(segment.fileName || '') === String(selected.fileName || '')
+      && String(segment.pageName || '') === String(selected.pageName || '')
+      && String(segment.start || '') === String(selected.start || '')
+      && String(segment.end || '') === String(selected.end || '')
+      && String(segment.userName || '') === String(selected.userName || '')
+    );
+
+    return latestMatch || selected;
+  }, [controller.selectedGanttSegment, dashboard.ganttVisibleSegments]);
 
   if (showRotateNotice) {
     return (
@@ -121,9 +136,9 @@ function App() {
       </DashboardLayout>
 
       <Suspense fallback={null}>
-        {controller.selectedGanttSegment ? (
+        {resolvedSelectedGanttSegment ? (
           <SegmentDetailPopup
-            segment={controller.selectedGanttSegment}
+            segment={resolvedSelectedGanttSegment}
             onClose={() => controller.setSelectedGanttSegment(null)}
           />
         ) : null}

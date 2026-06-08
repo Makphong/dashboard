@@ -4,6 +4,7 @@ import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
 import { mergeContinuousReprocessingSegments, toDrillGroup } from '../../../lib/segmentUtils.js';
 import { buildAverageTransitionTimeData } from '../utils/transitionMetrics.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
+import { mapSegmentsToRows } from '../../timeline/timelineUtils.js';
 
 const GanttTimelineChart = lazy(() => import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
 const DonutWorkloadChart = lazy(() => import('../../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
@@ -63,21 +64,34 @@ function toTimelineBarLabel(segmentType) {
   return toGanttSegmentTypeLabel(segmentType);
 }
 
-function buildTimelineDetailData(segments) {
-  const rawBars = (Array.isArray(segments) ? segments : [])
-    .filter((segment) => isTimelineDurationSegment(segment))
+function buildTimelineDetailData(segments, timelineSettings) {
+  const singleLane = Boolean(timelineSettings?.singleLane);
+  const showSystemLane = timelineSettings?.showSystemLane !== false;
+  const showIdleLane = timelineSettings?.showIdleLane !== false;
+
+  const mappedRows = mapSegmentsToRows(
+    Array.isArray(segments) ? segments : [],
+    singleLane
+  ).filter((segment) => {
+    if (!showSystemLane && segment.origLane === 'System') return false;
+    if (!showIdleLane && segment.origLane === 'Idle') return false;
+    return isTimelineDurationSegment(segment);
+  });
+
+  const rawBars = mappedRows
     .map((segment, index) => {
       const countKey = toTimelineDetailCountKey(segment.segmentType);
       return {
         id: segment.id || `timeline-bar-${index}`,
         countKey,
-        lane: toTimelineLane(segment.segmentType, segment.userName),
+        lane: segment.lane || toTimelineLane(segment.segmentType, segment.userName),
         userName: segment.userName || 'System',
         activity: toTimelineBarLabel(segment.segmentType),
         segmentType: String(segment.segmentType || 'UNKNOWN'),
         start: segment.start,
         end: segment.end,
         startTs: Number(segment.startTs) || Date.parse(String(segment.start || '')) || 0,
+        endTs: Number(segment.endTs) || Date.parse(String(segment.end || '')) || 0,
         durationSeconds: Number(segment.durationSeconds) || 0,
         documentLabel: segment.documentLabel || (segment.pageName ? `${segment.fileName || 'Unknown File'} / ${segment.pageName}` : (segment.fileName || 'Unknown File')),
       };
@@ -360,10 +374,10 @@ function buildTransitionBreakdownGroups(segments) {
     .filter((group) => group.activities.length > 0);
 }
 
-const TimelineDetailView = React.memo(({ segments }) => {
+const TimelineDetailView = React.memo(({ segments, timelineSettings }) => {
   const { bars, summaryCards, sourceRows } = React.useMemo(
-    () => buildTimelineDetailData(segments),
-    [segments]
+    () => buildTimelineDetailData(segments, timelineSettings),
+    [segments, timelineSettings]
   );
 
   if (bars.length === 0) {
@@ -1119,7 +1133,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
             )}
             {visualizationId === 'donut' && <DonutWorkloadChart key={donutAnimationKey} rows={workloadVisibleRows} expanded />}
           </Suspense>
-          {visualizationId === 'gantt-detail' && <TimelineDetailView segments={ganttVisibleSegments} />}
+          {visualizationId === 'gantt-detail' && <TimelineDetailView segments={ganttVisibleSegments} timelineSettings={timelineSettings} />}
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView
               segments={ganttVisibleSegments}

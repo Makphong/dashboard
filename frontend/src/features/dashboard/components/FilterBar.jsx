@@ -126,7 +126,7 @@ export function FilterBar({
 
         <div className="shrink-0 flex items-center gap-4 pl-4 border-l border-[#d7e8f6]">
           <button
-            onClick={() => refreshAll()}
+            onClick={() => refreshAll({ refreshSnapshot: true })}
             disabled={loading || syncing}
             className="h-10 px-4 rounded-xl border border-[#bfe8f8] bg-white text-sm font-semibold text-[#3860be] hover:bg-[#e8f7fd] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-ktb"
           >

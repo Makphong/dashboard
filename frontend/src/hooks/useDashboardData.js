@@ -122,7 +122,10 @@ export function useDashboardData() {
   };
 
   const loadDashboardPayload = async (options = {}) => {
-    const payload = await fetchDashboardPayload(Boolean(options.includeDebug));
+    const payload = await fetchDashboardPayload({
+      includeDebug: Boolean(options.includeDebug),
+      refreshSnapshot: Boolean(options.refreshSnapshot),
+    });
 
     startTransition(() => {
       setSources(payload.sources);
