@@ -55,8 +55,18 @@ def _is_placeholder_pending_exit_noise(events: list[dict], event_index: int) -> 
     )
     if previous_user_actor is None or not next_user_actors:
         return False
+    if next_user_actors != {previous_user_actor}:
+        return False
 
-    return next_user_actors == {previous_user_actor}
+    for idx in range(event_index - 1, -1, -1):
+        candidate = events[idx]
+        if candidate["is_status_event"]:
+            return any(
+                _is_user_detail_event(inner)
+                for inner in events[idx + 1 : event_index]
+            )
+
+    return False
 
 
 def _remove_placeholder_pending_exit_noise(events: list[dict]) -> list[dict]:
