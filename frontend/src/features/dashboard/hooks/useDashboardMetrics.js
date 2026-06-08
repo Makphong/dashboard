@@ -12,13 +12,12 @@ import { toSegmentGroup } from '../utils/segmentData.js';
 
 export function useDashboardMetrics(params) {
   const {
-    ganttVisibleSegments,
     filteredBaseSegments,
     showWorkloadIdle,
     selectedSegmentTypes,
   } = params;
 
-  const masterFilteredSegments = useMemo(() => {
+  const chartBaseSegments = useMemo(() => {
     return filteredBaseSegments.filter((segment) => {
       const segmentGroup = toSegmentGroup(segment.segmentType);
       if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return false;
@@ -27,29 +26,26 @@ export function useDashboardMetrics(params) {
   }, [filteredBaseSegments, selectedSegmentTypes]);
 
   const kpiData = useMemo(() => {
-    const kpis = masterFilteredSegments.length > 0 ? buildKpisFromSegments(masterFilteredSegments) : null;
+    const kpis = chartBaseSegments.length > 0 ? buildKpisFromSegments(chartBaseSegments) : null;
     return kpis ? buildKpiData(kpis) : initialKpiData;
-  }, [masterFilteredSegments]);
+  }, [chartBaseSegments]);
 
-  const flowRows = useMemo(() => calculateFlowRows(masterFilteredSegments), [masterFilteredSegments]);
+  const flowRows = useMemo(() => calculateFlowRows(chartBaseSegments), [chartBaseSegments]);
 
-  const userStatsRows = useMemo(() => calculateUserStatsRows(masterFilteredSegments), [masterFilteredSegments]);
+  const userStatsRows = useMemo(() => calculateUserStatsRows(chartBaseSegments), [chartBaseSegments]);
 
   const contributionRows = useMemo(() => userStatsRows.map((row) => ({ ...row })), [userStatsRows]);
 
   const workloadContributors = useMemo(() => {
     const laneDurationMap = new Map();
 
-    filteredBaseSegments.forEach((segment) => {
+    chartBaseSegments.forEach((segment) => {
       const segmentType = String(segment.segmentType || '');
       const durationSeconds = safeNumber(segment.durationSeconds);
       if (durationSeconds <= 0) return;
 
       const isIdle = isIdleContextSegment(segmentType);
       if (isIdle && !showWorkloadIdle) return;
-
-      const segmentGroup = toSegmentGroup(segmentType);
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
 
       let lane = toTimelineLane(segmentType, segment.userName);
       if (segmentType.startsWith('SYSTEM_')) lane = 'System';
@@ -60,9 +56,10 @@ export function useDashboardMetrics(params) {
     return Array.from(laneDurationMap.entries())
       .map(([user, totalSeconds]) => ({ user, totalSeconds }))
       .sort((a, b) => b.totalSeconds - a.totalSeconds);
-  }, [filteredBaseSegments, showWorkloadIdle, selectedSegmentTypes]);
+  }, [chartBaseSegments, showWorkloadIdle]);
 
   return {
+    chartBaseSegments,
     kpiData,
     flowRows,
     contributionRows,

@@ -5,7 +5,6 @@ import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 import { toDrillGroup } from '../../lib/segmentUtils.js';
 import { buildAverageTransitionTimeData } from './utils/transitionMetrics.js';
-import { toSegmentGroup } from './utils/segmentData.js';
 
 function buildChartAnimationKey(rows, fields) {
   if (!Array.isArray(rows) || rows.length === 0) return 'empty';
@@ -66,8 +65,7 @@ export const DashboardView = React.memo(({
   const {
     kpiData,
     ganttVisibleSegments,
-    filteredBaseSegments,
-    selectedSegmentTypes,
+    chartBaseSegments,
     contributionRows,
     showIdle,
     setShowIdle,
@@ -87,10 +85,8 @@ export const DashboardView = React.memo(({
       EditMeta: 0,
       Idle: 0,
     };
-    filteredBaseSegments.forEach(s => {
+    chartBaseSegments.forEach(s => {
       const drillGroup = toDrillGroup(s.segmentType);
-      const segmentGroup = toSegmentGroup(s.segmentType);
-      if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
       if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
       if (drillGroup === 'Uploading') totals.Uploading += duration;
@@ -139,15 +135,15 @@ export const DashboardView = React.memo(({
       });
     }
     return items;
-  }, [filteredBaseSegments, selectedSegmentTypes, mergeReviewAndEdit, showProcessBreakdownIdle]);
+  }, [chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    return buildAverageTransitionTimeData(filteredBaseSegments, {
+    return buildAverageTransitionTimeData(chartBaseSegments, {
       afterProcessing: 'First Spread',
       afterReprocessing: 'Second Spread',
       betweenReviewEdit: 'Review & Edit',
     });
-  }, [filteredBaseSegments]);
+  }, [chartBaseSegments]);
 
   const donutAnimationKey = React.useMemo(
     () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
@@ -340,7 +336,7 @@ export const DashboardView = React.memo(({
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
+            {chartBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
                 <ProcessTimeBreakdownChart key={processBreakdownAnimationKey} data={processBreakdownData} showLabels={showProcessBreakdownLabels} />
               </Suspense>
@@ -357,7 +353,7 @@ export const DashboardView = React.memo(({
             </div>
           </div>
           <div className="flex-1 min-h-0">
-            {filteredBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
+            {chartBaseSegments.length === 0 ? <EmptyState icon={Clock} title="No Data" /> : (
               <Suspense fallback={<ChartPanelFallback />}>
                 <ProcessTimeBreakdownChart key={transitionAnimationKey} data={transitionTimeData} showLabels={showProcessBreakdownLabels} />
               </Suspense>

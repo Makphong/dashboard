@@ -186,7 +186,7 @@ function App() {
             onClose={() => controller.setExpandedVisualizationId('')}
             data={{
               ganttVisibleSegments: dashboard.ganttVisibleSegments,
-              processBreakdownSegments: dashboard.filteredBaseSegments,
+              chartBaseSegments: dashboard.chartBaseSegments,
               selectedSegmentTypes: dashboard.selectedSegmentTypes,
               showProcessBreakdownIdle: controller.showProcessBreakdownIdle,
               showProcessBreakdownLabels: controller.showProcessBreakdownLabels,

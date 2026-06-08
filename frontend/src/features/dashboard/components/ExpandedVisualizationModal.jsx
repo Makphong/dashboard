@@ -1037,7 +1037,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
 
   const {
     ganttVisibleSegments,
-    processBreakdownSegments,
+    chartBaseSegments,
     selectedSegmentTypes,
     showProcessBreakdownIdle,
     showProcessBreakdownLabels,
@@ -1057,11 +1057,9 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       EditMeta: 0,
       Idle: 0,
     };
-    const sourceSegments = processBreakdownSegments || ganttVisibleSegments;
+    const sourceSegments = chartBaseSegments || ganttVisibleSegments;
     sourceSegments.forEach(s => {
       const drillGroup = toDrillGroup(s.segmentType);
-      const segmentGroup = toSegmentGroup(s.segmentType);
-      if ((selectedSegmentTypes || []).length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
       if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
       if (drillGroup === 'Uploading') totals.Uploading += duration;
@@ -1109,16 +1107,16 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       });
     }
     return items;
-  }, [ganttVisibleSegments, processBreakdownSegments, selectedSegmentTypes, mergeReviewAndEdit]);
+  }, [ganttVisibleSegments, chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    const sourceSegments = processBreakdownSegments || ganttVisibleSegments;
+    const sourceSegments = chartBaseSegments || ganttVisibleSegments;
     return buildAverageTransitionTimeData(sourceSegments, {
       afterProcessing: 'After Processing',
       afterReprocessing: 'After Reprocessing',
       betweenReviewEdit: 'Between Review And Edit',
     });
-  }, [ganttVisibleSegments, processBreakdownSegments]);
+  }, [ganttVisibleSegments, chartBaseSegments]);
 
   const donutAnimationKey = React.useMemo(
     () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
@@ -1172,23 +1170,23 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
           {visualizationId === 'gantt-detail' && <TimelineDetailView segments={ganttVisibleSegments} timelineSettings={timelineSettings} />}
           {visualizationId === 'donut-detail' && (
             <UserShareDetailView
-              segments={ganttVisibleSegments}
+              segments={chartBaseSegments || ganttVisibleSegments}
               workloadVisibleRows={workloadVisibleRows}
             />
           )}
           {visualizationId === 'contribution-detail' && (
-            <UserBreakdownDetailView rows={contributionRows} segments={ganttVisibleSegments} />
+            <UserBreakdownDetailView rows={contributionRows} segments={chartBaseSegments || ganttVisibleSegments} />
           )}
           {visualizationId === 'process-breakdown-detail' && (
             <TimeBreakdownDetailView
-              segments={processBreakdownSegments || ganttVisibleSegments}
+              segments={chartBaseSegments || ganttVisibleSegments}
               selectedSegmentTypes={selectedSegmentTypes}
               showProcessBreakdownIdle={showProcessBreakdownIdle}
               mergeReviewAndEdit={mergeReviewAndEdit}
             />
           )}
           {visualizationId === 'matrix-detail' && (
-            <TransitionBreakdownDetailView segments={processBreakdownSegments || ganttVisibleSegments} />
+            <TransitionBreakdownDetailView segments={chartBaseSegments || ganttVisibleSegments} />
           )}
           <Suspense fallback={<ExpandedChartFallback />}>
             {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart key={processBreakdownAnimationKey} data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}

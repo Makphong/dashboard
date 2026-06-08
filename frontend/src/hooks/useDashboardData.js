@@ -92,12 +92,12 @@ export function useDashboardData() {
   });
 
   const {
+    chartBaseSegments,
     kpiData,
     flowRows,
     contributionRows,
     workloadContributors,
   } = useDashboardMetrics({
-    ganttVisibleSegments,
     filteredBaseSegments,
     showWorkloadIdle,
     selectedSegmentTypes: normalizedSelectedSegmentTypes,
@@ -234,6 +234,7 @@ export function useDashboardData() {
     segmentTypeOptions,
     invalidSheetCounts,
     ganttVisibleSegments,
+    chartBaseSegments,
     kpiData,
     filteredBaseSegments,
     flowRows,
