@@ -15,6 +15,30 @@ def _is_user_detail_event(event: dict) -> bool:
     return event["actor_type"] == "User" and not event["is_status_event"]
 
 
+def _previous_non_placeholder_user_actor(
+    events: list[dict], event_index: int
+) -> str | None:
+    for idx in range(event_index - 1, -1, -1):
+        candidate = events[idx]
+        if candidate["actor_type"] != "User" or candidate["actor_name"] == "User0":
+            continue
+        return candidate["actor_name"]
+    return None
+
+
+def _next_non_placeholder_user_detail_actor_before_next_status(
+    events: list[dict], event_index: int
+) -> set[str]:
+    actors: set[str] = set()
+    for idx in range(event_index + 1, len(events)):
+        candidate = events[idx]
+        if candidate["is_status_event"]:
+            return actors
+        if _is_user_detail_event(candidate) and candidate["actor_name"] != "User0":
+            actors.add(candidate["actor_name"])
+    return actors
+
+
 def _is_placeholder_pending_exit_noise(events: list[dict], event_index: int) -> bool:
     event = events[event_index]
     if not (
@@ -25,20 +49,14 @@ def _is_placeholder_pending_exit_noise(events: list[dict], event_index: int) -> 
     ):
         return False
 
-    next_status_index: int | None = None
-    for idx in range(event_index + 1, len(events)):
-        if events[idx]["is_status_event"]:
-            next_status_index = idx
-            break
-
-    if next_status_index is None:
+    previous_user_actor = _previous_non_placeholder_user_actor(events, event_index)
+    next_user_actors = _next_non_placeholder_user_detail_actor_before_next_status(
+        events, event_index
+    )
+    if previous_user_actor is None or not next_user_actors:
         return False
 
-    for candidate in events[event_index + 1 : next_status_index]:
-        if _is_user_detail_event(candidate) and candidate["actor_name"] != "User0":
-            return True
-
-    return False
+    return next_user_actors == {previous_user_actor}
 
 
 def _remove_placeholder_pending_exit_noise(events: list[dict]) -> list[dict]:
