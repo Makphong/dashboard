@@ -1,6 +1,6 @@
 import { buildSheetKey, toDrillGroup, toTimelineLane } from '../../../lib/utils.js';
 
-export const SEGMENT_GROUP_OPTIONS = ['Uploading', 'Processing', 'Reprocess', 'Review', 'Edit', 'Idle'];
+export const SEGMENT_GROUP_OPTIONS = ['Uploading', 'Processing', 'Reprocess', 'Review', 'EditData', 'EditMeta', 'Idle'];
 
 const DAY_WINDOW_MAP = { '7d': 7, '30d': 30, '90d': 90 };
 
@@ -8,7 +8,7 @@ export function toSegmentGroup(segmentType) {
   const drillGroup = toDrillGroup(segmentType);
   if (drillGroup === 'Reprocessing') return 'Reprocess';
   if (drillGroup === 'ReviewAutoClose') return 'Review';
-  if (drillGroup === 'EditAndComplete') return 'Edit';
+  if (drillGroup === 'EditAndComplete') return 'EditData';
   return drillGroup;
 }
 

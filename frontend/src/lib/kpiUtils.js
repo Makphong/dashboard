@@ -5,7 +5,7 @@ import {
 import { Clock, Users, Timer, RefreshCw, AlertTriangle } from 'lucide-react';
 import { formatDuration, formatPercent } from './durationFormatters.js';
 import { safeNumber } from './numberUtils.js';
-import { isIdleContextSegment, isProcessingEquivalentIdleSegment } from './segmentUtils.js';
+import { isDataEditSegmentType, isIdleContextSegment, isMetaEditSegmentType, isProcessingEquivalentIdleSegment } from './segmentUtils.js';
 
 export function buildKpiData(kpis) {
   if (!kpis) return initialKpiData;
@@ -98,7 +98,7 @@ export function buildKpisFromSegments(segments) {
   const editTimeSeconds = coreUserSegments
     .filter((segment) => {
       const type = String(segment.segmentType || '');
-      return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+      return isDataEditSegmentType(type) || isMetaEditSegmentType(type);
     })
     .reduce((sum, segment) => sum + effectiveDuration(segment), 0);
   const reworkRate = activeUserTimeSeconds > 0 ? (editTimeSeconds / activeUserTimeSeconds) : 0;
@@ -128,7 +128,7 @@ export function buildKpisFromSegments(segments) {
 
   const reworkSessions = coreUserSegments.filter((segment) => {
     const type = String(segment.segmentType || '');
-    return type === 'USER_EDITING_CORRECTION' || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL';
+    return isDataEditSegmentType(type) || isMetaEditSegmentType(type);
   }).length;
 
   const segmentsBySheet = new Map();

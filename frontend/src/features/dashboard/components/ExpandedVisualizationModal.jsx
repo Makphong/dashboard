@@ -5,6 +5,7 @@ import { mergeContinuousReprocessingSegments, toDrillGroup } from '../../../lib/
 import { buildAverageTransitionTimeData } from '../utils/transitionMetrics.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
 import { mapSegmentsToRows } from '../../timeline/timelineUtils.js';
+import { toSegmentGroup } from '../utils/segmentData.js';
 
 const GanttTimelineChart = lazy(() => import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
 const DonutWorkloadChart = lazy(() => import('../../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
@@ -52,7 +53,8 @@ function toTimelineDetailCountKey(segmentType) {
   if (drillGroup === 'Processing') return 'Processing';
   if (drillGroup === 'Reprocessing') return 'Reprocessing';
   if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') return 'Review';
-  if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') return 'Edit';
+  if (drillGroup === 'EditData') return 'EditData';
+  if (drillGroup === 'EditMeta') return 'EditMeta';
   if (drillGroup === 'Idle') return 'Idle';
   return '';
 }
@@ -113,7 +115,15 @@ function buildTimelineDetailData(segments, timelineSettings) {
     }))
     .sort((a, b) => a.startTs - b.startTs);
 
-  const summaryCounts = { Uploading: 0, Processing: 0, Reprocessing: 0, Review: 0, Edit: 0, Idle: 0 };
+  const summaryCounts = {
+    Uploading: 0,
+    Processing: 0,
+    Reprocessing: 0,
+    Review: 0,
+    EditData: 0,
+    EditMeta: 0,
+    Idle: 0,
+  };
   const sourceMap = new Map();
 
   bars.forEach((bar) => {
@@ -142,7 +152,8 @@ function buildTimelineDetailData(segments, timelineSettings) {
       { key: 'Processing', label: 'First Spread', count: summaryCounts.Processing, accentClass: 'text-[#0f172a]' },
       { key: 'Reprocessing', label: 'Second Spread', count: summaryCounts.Reprocessing, accentClass: 'text-[#3730a3]' },
       { key: 'Review', label: 'Review', count: summaryCounts.Review, accentClass: 'text-[#0f766e]' },
-      { key: 'Edit', label: 'Edit', count: summaryCounts.Edit, accentClass: 'text-[#9a3412]' },
+      { key: 'EditData', label: 'Edit Data', count: summaryCounts.EditData, accentClass: 'text-[#9a3412]' },
+      { key: 'EditMeta', label: 'Edit Meta', count: summaryCounts.EditMeta, accentClass: 'text-[#7c2d12]' },
       { key: 'Idle', label: 'Idle', count: summaryCounts.Idle, accentClass: 'text-slate-500' },
     ],
     sourceRows: Array.from(sourceMap.values())
@@ -218,7 +229,7 @@ function buildUserBreakdownGroups(segments, contributionRows) {
     const drillGroup = toDrillGroup(segment.segmentType);
     const type = drillGroup === 'Review' || drillGroup === 'ReviewAutoClose'
       ? 'Review'
-      : (drillGroup === 'Edit' || drillGroup === 'EditAndComplete' ? 'Edit' : '');
+      : (drillGroup === 'EditData' || drillGroup === 'EditMeta' ? 'Edit' : '');
     if (!type) return;
 
     if (preferredUserSet.size > 0 && !preferredUserSet.has(lane)) return;
@@ -259,21 +270,28 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
 
   const resolveGroupKey = (segment) => {
     const drillGroup = toDrillGroup(segment.segmentType);
-    const segmentGroup = drillGroup === 'Reprocessing'
-      ? 'Reprocess'
-      : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+    const segmentGroup = toSegmentGroup(segment.segmentType);
 
     if (safeSelected.length > 0 && !safeSelected.includes(segmentGroup)) return null;
     if (!showProcessBreakdownIdle && drillGroup === 'Idle') return null;
 
-    if (mergeReviewAndEdit && (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose' || drillGroup === 'Edit' || drillGroup === 'EditAndComplete')) {
+    if (
+      mergeReviewAndEdit
+      && (
+        drillGroup === 'Review'
+        || drillGroup === 'ReviewAutoClose'
+        || drillGroup === 'EditData'
+        || drillGroup === 'EditMeta'
+      )
+    ) {
       return { key: 'review-edit', label: 'Review & Edit', colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]' };
     }
     if (drillGroup === 'Uploading') return { key: 'uploading', label: 'Uploading', colorClass: 'bg-slate-100 text-slate-700', dotClass: 'bg-slate-500' };
     if (drillGroup === 'Processing') return { key: 'processing', label: 'First Spread', colorClass: 'bg-[#dbeafe] text-[#1d4ed8]', dotClass: 'bg-[#3b82f6]' };
     if (drillGroup === 'Reprocessing') return { key: 'reprocess', label: 'Second Spread', colorClass: 'bg-[#e0e7ff] text-[#4338ca]', dotClass: 'bg-[#6366f1]' };
     if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') return { key: 'review', label: 'Review', colorClass: 'bg-[#ecfeff] text-[#0f766e]', dotClass: 'bg-[#06B6D4]' };
-    if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') return { key: 'edit', label: 'Edit', colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]' };
+    if (drillGroup === 'EditData') return { key: 'edit-data', label: 'Edit Data', colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]' };
+    if (drillGroup === 'EditMeta') return { key: 'edit-meta', label: 'Edit Meta', colorClass: 'bg-[#fef2f2] text-[#9a3412]', dotClass: 'bg-[#C2410C]' };
     if (drillGroup === 'Idle') return { key: 'idle', label: 'Idle', colorClass: 'bg-slate-100 text-slate-600', dotClass: 'bg-slate-400' };
     return null;
   };
@@ -299,7 +317,7 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
 
   const order = mergeReviewAndEdit
     ? ['uploading', 'processing', 'reprocess', 'review-edit', 'idle']
-    : ['uploading', 'processing', 'reprocess', 'review', 'edit', 'idle'];
+    : ['uploading', 'processing', 'reprocess', 'review', 'edit-data', 'edit-meta', 'idle'];
 
   return order
     .filter((key) => grouped.has(key))
@@ -341,10 +359,15 @@ function buildTransitionBreakdownGroups(segments) {
         groupKey = 'after-processing';
       } else if (prevDrill === 'Reprocessing') {
         groupKey = 'after-reprocessing';
-      } else if (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading') {
+      } else if (
+        prevDrill === 'Review'
+        || prevDrill === 'EditData'
+        || prevDrill === 'EditMeta'
+        || prevDrill === 'Uploading'
+      ) {
         const hasFutureAction = sorted.slice(i + 1).some((s) => {
           const dg = toDrillGroup(s.segmentType);
-          return dg === 'Review' || dg === 'Edit';
+          return dg === 'Review' || dg === 'EditData' || dg === 'EditMeta';
         });
         if (hasFutureAction) groupKey = 'between-review-edit';
       }
@@ -1025,14 +1048,19 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   } = data;
 
   const processBreakdownData = React.useMemo(() => {
-    const totals = { Uploading: 0, Processing: 0, Reprocess: 0, Review: 0, Edit: 0, Idle: 0 };
+    const totals = {
+      Uploading: 0,
+      Processing: 0,
+      Reprocess: 0,
+      Review: 0,
+      EditData: 0,
+      EditMeta: 0,
+      Idle: 0,
+    };
     const sourceSegments = processBreakdownSegments || ganttVisibleSegments;
     sourceSegments.forEach(s => {
-      const segmentType = String(s.segmentType || '');
       const drillGroup = toDrillGroup(s.segmentType);
-      const segmentGroup = drillGroup === 'Reprocessing'
-        ? 'Reprocess'
-        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      const segmentGroup = toSegmentGroup(s.segmentType);
       if ((selectedSegmentTypes || []).length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
       if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
@@ -1040,14 +1068,15 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       else if (drillGroup === 'Processing') totals.Processing += duration;
       else if (drillGroup === 'Reprocessing') totals.Reprocess += duration;
       else if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') totals.Review += duration;
-      else if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') totals.Edit += duration;
+      else if (drillGroup === 'EditData') totals.EditData += duration;
+      else if (drillGroup === 'EditMeta') totals.EditMeta += duration;
       else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
 
     let items = [];
     if (mergeReviewAndEdit) {
-      const mergedReviewEdit = totals.Review + totals.Edit;
+      const mergedReviewEdit = totals.Review + totals.EditData + totals.EditMeta;
       items = [
         { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
         { label: 'Processing', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
@@ -1064,7 +1093,14 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         }));
     }
 
-    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit;
+    const completeSeconds = (
+      totals.Uploading
+      + totals.Processing
+      + totals.Reprocess
+      + totals.Review
+      + totals.EditData
+      + totals.EditMeta
+    );
     if (completeSeconds > 0) {
       items.push({
         label: 'Complete',

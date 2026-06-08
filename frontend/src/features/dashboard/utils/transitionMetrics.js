@@ -24,7 +24,7 @@ export function buildAverageTransitionTimeData(segments, labels = {}) {
       const curr = sorted[i];
       const currDrill = toDrillGroup(curr.segmentType);
 
-      if (currDrill === 'Review' || currDrill === 'Edit') {
+      if (currDrill === 'Review' || currDrill === 'EditData' || currDrill === 'EditMeta') {
         hasFutureReviewOrEdit = true;
       }
 
@@ -42,7 +42,12 @@ export function buildAverageTransitionTimeData(segments, labels = {}) {
         countAfterReprocess += 1;
       } else if (
         hasFutureReviewOrEdit &&
-        (prevDrill === 'Review' || prevDrill === 'Edit' || prevDrill === 'Uploading')
+        (
+          prevDrill === 'Review'
+          || prevDrill === 'EditData'
+          || prevDrill === 'EditMeta'
+          || prevDrill === 'Uploading'
+        )
       ) {
         idleBetweenActions += duration;
         countBetweenActions += 1;

@@ -4,6 +4,7 @@ import {
   WORKFLOW_FLOW_SEGMENT_TYPES,
   TRANSITION_FRIENDLY_LABELS
 } from '../../../lib/constants.js';
+import { isDataEditSegmentType, isMetaEditSegmentType } from '../../../lib/segmentUtils.js';
 
 export function calculateFlowRows(filteredBaseSegments) {
   const groupedByDocument = new Map();
@@ -19,12 +20,15 @@ export function calculateFlowRows(filteredBaseSegments) {
     'USER_REVIEW_COMMENT_CHECK',
     'USER_REVIEW_AUTO_TIMEOUT',
     'USER_EDITING_CORRECTION',
+    'USER_EDITING_METADATA_CORRECTION',
     'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
+    'USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL',
     'USER_COMPLETION_APPROVAL',
   ]);
   const COMPLETE_TYPES = new Set([
     'USER_COMPLETION_APPROVAL',
     'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL',
+    'USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL',
   ]);
 
   const statsById = Object.fromEntries(
@@ -124,7 +128,7 @@ export function calculateUserStatsRows(ganttVisibleSegments) {
     if (segment.segmentType === 'USER_UPLOADING') { stats.uploadSeconds += durationSeconds; return; }
     stats.sessionCount += 1;
     const st = String(segment.segmentType || '');
-    if (st === 'USER_EDITING_CORRECTION' || st === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') { 
+    if (isDataEditSegmentType(st) || isMetaEditSegmentType(st)) { 
       stats.editSeconds += durationSeconds; 
       stats.reworkCount += 1; 
     }

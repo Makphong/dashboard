@@ -45,11 +45,30 @@ export function toCompleteMarkerType(segmentOrType) {
   const segment = segmentOrType && typeof segmentOrType === 'object' ? segmentOrType : null;
   const type = String(segment ? segment.segmentType : segmentOrType || '');
   if (type === 'USER_COMPLETION_APPROVAL') return 'COMPLETE_BY_REVIEW_MARKER';
-  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') return 'COMPLETE_BY_EDIT_MARKER';
+  if (
+    type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL'
+    || type === 'USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL'
+  ) return 'COMPLETE_BY_EDIT_MARKER';
   if (segment && segment.hasReprocessRound2CompleteMarker) return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
   if (type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2') return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
   if (type === 'SYSTEM_SCHEDULED_REPROCESSING') return 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER';
   return '';
+}
+
+export function isDataEditSegmentType(segmentType) {
+  const type = String(segmentType || '');
+  return (
+    type === 'USER_EDITING_CORRECTION'
+    || type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL'
+  );
+}
+
+export function isMetaEditSegmentType(segmentType) {
+  const type = String(segmentType || '');
+  return (
+    type === 'USER_EDITING_METADATA_CORRECTION'
+    || type === 'USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL'
+  );
 }
 
 export function mergeContinuousReprocessingSegments(sortedSegments) {
@@ -103,7 +122,7 @@ export function toDrillGroup(segmentType) {
   const type = String(segmentType || '');
   if (type === 'USER_UPLOADING') return 'Uploading';
   if (type === 'COMPLETE_BY_REVIEW_MARKER') return 'Review';
-  if (type === 'COMPLETE_BY_EDIT_MARKER') return 'Edit';
+  if (type === 'COMPLETE_BY_EDIT_MARKER') return 'EditData';
   if (type === 'COMPLETE_AFTER_REPROCESS_ROUND_2_MARKER') return 'Reprocessing';
   if (isProcessingEquivalentIdleSegment(type)) return 'Reprocessing';
   if (type === 'SYSTEM_INITIAL_PROCESSING' || type === 'SYSTEM_INTERNAL_TRANSITION') return 'Processing';
@@ -114,9 +133,9 @@ export function toDrillGroup(segmentType) {
     type === 'SYSTEM_SCHEDULED_REPROCESSING'
     || type === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2'
   ) return 'Reprocessing';
-  if (type === 'USER_EDITING_CORRECTION') return 'Edit';
+  if (isDataEditSegmentType(type)) return 'EditData';
+  if (isMetaEditSegmentType(type)) return 'EditMeta';
   if (type === 'USER_COMPLETION_APPROVAL') return 'Review';
-  if (type === 'USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL') return 'Edit';
   return 'Processing';
 }
 

@@ -5,6 +5,7 @@ import { KpiSubtext } from '../../components/shared/KpiSubtext.jsx';
 import { GANTT_DRILL_GROUP_COLORS } from '../../lib/constants.js';
 import { toDrillGroup } from '../../lib/segmentUtils.js';
 import { buildAverageTransitionTimeData } from './utils/transitionMetrics.js';
+import { toSegmentGroup } from './utils/segmentData.js';
 
 function buildChartAnimationKey(rows, fields) {
   if (!Array.isArray(rows) || rows.length === 0) return 'empty';
@@ -77,13 +78,18 @@ export const DashboardView = React.memo(({
   } = dashboard;
 
   const processBreakdownData = React.useMemo(() => {
-    const totals = { Uploading: 0, Processing: 0, Reprocess: 0, Review: 0, Edit: 0, Idle: 0 };
+    const totals = {
+      Uploading: 0,
+      Processing: 0,
+      Reprocess: 0,
+      Review: 0,
+      EditData: 0,
+      EditMeta: 0,
+      Idle: 0,
+    };
     filteredBaseSegments.forEach(s => {
-      const segmentType = String(s.segmentType || '');
       const drillGroup = toDrillGroup(s.segmentType);
-      const segmentGroup = drillGroup === 'Reprocessing'
-        ? 'Reprocess'
-        : (drillGroup === 'ReviewAutoClose' ? 'Review' : (drillGroup === 'EditAndComplete' ? 'Edit' : drillGroup));
+      const segmentGroup = toSegmentGroup(s.segmentType);
       if (selectedSegmentTypes.length > 0 && !selectedSegmentTypes.includes(segmentGroup)) return;
       if (!showProcessBreakdownIdle && drillGroup === 'Idle') return;
       const duration = Number(s.durationSeconds) || 0;
@@ -91,14 +97,15 @@ export const DashboardView = React.memo(({
       else if (drillGroup === 'Processing') totals.Processing += duration;
       else if (drillGroup === 'Reprocessing') totals.Reprocess += duration;
       else if (drillGroup === 'Review' || drillGroup === 'ReviewAutoClose') totals.Review += duration;
-      else if (drillGroup === 'Edit' || drillGroup === 'EditAndComplete') totals.Edit += duration;
+      else if (drillGroup === 'EditData') totals.EditData += duration;
+      else if (drillGroup === 'EditMeta') totals.EditMeta += duration;
       else if (drillGroup === 'Idle') totals.Idle += duration;
       else totals.Idle += duration;
     });
 
     let items = [];
     if (mergeReviewAndEdit) {
-      const mergedReviewEdit = totals.Review + totals.Edit;
+      const mergedReviewEdit = totals.Review + totals.EditData + totals.EditMeta;
       items = [
         { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
         { label: 'First Spread', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
@@ -116,7 +123,14 @@ export const DashboardView = React.memo(({
         }));
     }
 
-    const completeSeconds = totals.Uploading + totals.Processing + totals.Reprocess + totals.Review + totals.Edit;
+    const completeSeconds = (
+      totals.Uploading
+      + totals.Processing
+      + totals.Reprocess
+      + totals.Review
+      + totals.EditData
+      + totals.EditMeta
+    );
     if (completeSeconds > 0) {
       items.push({
         label: 'Complete',
