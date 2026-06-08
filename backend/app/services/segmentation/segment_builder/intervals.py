@@ -5,6 +5,7 @@ from ....config.constants.constants_workflow import (
     IN_REVIEW_STATE,
     PENDING_STATES,
     USER_EDIT_CHANGE_TYPES,
+    USER_METADATA_EDIT_CHANGE_TYPES,
 )
 from .factory import build_segment
 from .helpers import (
@@ -146,6 +147,14 @@ def _in_review_segments(interval: dict) -> list[dict]:
             and event["change_type"] in USER_EDIT_CHANGE_TYPES
         ]
     )
+    user_metadata_edit_count = len(
+        [
+            event
+            for event in interval["inner_events"]
+            if event["actor_type"] == "User"
+            and event["change_type"] in USER_METADATA_EDIT_CHANGE_TYPES
+        ]
+    )
 
     if (
         interval["enter_actor_type"] == "User"
@@ -156,6 +165,24 @@ def _in_review_segments(interval: dict) -> list[dict]:
             build_segment(
                 interval,
                 "USER_EDITING_CORRECTION",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=interval["enter_actor"],
+                actor_type="User",
+                is_active_work=True,
+                is_idle=False,
+            )
+        ]
+
+    if (
+        interval["enter_actor_type"] == "User"
+        and interval["exit_to"] != COMPLETED_STATE
+        and user_metadata_edit_count > 0
+    ):
+        return [
+            build_segment(
+                interval,
+                "USER_EDITING_METADATA_CORRECTION",
                 interval["start_event"],
                 interval["end_event"],
                 actor_name=interval["enter_actor"],
@@ -205,6 +232,24 @@ def _in_review_segments(interval: dict) -> list[dict]:
             build_segment(
                 interval,
                 "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL",
+                interval["start_event"],
+                interval["end_event"],
+                actor_name=interval["enter_actor"],
+                actor_type="User",
+                is_active_work=True,
+                is_idle=False,
+            )
+        ]
+
+    if (
+        interval["enter_actor_type"] == "User"
+        and interval["exit_to"] == COMPLETED_STATE
+        and user_metadata_edit_count > 0
+    ):
+        return [
+            build_segment(
+                interval,
+                "USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL",
                 interval["start_event"],
                 interval["end_event"],
                 actor_name=interval["enter_actor"],
