@@ -151,6 +151,7 @@ export function buildGanttPositionedBars(config) {
   const {
     lanes,
     laneToSegments,
+    singleLane,
     compactTs,
     displayMinTs,
     displayMaxTs,
@@ -173,10 +174,10 @@ export function buildGanttPositionedBars(config) {
       const minWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
       const width = Math.max(minWidth, x2 - x1);
 
-      if (x < lastRight + 1.5) x = lastRight + 1.5;
+      if (!singleLane && x < lastRight + 1.5) x = lastRight + 1.5;
 
       positioned.push({ s: segment, x, w: width });
-      lastRight = x + width;
+      if (!singleLane) lastRight = x + width;
     });
     result[lane] = positioned;
   });

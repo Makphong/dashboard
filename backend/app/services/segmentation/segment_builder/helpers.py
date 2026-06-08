@@ -62,6 +62,22 @@ def previous_system_event_before(
     return sorted(candidates, key=lambda item: item["order_index"])[-1]
 
 
+def previous_in_review_entry_event(
+    events: list[dict], before_order_index: int
+) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] < before_order_index
+        and event["is_status_event"]
+        and event["from_status"] in PENDING_STATES
+        and event["to_status"] == IN_REVIEW_STATE
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[-1]
+
+
 def next_system_detail_after(events: list[dict], after_order_index: int) -> dict | None:
     candidates = [
         event

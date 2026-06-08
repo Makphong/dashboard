@@ -11,6 +11,7 @@ from .helpers import (
     find_system_reprocess_cycle_end,
     first_system_evidence,
     is_same_timestamp_reopen_to_review_handoff,
+    previous_in_review_entry_event,
 )
 
 
@@ -37,19 +38,46 @@ def _same_timestamp_handoff_segments(interval: dict) -> list[dict]:
     ]
 
 
+def _system_reprocess_start_event(
+    interval: dict, all_events: list[dict], first_system: dict
+) -> dict:
+    if not (
+        interval["enter_actor_type"] == "User"
+        and interval["enter_from"] == IN_REVIEW_STATE
+        and interval["enter_to"] in PENDING_STATES
+        and interval["exit_actor_type"] == "System"
+        and interval["exit_from"] == IN_REVIEW_STATE
+        and interval["exit_to"] == COMPLETED_STATE
+    ):
+        return first_system
+
+    previous_review_entry = previous_in_review_entry_event(
+        all_events,
+        interval["start_event"]["order_index"],
+    )
+    return previous_review_entry or first_system
+
+
 def _pending_segments(interval: dict, all_events: list[dict]) -> list[dict]:
-    first_system = first_system_evidence(interval["inner_events"])
+    first_system = first_system_evidence(
+        [*interval["inner_events"], interval["end_event"]]
+    )
     if first_system is not None:
         segments: list[dict] = []
         cycle_end = find_system_reprocess_cycle_end(first_system, all_events)
+        system_start = _system_reprocess_start_event(
+            interval,
+            all_events,
+            first_system,
+        )
 
-        if first_system["event_time"] > interval["start_time"]:
+        if system_start["event_time"] > interval["start_time"]:
             segments.append(
                 build_segment(
                     interval,
                     "IDLE_WAITING_FOR_SCHEDULED_REPROCESS",
                     interval["start_event"],
-                    first_system,
+                    system_start,
                     actor_name=None,
                     actor_type="None",
                     is_active_work=False,
@@ -62,7 +90,7 @@ def _pending_segments(interval: dict, all_events: list[dict]) -> list[dict]:
             build_segment(
                 interval,
                 "SYSTEM_SCHEDULED_REPROCESSING",
-                first_system,
+                system_start,
                 cycle_end,
                 actor_name="System",
                 actor_type="System",
@@ -190,6 +218,39 @@ def _in_review_segments(interval: dict) -> list[dict]:
         interval["enter_actor_type"] == "User"
         and interval["exit_to"] == COMPLETED_STATE
         and user_edit_count == 0
+        and interval["exit_actor_type"] == "System"
+    ):
+        first_system = first_system_evidence(
+            [*interval["inner_events"], interval["end_event"]]
+        )
+        if first_system is not None:
+            return [
+                build_segment(
+                    interval,
+                    "USER_REVIEW_COMMENT_CHECK",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                ),
+                build_segment(
+                    interval,
+                    "SYSTEM_SCHEDULED_REPROCESSING",
+                    interval["start_event"],
+                    interval["end_event"],
+                    actor_name="System",
+                    actor_type="System",
+                    is_active_work=True,
+                    is_idle=False,
+                ),
+            ]
+
+    if (
+        interval["enter_actor_type"] == "User"
+        and interval["exit_to"] == COMPLETED_STATE
+        and user_edit_count == 0
     ):
         return [
             build_segment(
@@ -213,7 +274,7 @@ def _in_review_segments(interval: dict) -> list[dict]:
         )
         and user_edit_count == 0
     ):
-        return [
+        segments = [
             build_segment(
                 interval,
                 "USER_REVIEW_COMMENT_CHECK",
@@ -225,6 +286,22 @@ def _in_review_segments(interval: dict) -> list[dict]:
                 is_idle=False,
             )
         ]
+
+        first_system = first_system_evidence(interval["inner_events"])
+        if first_system is not None and first_system["event_time"] < interval["end_time"]:
+            segments.append(
+                build_segment(
+                    interval,
+                    "SYSTEM_INTERNAL_TRANSITION",
+                    first_system,
+                    interval["end_event"],
+                    actor_name="System",
+                    actor_type="System",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            )
+        return segments
 
     if interval["enter_actor_type"] == "System":
         return [

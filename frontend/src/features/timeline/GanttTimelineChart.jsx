@@ -167,13 +167,14 @@ export const GanttTimelineChart = ({
   const laneToPositionedBars = useMemo(() => buildGanttPositionedBars({
     lanes,
     laneToSegments,
+    singleLane,
     compactTs,
     displayMinTs,
     displayMaxTs,
     baseCompactedTs,
     pxPerMs,
     timelinePadLeft,
-  }), [lanes, laneToSegments, compactTs, displayMinTs, displayMaxTs, baseCompactedTs, pxPerMs]);
+  }), [lanes, laneToSegments, singleLane, compactTs, displayMinTs, displayMaxTs, baseCompactedTs, pxPerMs]);
 
   const timelineSvgWidth = useMemo(() => {
     let maxRight = timelinePadLeft + timelineWidth + timelinePadRight;

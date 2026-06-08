@@ -71,8 +71,46 @@ function App() {
       && String(segment.userName || '') === String(selected.userName || '')
     );
 
-    return latestMatch || selected;
-  }, [controller.selectedGanttSegment, dashboard.ganttVisibleSegments]);
+    const resolved = latestMatch || selected;
+    if (!controller.ganttSingleLaneMode) return resolved;
+
+    const segmentType = String(resolved.segmentType || '');
+    if (!segmentType.startsWith('SYSTEM_SCHEDULED_REPROCESSING')) return resolved;
+
+    const selectedStartTs = Date.parse(String(resolved.start || ''));
+    const selectedEndTs = Date.parse(String(resolved.end || ''));
+    if (!Number.isFinite(selectedStartTs) || !Number.isFinite(selectedEndTs)) return resolved;
+
+    const sameSheetSegments = (dashboard.ganttVisibleSegments || []).filter((segment) =>
+      String(segment.fileName || '') === String(resolved.fileName || '')
+      && String(segment.pageName || '') === String(resolved.pageName || '')
+      && String(segment.userName || '').toLowerCase() === 'system'
+    );
+
+    const overlapSource = sameSheetSegments
+      .map((segment) => ({
+        ...segment,
+        startTs: Date.parse(String(segment.start || '')),
+        endTs: Date.parse(String(segment.end || '')),
+      }))
+      .filter((segment) =>
+        Number.isFinite(segment.startTs)
+        && Number.isFinite(segment.endTs)
+        && segment.segmentType === 'SYSTEM_INTERNAL_TRANSITION'
+        && segment.endTs <= selectedStartTs
+        && segment.endTs >= selectedStartTs - 1000
+      )
+      .sort((a, b) => b.startTs - a.startTs)[0];
+
+    if (!overlapSource) return resolved;
+
+    const mergedStartTs = Math.min(overlapSource.startTs, selectedStartTs);
+    return {
+      ...resolved,
+      start: new Date(mergedStartTs).toISOString(),
+      durationSeconds: Math.max(0, Math.round((selectedEndTs - mergedStartTs) / 1000)),
+    };
+  }, [controller.selectedGanttSegment, controller.ganttSingleLaneMode, dashboard.ganttVisibleSegments]);
 
   if (showRotateNotice) {
     return (

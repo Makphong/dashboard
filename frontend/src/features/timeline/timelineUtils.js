@@ -22,6 +22,51 @@ import {
   toDisplayDate
 } from '../../lib/utils.js';
 
+function applySecondSpreadHandoffTiming(rows) {
+  const rowsByContext = new Map();
+  rows.forEach((row) => {
+    if (!rowsByContext.has(row.contextKey)) rowsByContext.set(row.contextKey, []);
+    rowsByContext.get(row.contextKey).push(row);
+  });
+
+  rowsByContext.forEach((contextRows) => {
+    contextRows.sort((a, b) => a.startTs - b.startTs);
+
+    contextRows.forEach((row) => {
+      const rowType = String(row.segmentType || '');
+      if (!rowType.startsWith('SYSTEM_SCHEDULED_REPROCESSING')) return;
+
+      const handoffUserRow = contextRows
+        .filter((candidate) => {
+          const candidateType = String(candidate.segmentType || '');
+          return candidateType.startsWith('USER_')
+            && candidate.startTs < row.startTs
+            && Math.abs(candidate.endTs - row.startTs) <= 1000;
+        })
+        .sort((a, b) => (b.endTs - a.endTs) || (a.startTs - b.startTs))[0];
+
+      const handoffSystemRow = contextRows
+        .filter((candidate) => (
+          candidate.segmentType === 'SYSTEM_INTERNAL_TRANSITION'
+          && candidate.startTs < row.startTs
+          && Math.abs(candidate.endTs - row.startTs) <= 1000
+        ))
+        .sort((a, b) => (b.endTs - a.endTs) || (a.startTs - b.startTs))[0];
+
+      const handoffStartTs = Math.min(
+        row.startTs,
+        handoffUserRow ? handoffUserRow.startTs : row.startTs,
+        handoffSystemRow ? handoffSystemRow.startTs : row.startTs
+      );
+      if (handoffStartTs >= row.startTs) return;
+
+      row.startTs = handoffStartTs;
+      row.start = new Date(handoffStartTs).toISOString();
+      row.durationSeconds = Math.max(0, Math.round((row.endTs - handoffStartTs) / 1000));
+    });
+  });
+}
+
 /**
  * Maps raw segments into parsed rows for the Gantt chart.
  */
@@ -67,6 +112,8 @@ export const mapSegmentsToRows = (segments, singleLane) => {
       hasReprocessRound2CompleteMarker: segmentType === 'SYSTEM_SCHEDULED_REPROCESSING_ROUND_2',
     });
   });
+
+  applySecondSpreadHandoffTiming(parsedRows);
 
   if (reopenMarkers.length === 0 || parsedRows.length === 0) return parsedRows;
 
