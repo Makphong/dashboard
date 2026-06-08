@@ -2,13 +2,52 @@ from __future__ import annotations
 
 import datetime as dt
 
-from ....config.constants.constants_workflow import IN_REVIEW_STATE, PENDING_STATES
+from ....config.constants.constants_workflow import (
+    COMPLETED_STATE,
+    IN_REVIEW_STATE,
+    PENDING_STATES,
+)
 from ..engine_utils import seconds_between
 from .intervals import build_interval_segments
 
 
 def _is_user_detail_event(event: dict) -> bool:
     return event["actor_type"] == "User" and not event["is_status_event"]
+
+
+def _is_placeholder_pending_exit_noise(events: list[dict], event_index: int) -> bool:
+    event = events[event_index]
+    if not (
+        event["is_status_event"]
+        and event["actor_name"] == "User0"
+        and event["from_status"] == IN_REVIEW_STATE
+        and event["to_status"] == "Pending Re-Review by Moodys"
+    ):
+        return False
+
+    next_status_index: int | None = None
+    for idx in range(event_index + 1, len(events)):
+        if events[idx]["is_status_event"]:
+            next_status_index = idx
+            break
+
+    if next_status_index is None:
+        return False
+
+    for candidate in events[event_index + 1 : next_status_index]:
+        if _is_user_detail_event(candidate) and candidate["actor_name"] != "User0":
+            return True
+
+    return False
+
+
+def _remove_placeholder_pending_exit_noise(events: list[dict]) -> list[dict]:
+    filtered: list[dict] = []
+    for idx, event in enumerate(events):
+        if _is_placeholder_pending_exit_noise(events, idx):
+            continue
+        filtered.append(event)
+    return filtered
 
 
 def _build_synthetic_status_event(
@@ -62,6 +101,13 @@ def _inject_synthetic_status_events(events: list[dict]) -> list[dict]:
                 and last_user_detail_in_review is not None
                 and event["from_status"] != IN_REVIEW_STATE
             ):
+                if (
+                    event["from_status"] in PENDING_STATES
+                    and event["to_status"] == COMPLETED_STATE
+                ):
+                    last_user_detail_in_review = None
+                    current_state = event["to_status"] or current_state
+                    continue
                 close_to_state = event["from_status"] or in_review_fallback_state
                 if close_to_state and close_to_state != IN_REVIEW_STATE:
                     synthetic_events.append(
@@ -183,6 +229,7 @@ def build_segments_for_document(doc_events: list[dict]) -> list[dict]:
     ordered = sorted(
         doc_events, key=lambda item: (item["event_time"], -int(item["row_number"]))
     )
+    ordered = _remove_placeholder_pending_exit_noise(ordered)
     ordered = _inject_synthetic_status_events(ordered)
     for idx, event in enumerate(ordered):
         event["order_index"] = idx
