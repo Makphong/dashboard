@@ -11,8 +11,11 @@ from .factory import build_segment
 from .helpers import (
     find_system_reprocess_cycle_end,
     first_system_evidence,
+    has_same_timestamp_reopen_handoff,
     is_same_timestamp_reopen_to_review_handoff,
     is_system_evidence,
+    next_status_event_after,
+    previous_status_event_before,
     previous_in_review_entry_event,
 )
 
@@ -61,6 +64,20 @@ def _system_reprocess_start_event(
 
 
 def _pending_segments(interval: dict, all_events: list[dict]) -> list[dict]:
+    previous_status = previous_status_event_before(
+        all_events,
+        interval["start_event"]["order_index"],
+    )
+    if (
+        interval["enter_actor_type"] == "System"
+        and interval["enter_from"] == IN_REVIEW_STATE
+        and interval["exit_to"] == COMPLETED_STATE
+        and not interval["inner_events"]
+        and previous_status is not None
+        and has_same_timestamp_reopen_handoff(all_events, previous_status)
+    ):
+        return []
+
     first_system = first_system_evidence(
         [*interval["inner_events"], interval["end_event"]]
     )
@@ -139,7 +156,44 @@ def _pending_segments(interval: dict, all_events: list[dict]) -> list[dict]:
     ]
 
 
-def _in_review_segments(interval: dict) -> list[dict]:
+def _completion_segment_type(
+    user_edit_count: int,
+    user_metadata_edit_count: int,
+) -> str:
+    if user_edit_count > 0:
+        return "USER_EDITING_CORRECTION_AND_COMPLETION_APPROVAL"
+    if user_metadata_edit_count > 0:
+        return "USER_EDITING_METADATA_CORRECTION_AND_COMPLETION_APPROVAL"
+    return "USER_COMPLETION_APPROVAL"
+
+
+def _timeout_completion_event(interval: dict, all_events: list[dict]) -> dict | None:
+    if not has_same_timestamp_reopen_handoff(all_events, interval["start_event"]):
+        return None
+
+    next_status = next_status_event_after(
+        all_events,
+        interval["end_event"]["order_index"],
+    )
+    if next_status is None:
+        return None
+    if (
+        next_status["from_status"] != interval["exit_to"]
+        or next_status["to_status"] != COMPLETED_STATE
+    ):
+        return None
+
+    between_events = [
+        event
+        for event in all_events
+        if interval["end_event"]["order_index"] < event["order_index"] < next_status["order_index"]
+    ]
+    if between_events:
+        return None
+    return next_status
+
+
+def _in_review_segments(interval: dict, all_events: list[dict]) -> list[dict]:
     user_edit_count = len(
         [
             event
@@ -198,6 +252,23 @@ def _in_review_segments(interval: dict) -> list[dict]:
         and interval["exit_actor_type"] == "System"
         and interval["exit_to"] in PENDING_STATES
     ):
+        timeout_completion_event = _timeout_completion_event(interval, all_events)
+        if timeout_completion_event is not None:
+            return [
+                build_segment(
+                    interval,
+                    _completion_segment_type(
+                        user_edit_count,
+                        user_metadata_edit_count,
+                    ),
+                    interval["start_event"],
+                    timeout_completion_event,
+                    actor_name=interval["enter_actor"],
+                    actor_type="User",
+                    is_active_work=True,
+                    is_idle=False,
+                )
+            ]
         return [
             build_segment(
                 interval,
@@ -483,7 +554,7 @@ def build_interval_segments(interval: dict, all_events: list[dict]) -> list[dict
         return _pending_segments(interval, all_events)
 
     if state == IN_REVIEW_STATE:
-        segments = _in_review_segments(interval)
+        segments = _in_review_segments(interval, all_events)
         if segments:
             return segments
 

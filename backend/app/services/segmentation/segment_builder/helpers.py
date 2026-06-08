@@ -78,6 +78,58 @@ def previous_in_review_entry_event(
     return sorted(candidates, key=lambda item: item["order_index"])[-1]
 
 
+def previous_status_event_before(events: list[dict], before_order_index: int) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] < before_order_index
+        and event["is_status_event"]
+        and event["to_status"]
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[-1]
+
+
+def next_status_event_after(events: list[dict], after_order_index: int) -> dict | None:
+    candidates = [
+        event
+        for event in events
+        if event["order_index"] > after_order_index
+        and event["is_status_event"]
+        and event["to_status"]
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item["order_index"])[0]
+
+
+def has_same_timestamp_reopen_handoff(
+    events: list[dict],
+    review_entry_event: dict,
+) -> bool:
+    if not (
+        review_entry_event["is_status_event"]
+        and review_entry_event["from_status"] in PENDING_STATES
+        and review_entry_event["to_status"] == IN_REVIEW_STATE
+    ):
+        return False
+
+    for event in events:
+        if event["order_index"] == review_entry_event["order_index"]:
+            continue
+        if event["event_time"] != review_entry_event["event_time"]:
+            continue
+        if not event["is_status_event"]:
+            continue
+        if (
+            event["from_status"] == COMPLETED_STATE
+            and event["to_status"] in PENDING_STATES
+        ):
+            return True
+    return False
+
+
 def next_system_detail_after(events: list[dict], after_order_index: int) -> dict | None:
     candidates = [
         event
