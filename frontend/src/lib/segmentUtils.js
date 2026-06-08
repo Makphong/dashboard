@@ -2,6 +2,7 @@ import {
   SEGMENT_TYPE_SHORT_LABELS,
   GANTT_SEGMENT_DISPLAY_LABELS,
   PROCESSING_EQUIVALENT_IDLE_SEGMENT_TYPES,
+  REPROCESSING_SEGMENT_MERGE_GAP_MS,
   MARKER_STAR_MIN_GAP_PX
 } from './constants.js';
 
@@ -89,16 +90,16 @@ export function mergeContinuousReprocessingSegments(sortedSegments) {
       return;
     }
 
-    const mergeTargetIndex = isReprocessingSegmentType(segmentCopy.segmentType)
-      ? merged.findIndex((candidate) => isReprocessingSegmentType(candidate.segmentType))
-      : -1;
+    const previous = merged[merged.length - 1];
+    const shouldMerge = isReprocessingSegmentType(segmentCopy.segmentType)
+      && isReprocessingSegmentType(previous.segmentType)
+      && segmentCopy.startTs <= previous.endTs + REPROCESSING_SEGMENT_MERGE_GAP_MS;
 
-    if (mergeTargetIndex < 0) {
+    if (!shouldMerge) {
       merged.push(segmentCopy);
       return;
     }
 
-    const previous = merged[mergeTargetIndex];
     const previousEndTs = previous.endTs;
     previous.startTs = Math.min(previous.startTs, segmentCopy.startTs);
     if (segmentCopy.startTs <= previous.startTs) previous.start = segmentCopy.start;
