@@ -284,20 +284,6 @@ export const GanttTimelineChart = ({
         anchorX,
         anchorTime,
       };
-      event.preventDefault();
-      return;
-    }
-
-    if (event.touches.length === 1) {
-      touchRef.current = {
-        mode: 'drag',
-        startX: event.touches[0].clientX,
-        startScrollLeft: bodyScrollRef.current.scrollLeft,
-        startDistance: 0,
-        startZoom: zoomScaleRef.current,
-        anchorX: 0,
-        anchorTime: 0,
-      };
     }
   };
 
@@ -319,32 +305,13 @@ export const GanttTimelineChart = ({
       };
       zoomScaleRef.current = nextZoom;
       setZoomScale(nextZoom);
-      event.preventDefault();
-      return;
-    }
-
-    if (touchRef.current.mode === 'drag' && event.touches.length === 1) {
-      const touch = event.touches[0];
-      bodyScrollRef.current.scrollLeft = touchRef.current.startScrollLeft - (touch.clientX - touchRef.current.startX);
-      event.preventDefault();
     }
   };
 
   const onTouchEnd = (event) => {
-    if (event.touches.length >= 2) return;
-    if (event.touches.length === 1 && bodyScrollRef.current) {
-      touchRef.current = {
-        mode: 'drag',
-        startX: event.touches[0].clientX,
-        startScrollLeft: bodyScrollRef.current.scrollLeft,
-        startDistance: 0,
-        startZoom: zoomScaleRef.current,
-        anchorX: 0,
-        anchorTime: 0,
-      };
-      return;
+    if (event.touches.length < 2) {
+      touchRef.current.mode = null;
     }
-    touchRef.current.mode = null;
   };
 
   useEffect(() => {
@@ -474,7 +441,6 @@ export const GanttTimelineChart = ({
               onTouchCancel={onTouchEnd}
               onMouseLeave={() => { onDragEnd(); setHoveredSegment(null); }}
               className="flex-1 overflow-x-auto no-scrollbar cursor-default"
-              style={{ touchAction: 'pan-y' }}
             >
               <GanttBarsSvg
                 timelineSvgWidth={timelineSvgWidth}
