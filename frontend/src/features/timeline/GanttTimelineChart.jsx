@@ -441,6 +441,7 @@ export const GanttTimelineChart = ({
               onTouchCancel={onTouchEnd}
               onMouseLeave={() => { onDragEnd(); setHoveredSegment(null); }}
               className="flex-1 overflow-x-auto no-scrollbar cursor-default"
+              style={{ touchAction: 'pan-x pan-y' }}
             >
               <GanttBarsSvg
                 timelineSvgWidth={timelineSvgWidth}
