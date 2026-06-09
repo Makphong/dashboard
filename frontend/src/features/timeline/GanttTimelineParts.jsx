@@ -29,8 +29,8 @@ export const GanttLegend = ({ items }) => (
 
 export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth, headerHeight, visibleTicks, getX }) => (
   <div className="scroll-clarity-layer flex border-b border-slate-200 bg-slate-50/95 sticky top-0 z-20">
-    <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 p-3 flex items-center">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lane</span>
+    <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 p-3 max-sm:px-2 flex items-center">
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-sm:text-[9px]">Lane</span>
     </div>
     <div ref={headerScrollRef} className="flex-1 overflow-hidden no-scrollbar">
       <svg width={timelineSvgWidth} height={headerHeight}>
@@ -59,8 +59,8 @@ export const GanttLaneLabels = ({ visibleLanes, lanes, laneLabelWidth, rowTopPad
       const idx = lanes.indexOf(lane);
       const y = rowTopPadding + idx * rowSlotHeight;
       return (
-        <div key={lane} style={{ position: 'absolute', top: y, width: '100%', height: rowHeight }} className="px-3 flex items-center border-b border-slate-50">
-          <span className="text-[11px] font-semibold text-slate-700 truncate">{lane}</span>
+        <div key={lane} style={{ position: 'absolute', top: y, width: '100%', height: rowHeight }} className="px-3 max-sm:px-2 flex items-center border-b border-slate-50">
+          <span className="text-[11px] max-sm:text-[10px] font-semibold text-slate-700 truncate">{lane}</span>
         </div>
       );
     })}

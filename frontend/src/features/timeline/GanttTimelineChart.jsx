@@ -188,7 +188,23 @@ export const GanttTimelineChart = ({
     return maxRight;
   }, [lanes, laneToPositionedBars, timelineWidth]);
 
-  const laneLabelWidth = expanded ? 210 : 132;
+  const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 639;
+  const mobileLaneLabelWidth = useMemo(() => {
+    if (typeof document === 'undefined' || lanes.length === 0) return 72;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return 72;
+
+    context.font = '600 10px "Krungthai Fast Regular", "Noto Sans Thai", "Segoe UI", Tahoma, Arial, sans-serif';
+    const longestLaneWidth = lanes.reduce((max, lane) => {
+      const measuredWidth = context.measureText(String(lane || '')).width;
+      return Math.max(max, measuredWidth);
+    }, 0);
+
+    return Math.max(56, Math.ceil(longestLaneWidth + 16));
+  }, [lanes]);
+  const laneLabelWidth = isMobileViewport ? mobileLaneLabelWidth : (expanded ? 210 : 132);
   const headerHeight = 50;
   const rowHeight = 34;
   const rowGap = 10;
