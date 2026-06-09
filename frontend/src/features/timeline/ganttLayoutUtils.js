@@ -160,30 +160,40 @@ export function buildGanttPositionedBars(config) {
     timelinePadLeft,
   } = config;
 
-  const result = {};
+  const allSegments = [];
   lanes.forEach((lane) => {
     const bars = laneToSegments[lane] || [];
-    const positioned = [];
-    let lastRight = -1;
-
     bars.forEach((segment) => {
-      const x1 = timelinePadLeft + (compactTs(Math.max(segment.startTs, displayMinTs)) - baseCompactedTs) * pxPerMs;
-      const x2 = timelinePadLeft + (compactTs(Math.min(segment.endTs, displayMaxTs)) - baseCompactedTs) * pxPerMs;
-
-      let x = x1;
-      const minWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
-      const width = Math.max(minWidth, x2 - x1);
-
-      if (x < lastRight + 1.5) {
-        x = lastRight + 1.5;
-      }
-
-      positioned.push({ s: segment, x, w: width });
-      lastRight = x + width;
+      allSegments.push({ lane, segment });
     });
-    result[lane] = positioned;
   });
-  return result;
+
+  allSegments.sort((a, b) => a.segment.startTs - b.segment.startTs);
+
+  let globalLastRight = -1;
+  const positionedByLane = {};
+  lanes.forEach((lane) => { positionedByLane[lane] = []; });
+
+  allSegments.forEach(({ lane, segment }) => {
+    const x1 = timelinePadLeft + (compactTs(Math.max(segment.startTs, displayMinTs)) - baseCompactedTs) * pxPerMs;
+    const x2 = timelinePadLeft + (compactTs(Math.min(segment.endTs, displayMaxTs)) - baseCompactedTs) * pxPerMs;
+
+    let x = x1;
+    
+    // Dynamic minimum width: ensure visibility (base 8px) but scale gently with duration
+    const durationSecs = Math.max(1, segment.durationSeconds || ((segment.endTs - segment.startTs) / 1000));
+    const minWidth = 8 + (Math.log10(durationSecs) * 4);
+    const width = Math.max(minWidth, x2 - x1);
+
+    if (x < globalLastRight + 1.5) {
+      x = globalLastRight + 1.5;
+    }
+
+    positionedByLane[lane].push({ s: segment, x, w: width });
+    globalLastRight = x + width;
+  });
+
+  return positionedByLane;
 }
 
 export function buildGanttTicks(config) {
