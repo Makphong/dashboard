@@ -111,7 +111,7 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
             >
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="font-bold text-[#17335f] truncate">{row.user}</span>
-                <span className="text-[11px] font-bold text-slate-400">{formatDuration(row.total)}</span>
+                <span className="text-[12px] font-bold text-slate-500">{formatDuration(row.total)}</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-slate-100/80 overflow-hidden shadow-inner">
                 <div className="h-full rounded-full overflow-hidden flex shadow-sm transition-[width] duration-500 ease-out" style={{ width: `${totalWidth}%` }}>

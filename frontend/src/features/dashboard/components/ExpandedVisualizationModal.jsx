@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { ChevronDown, Clock, User, X } from 'lucide-react';
 import { GANTT_DRILL_GROUP_COLORS } from '../../../lib/constants.js';
 import { mergeContinuousReprocessingSegments, toDrillGroup } from '../../../lib/segmentUtils.js';
-import { buildAverageTransitionTimeData } from '../utils/transitionMetrics.js';
+import { buildAverageTransitionTimeData, buildTransitionBreakdownGroups } from '../utils/transitionMetrics.js';
 import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane } from '../../../lib/utils.js';
 import { mapSegmentsToRows } from '../../timeline/timelineUtils.js';
 import { toSegmentGroup } from '../utils/segmentData.js';
@@ -64,6 +64,14 @@ function toTimelineBarLabel(segmentType) {
   if (drillGroup === 'Processing') return 'First Spread';
   if (drillGroup === 'Reprocessing') return 'Second Spread';
   return toGanttSegmentTypeLabel(segmentType);
+}
+
+function shouldExcludeDetailActivity(activityLabel, documentLabel) {
+  const haystack = `${String(activityLabel || '')} ${String(documentLabel || '')}`.toLowerCase();
+  return haystack.includes('markup')
+    || haystack.includes('timestamp')
+    || haystack.includes('time stamp')
+    || haystack.includes('time stam');
 }
 
 function buildTimelineDetailData(segments, timelineSettings) {
@@ -300,12 +308,14 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
   safeSegments.forEach((segment) => {
     const groupMeta = resolveGroupKey(segment);
     if (!groupMeta) return;
+    const activityLabel = toGanttSegmentTypeLabel(segment.segmentType);
+    if (shouldExcludeDetailActivity(activityLabel, segment.documentLabel)) return;
     if (!grouped.has(groupMeta.key)) grouped.set(groupMeta.key, { ...groupMeta, activities: [], totalSeconds: 0 });
     const entry = grouped.get(groupMeta.key);
     const durationSeconds = Number(segment.durationSeconds) || 0;
     entry.activities.push({
       id: segment.id || `${groupMeta.key}-${segment.startTs}-${segment.segmentType}`,
-      activity: toGanttSegmentTypeLabel(segment.segmentType),
+      activity: activityLabel,
       start: segment.start,
       end: segment.end,
       startTs: segment.startTs,
@@ -329,72 +339,6 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
       };
     })
     .filter((group) => group.totalSeconds > 0);
-}
-
-function buildTransitionBreakdownGroups(segments) {
-  const sourceSegments = Array.isArray(segments) ? segments : [];
-  const groupsByKey = new Map([
-    ['after-processing', { key: 'after-processing', label: 'After Processing', colorClass: 'bg-[#dbeafe] text-[#1d4ed8]', dotClass: 'bg-[#3b82f6]', activities: [], totalSeconds: 0 }],
-    ['after-reprocessing', { key: 'after-reprocessing', label: 'After Reprocessing', colorClass: 'bg-[#e0e7ff] text-[#4338ca]', dotClass: 'bg-[#6366f1]', activities: [], totalSeconds: 0 }],
-    ['between-review-edit', { key: 'between-review-edit', label: 'Between Review & Edit', colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]', activities: [], totalSeconds: 0 }],
-  ]);
-
-  const segmentGroups = new Map();
-  sourceSegments.forEach((segment) => {
-    if (!segmentGroups.has(segment.sheetKey)) segmentGroups.set(segment.sheetKey, []);
-    segmentGroups.get(segment.sheetKey).push(segment);
-  });
-
-  segmentGroups.forEach((items) => {
-    const sorted = [...items].sort((a, b) => a.startTs - b.startTs);
-    for (let i = 1; i < sorted.length; i += 1) {
-      const prev = sorted[i - 1];
-      const curr = sorted[i];
-      const prevDrill = toDrillGroup(prev.segmentType);
-      const currDrill = toDrillGroup(curr.segmentType);
-      if (currDrill !== 'Idle') continue;
-
-      let groupKey = '';
-      if (prevDrill === 'Processing') {
-        groupKey = 'after-processing';
-      } else if (prevDrill === 'Reprocessing') {
-        groupKey = 'after-reprocessing';
-      } else if (
-        prevDrill === 'Review'
-        || prevDrill === 'EditData'
-        || prevDrill === 'EditMeta'
-        || prevDrill === 'Uploading'
-      ) {
-        const hasFutureAction = sorted.slice(i + 1).some((s) => {
-          const dg = toDrillGroup(s.segmentType);
-          return dg === 'Review' || dg === 'EditData' || dg === 'EditMeta';
-        });
-        if (hasFutureAction) groupKey = 'between-review-edit';
-      }
-      if (!groupKey) continue;
-
-      const group = groupsByKey.get(groupKey);
-      const durationSeconds = Number(curr.durationSeconds) || 0;
-      group.activities.push({
-        id: curr.id || `${groupKey}-${curr.startTs}`,
-        activity: toGanttSegmentTypeLabel(curr.segmentType),
-        start: curr.start,
-        end: curr.end,
-        startTs: curr.startTs,
-        durationSeconds,
-        documentLabel: curr.documentLabel,
-      });
-      group.totalSeconds += durationSeconds;
-    }
-  });
-
-  return Array.from(groupsByKey.values())
-    .map((group) => ({
-      ...group,
-      averageSeconds: group.activities.length > 0 ? group.totalSeconds / group.activities.length : 0,
-      activities: group.activities.slice().sort((a, b) => a.startTs - b.startTs),
-    }))
-    .filter((group) => group.activities.length > 0);
 }
 
 const TimelineDetailView = React.memo(({ segments, timelineSettings }) => {
@@ -570,6 +514,7 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
               <table className="min-w-full text-sm">
                 <thead className="bg-white">
                   <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    <th className="px-5 py-3">No.</th>
                     <th className="px-5 py-3">Activity</th>
                     <th className="px-5 py-3">Start</th>
                     <th className="px-5 py-3">End</th>
@@ -577,8 +522,9 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {group.activities.map((activity) => (
+                  {group.activities.map((activity, index) => (
                     <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
                       <td className="px-5 py-4">
                         <div className="font-semibold text-[#17335f]">{activity.activity}</div>
                         {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
@@ -592,6 +538,7 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
                 <tfoot>
                   <tr className="border-t border-slate-200 bg-slate-50/70">
                     <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                    <td className="px-5 py-4" />
                     <td className="px-5 py-4" />
                     <td className="px-5 py-4" />
                     <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</td>
@@ -695,6 +642,7 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                         <table className="min-w-full text-sm">
                           <thead className="bg-white">
                             <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              <th className="px-5 py-3">No.</th>
                               <th className="px-5 py-3">Activity</th>
                               <th className="px-5 py-3">Start</th>
                               <th className="px-5 py-3">End</th>
@@ -702,8 +650,9 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {editActivities.map((activity) => (
+                            {editActivities.map((activity, index) => (
                               <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                                <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
                                 <td className="px-5 py-4">
                                   <div className="font-semibold text-[#17335f]">{activity.activity}</div>
                                   {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
@@ -717,6 +666,7 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                           <tfoot>
                             <tr className="border-t border-slate-200 bg-slate-50/70">
                               <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                              <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(row.editSeconds)}</td>
@@ -737,6 +687,7 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                         <table className="min-w-full text-sm">
                           <thead className="bg-white">
                             <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              <th className="px-5 py-3">No.</th>
                               <th className="px-5 py-3">Activity</th>
                               <th className="px-5 py-3">Start</th>
                               <th className="px-5 py-3">End</th>
@@ -744,8 +695,9 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {reviewActivities.map((activity) => (
+                            {reviewActivities.map((activity, index) => (
                               <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                                <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
                                 <td className="px-5 py-4">
                                   <div className="font-semibold text-[#17335f]">{activity.activity}</div>
                                   {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
@@ -759,6 +711,7 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                           <tfoot>
                             <tr className="border-t border-slate-200 bg-slate-50/70">
                               <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                              <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(row.reviewSeconds)}</td>
@@ -856,6 +809,7 @@ const TimeBreakdownDetailView = React.memo(({
                 <table className="min-w-full text-sm">
                   <thead className="bg-white">
                     <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      <th className="px-5 py-3">No.</th>
                       <th className="px-5 py-3">Activity</th>
                       <th className="px-5 py-3">Start</th>
                       <th className="px-5 py-3">End</th>
@@ -863,8 +817,9 @@ const TimeBreakdownDetailView = React.memo(({
                     </tr>
                   </thead>
                   <tbody>
-                    {group.activities.map((activity) => (
+                    {group.activities.map((activity, activityIndex) => (
                       <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-4 font-medium text-slate-500">{activityIndex + 1}</td>
                         <td className="px-5 py-4">
                           <div className="font-semibold text-[#17335f]">{activity.activity}</div>
                           {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
@@ -878,6 +833,7 @@ const TimeBreakdownDetailView = React.memo(({
                   <tfoot>
                     <tr className="border-t border-slate-200 bg-slate-50/70">
                       <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                      <td className="px-5 py-4" />
                       <td className="px-5 py-4" />
                       <td className="px-5 py-4" />
                       <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</td>
@@ -898,7 +854,39 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
   const [contentHeight, setContentHeight] = React.useState(0);
   const contentRef = React.useRef(null);
 
-  const groups = React.useMemo(() => buildTransitionBreakdownGroups(segments), [segments]);
+  const groups = React.useMemo(() => {
+    const colorMap = {
+      'after-processing': { colorClass: 'bg-[#dbeafe] text-[#1d4ed8]', dotClass: 'bg-[#3b82f6]' },
+      'after-reprocessing': { colorClass: 'bg-[#e0e7ff] text-[#4338ca]', dotClass: 'bg-[#6366f1]' },
+      'between-review-edit': { colorClass: 'bg-[#fff7ed] text-[#c2410c]', dotClass: 'bg-[#F59E0B]' },
+    };
+
+    return buildTransitionBreakdownGroups(segments, {
+      afterProcessing: 'After Processing',
+      afterReprocessing: 'After Reprocessing',
+      betweenReviewEdit: 'Between Review & Edit',
+    })
+      .map((group) => {
+        const activities = group.activities
+          .slice()
+          .sort((a, b) => a.startTs - b.startTs)
+          .map((activity) => ({
+            ...activity,
+            activity: toGanttSegmentTypeLabel(activity.activity),
+          }))
+          .filter((activity) => !shouldExcludeDetailActivity(activity.activity, activity.documentLabel));
+        const totalSeconds = activities.reduce((sum, activity) => sum + (Number(activity.durationSeconds) || 0), 0);
+
+        return {
+          ...group,
+          ...colorMap[group.key],
+          activities,
+          totalSeconds,
+          averageSeconds: activities.length > 0 ? totalSeconds / activities.length : 0,
+        };
+      })
+      .filter((group) => group.activities.length > 0);
+  }, [segments]);
 
   React.useLayoutEffect(() => {
     if (!openGroup) {
@@ -969,6 +957,7 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
                 <table className="min-w-full text-sm">
                   <thead className="bg-white">
                     <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      <th className="px-5 py-3">No.</th>
                       <th className="px-5 py-3">Activity</th>
                       <th className="px-5 py-3">Start</th>
                       <th className="px-5 py-3">End</th>
@@ -976,8 +965,9 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {group.activities.map((activity) => (
+                    {group.activities.map((activity, activityIndex) => (
                       <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-5 py-4 font-medium text-slate-500">{activityIndex + 1}</td>
                         <td className="px-5 py-4">
                           <div className="font-semibold text-[#17335f]">{activity.activity}</div>
                           {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
@@ -991,6 +981,7 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
                   <tfoot>
                     <tr className="border-t border-slate-200 bg-slate-50/70">
                       <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                      <td className="px-5 py-4" />
                       <td className="px-5 py-4" />
                       <td className="px-5 py-4" />
                       <td className="px-5 py-4 text-sm font-bold text-[#17335f]">
@@ -1110,13 +1101,12 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   }, [ganttVisibleSegments, chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    const sourceSegments = chartBaseSegments || ganttVisibleSegments;
-    return buildAverageTransitionTimeData(sourceSegments, {
+    return buildAverageTransitionTimeData(ganttVisibleSegments, {
       afterProcessing: 'After Processing',
       afterReprocessing: 'After Reprocessing',
       betweenReviewEdit: 'Between Review And Edit',
     });
-  }, [ganttVisibleSegments, chartBaseSegments]);
+  }, [ganttVisibleSegments]);
 
   const donutAnimationKey = React.useMemo(
     () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
@@ -1186,7 +1176,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
             />
           )}
           {visualizationId === 'matrix-detail' && (
-            <TransitionBreakdownDetailView segments={chartBaseSegments || ganttVisibleSegments} />
+            <TransitionBreakdownDetailView segments={ganttVisibleSegments} />
           )}
           <Suspense fallback={<ExpandedChartFallback />}>
             {visualizationId === 'process-breakdown' && <ProcessTimeBreakdownChart key={processBreakdownAnimationKey} data={processBreakdownData} showLabels={showProcessBreakdownLabels} />}

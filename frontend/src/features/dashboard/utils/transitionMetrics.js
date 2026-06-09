@@ -1,26 +1,32 @@
 import { toDrillGroup } from '../../../lib/segmentUtils.js';
 
-export function buildAverageTransitionTimeData(segments, labels = {}) {
+function shouldExcludeTransitionActivity(activityLabel, documentLabel) {
+  const haystack = `${String(activityLabel || '')} ${String(documentLabel || '')}`.toLowerCase();
+  return haystack.includes('markup')
+    || haystack.includes('timestamp')
+    || haystack.includes('time stamp')
+    || haystack.includes('time stam');
+}
+
+export function buildTransitionBreakdownGroups(segments, labels = {}) {
   const sourceSegments = Array.isArray(segments) ? segments : [];
-  const groups = new Map();
+  const groups = new Map([
+    ['after-processing', { key: 'after-processing', label: labels.afterProcessing || 'First Spread', totalSeconds: 0, count: 0, activities: [] }],
+    ['after-reprocessing', { key: 'after-reprocessing', label: labels.afterReprocessing || 'Second Spread', totalSeconds: 0, count: 0, activities: [] }],
+    ['between-review-edit', { key: 'between-review-edit', label: labels.betweenReviewEdit || 'Review & Edit', totalSeconds: 0, count: 0, activities: [] }],
+  ]);
+  const segmentsBySheet = new Map();
 
   sourceSegments.forEach((segment) => {
-    if (!groups.has(segment.sheetKey)) groups.set(segment.sheetKey, []);
-    groups.get(segment.sheetKey).push(segment);
+    if (!segmentsBySheet.has(segment.sheetKey)) segmentsBySheet.set(segment.sheetKey, []);
+    segmentsBySheet.get(segment.sheetKey).push(segment);
   });
 
-  let idleAfterProcess = 0;
-  let countAfterProcess = 0;
-  let idleAfterReprocess = 0;
-  let countAfterReprocess = 0;
-  let idleBetweenActions = 0;
-  let countBetweenActions = 0;
-
-  groups.forEach((groupSegments) => {
-    const sorted = [...groupSegments].sort((a, b) => a.startTs - b.startTs);
+  segmentsBySheet.forEach((items) => {
+    const sorted = [...items].sort((a, b) => a.startTs - b.startTs);
     let hasFutureReviewOrEdit = false;
 
-    for (let i = sorted.length - 1; i >= 1; i -= 1) {
+    for (let i = sorted.length - 1; i >= 0; i -= 1) {
       const curr = sorted[i];
       const currDrill = toDrillGroup(curr.segmentType);
 
@@ -30,16 +36,14 @@ export function buildAverageTransitionTimeData(segments, labels = {}) {
 
       if (currDrill !== 'Idle') continue;
 
-      const prev = sorted[i - 1];
-      const prevDrill = toDrillGroup(prev.segmentType);
-      const duration = Number(curr.durationSeconds) || 0;
+      const prev = i > 0 ? sorted[i - 1] : null;
+      const prevDrill = prev ? toDrillGroup(prev.segmentType) : '';
+      let groupKey = 'between-review-edit';
 
       if (prevDrill === 'Processing') {
-        idleAfterProcess += duration;
-        countAfterProcess += 1;
+        groupKey = 'after-processing';
       } else if (prevDrill === 'Reprocessing') {
-        idleAfterReprocess += duration;
-        countAfterReprocess += 1;
+        groupKey = 'after-reprocessing';
       } else if (
         hasFutureReviewOrEdit &&
         (
@@ -49,30 +53,43 @@ export function buildAverageTransitionTimeData(segments, labels = {}) {
           || prevDrill === 'Uploading'
         )
       ) {
-        idleBetweenActions += duration;
-        countBetweenActions += 1;
+        groupKey = 'between-review-edit';
       }
+
+      const group = groups.get(groupKey);
+      const durationSeconds = Number(curr.durationSeconds) || 0;
+      if (shouldExcludeTransitionActivity(curr.segmentType, curr.documentLabel)) continue;
+      group.totalSeconds += durationSeconds;
+      group.count += 1;
+      group.activities.push({
+        id: curr.id || `${groupKey}-${curr.startTs || i}`,
+        activity: curr.segmentType,
+        start: curr.start,
+        end: curr.end,
+        startTs: curr.startTs,
+        durationSeconds,
+        documentLabel: curr.documentLabel,
+      });
     }
   });
 
-  return [
-    {
-      label: labels.afterProcessing || 'First Spread',
-      seconds: countAfterProcess > 0 ? idleAfterProcess / countAfterProcess : 0,
-      totalSeconds: idleAfterProcess,
-      color: '#3b82f6',
-    },
-    {
-      label: labels.afterReprocessing || 'Second Spread',
-      seconds: countAfterReprocess > 0 ? idleAfterReprocess / countAfterReprocess : 0,
-      totalSeconds: idleAfterReprocess,
-      color: '#6366f1',
-    },
-    {
-      label: labels.betweenReviewEdit || 'Review & Edit',
-      seconds: countBetweenActions > 0 ? idleBetweenActions / countBetweenActions : 0,
-      totalSeconds: idleBetweenActions,
-      color: '#f59e0b',
-    },
-  ];
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    averageSeconds: group.count > 0 ? group.totalSeconds / group.count : 0,
+  }));
+}
+
+export function buildAverageTransitionTimeData(segments, labels = {}) {
+  const colors = {
+    'after-processing': '#3b82f6',
+    'after-reprocessing': '#6366f1',
+    'between-review-edit': '#f59e0b',
+  };
+
+  return buildTransitionBreakdownGroups(segments, labels).map((group) => ({
+    label: group.label,
+    seconds: group.averageSeconds,
+    totalSeconds: group.totalSeconds,
+    color: colors[group.key] || '#94a3b8',
+  }));
 }

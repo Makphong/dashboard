@@ -24,17 +24,34 @@ def _is_sso_clapp_user(actor_name: str | None) -> bool:
     return normalize_text(actor_name) == "ssoclappuser"
 
 
-def _is_disallowed_sheet_user(actor_name: str | None) -> bool:
+def _parse_sheet_user_number(actor_name: str | None) -> int | None:
+    token = normalize_text(actor_name)
+    if token.startswith("user") and token[4:].isdigit():
+        return int(token[4:])
+    return None
+
+
+def _is_disallowed_sheet_user(
+    actor_name: str | None, *, allow_large_user_numbers: bool = False
+) -> bool:
     normalized_name = str(actor_name or "").strip()
     if not normalized_name:
         return True
 
     token = normalize_text(normalized_name)
-    if token in {"system", "idle", "unknownuser", "ssoclappuser", "user0"}:
+    if token in {
+        "system",
+        "idle",
+        "unknownuser",
+        "ssoclappuser",
+        "user0",
+        "cognizeuser",
+    }:
         return True
 
-    if token.startswith("user") and token[4:].isdigit():
-        return int(token[4:]) > 10
+    user_number = _parse_sheet_user_number(normalized_name)
+    if user_number is not None:
+        return user_number > 10 and not allow_large_user_numbers
 
     return False
 
@@ -64,6 +81,32 @@ def _find_nearest_sheet_user(
     return nearest_user if nearest_row >= 0 else None
 
 
+def _find_smallest_sheet_user(sheet_candidates: list[tuple[int, str]]) -> str | None:
+    numbered_candidates: list[tuple[int, int, str]] = []
+    for candidate_row, candidate_user in sheet_candidates:
+        user_number = _parse_sheet_user_number(candidate_user)
+        if user_number is None:
+            continue
+        numbered_candidates.append((user_number, candidate_row, candidate_user))
+
+    if not numbered_candidates:
+        return None
+
+    _, _, smallest_user = min(numbered_candidates, key=lambda candidate: candidate[:2])
+    return smallest_user
+
+
+def _resolve_sso_clapp_sheet_user(
+    preferred_candidates: list[tuple[int, str]],
+    fallback_candidates: list[tuple[int, str]],
+    row_number: int,
+) -> str | None:
+    nearest_user = _find_nearest_sheet_user(preferred_candidates, row_number)
+    if nearest_user:
+        return nearest_user
+    return _find_smallest_sheet_user(fallback_candidates)
+
+
 def fetch_normalized_events(
     signature: tuple[int, int] | None = None,
 ) -> tuple[list[dict], dict[str, int]]:
@@ -88,6 +131,7 @@ def fetch_normalized_events(
     events: list[dict] = []
     invalid_counts: dict[str, int] = {}
     sheet_user_candidates: dict[str, list[tuple[int, str]]] = {}
+    sheet_fallback_candidates: dict[str, list[tuple[int, str]]] = {}
 
     for db_row in rows:
         sheet_key = f"{db_row['file_name']}::{db_row['page_name']}"
@@ -114,6 +158,12 @@ def fetch_normalized_events(
         resolved_actor_name = actor_name or (
             "System" if actor_type == "System" else "Unknown User"
         )
+        if not _is_disallowed_sheet_user(
+            resolved_actor_name, allow_large_user_numbers=True
+        ):
+            sheet_fallback_candidates.setdefault(sheet_key, []).append(
+                (int(db_row["row_number"]), resolved_actor_name)
+            )
         if not _is_disallowed_sheet_user(resolved_actor_name):
             sheet_user_candidates.setdefault(sheet_key, []).append(
                 (int(db_row["row_number"]), resolved_actor_name)
@@ -198,17 +248,20 @@ def fetch_normalized_events(
 
     for sheet_key, candidates in sheet_user_candidates.items():
         candidates.sort(key=lambda candidate: candidate[0])
+    for sheet_key, candidates in sheet_fallback_candidates.items():
+        candidates.sort(key=lambda candidate: candidate[0])
 
     for event in events:
         if not _is_sso_clapp_user(event.get("actor_name")):
             continue
         sheet_key = f"{event['file_name']}::{event['page_name']}"
-        nearest_user = _find_nearest_sheet_user(
+        resolved_user = _resolve_sso_clapp_sheet_user(
             sheet_user_candidates.get(sheet_key, []),
+            sheet_fallback_candidates.get(sheet_key, []),
             int(event["row_number"]),
         )
-        if nearest_user:
-            event["actor_name"] = nearest_user
+        if resolved_user:
+            event["actor_name"] = resolved_user
 
     _NORMALIZED_EVENTS_CACHE_SIGNATURE = cache_signature
     _NORMALIZED_EVENTS_CACHE_VALUE = (events, invalid_counts)
