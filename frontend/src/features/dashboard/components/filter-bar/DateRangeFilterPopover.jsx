@@ -31,6 +31,7 @@ export function DateRangeFilterPopover({
       setOpenDropdown={setOpenDropdown}
       icon={Calendar}
       active={datePreset !== 'all'}
+      minWidthClass="min-w-[190px] max-sm:min-w-0"
     >
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-2">

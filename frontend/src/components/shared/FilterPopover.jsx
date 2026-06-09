@@ -38,10 +38,23 @@ export const FilterPopover = ({
     const updatePanelPosition = () => {
       const anchor = rootRef.current;
       if (!anchor) return;
+      const isMobileViewport = window.innerWidth <= 639;
       const rect = anchor.getBoundingClientRect();
       const panelWidth = panelRef.current?.offsetWidth || 0;
       const viewportPadding = 8;
       const anchorGap = 8;
+
+      if (isMobileViewport) {
+        const top = Math.max(viewportPadding, rect.bottom + anchorGap);
+        const maxHeight = Math.max(120, window.innerHeight - top - viewportPadding);
+        setPanelStyle({
+          top,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          maxHeight,
+        });
+        return;
+      }
 
       let left = rect.left;
       if (panelWidth > 0 && (left + panelWidth) > (window.innerWidth - viewportPadding)) {
@@ -55,7 +68,7 @@ export const FilterPopover = ({
 
       const top = Math.max(viewportPadding, rect.bottom + anchorGap);
       const maxHeight = Math.max(120, window.innerHeight - top - viewportPadding);
-      setPanelStyle({ top, left, maxHeight });
+      setPanelStyle({ top, left, maxHeight, transform: 'none' });
     };
 
     updatePanelPosition();
@@ -70,18 +83,18 @@ export const FilterPopover = ({
   }, [isOpen]);
 
   return (
-    <div ref={rootRef} className={`relative shrink-0 ${minWidthClass}`}>
+    <div ref={rootRef} className={`relative shrink-0 max-sm:flex-1 max-sm:min-w-0 ${minWidthClass}`}>
       <button
         onClick={() => setOpenDropdown(isOpen ? '' : id)}
-        className={`w-full h-11 rounded-xl border px-3 flex items-center gap-2 transition-colors text-left
+        className={`w-full h-11 rounded-xl border px-3 flex items-center gap-2 transition-colors text-left max-sm:h-10 max-sm:rounded-lg max-sm:px-2.5 max-sm:gap-1.5
           ${active ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300'}`}
       >
-        {Icon ? <Icon className={`w-4 h-4 ${active ? 'text-blue-600' : 'text-slate-400'} shrink-0`} /> : null}
+        {Icon ? <Icon className={`w-4 h-4 max-sm:w-3.5 max-sm:h-3.5 ${active ? 'text-blue-600' : 'text-slate-400'} shrink-0`} /> : null}
         <div className="min-w-0 flex-1 leading-tight">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-slate-400">{title}</div>
-          <div className={`text-sm font-semibold truncate ${active ? 'text-blue-700' : 'text-slate-700'}`}>{summary}</div>
+          <div className="text-[10px] uppercase tracking-[0.08em] text-slate-400 max-sm:hidden">{title}</div>
+          <div className={`text-sm font-semibold truncate max-sm:text-[11px] ${active ? 'text-blue-700' : 'text-slate-700'}`}>{summary}</div>
         </div>
-        <ChevronDown className={`w-4 h-4 transition-transform ${active ? 'text-blue-400' : 'text-slate-400'} ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 max-sm:w-3.5 max-sm:h-3.5 transition-transform ${active ? 'text-blue-400' : 'text-slate-400'} ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen ? createPortal(
         <div

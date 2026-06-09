@@ -68,7 +68,7 @@ export function DocumentFilterPopover({
       setOpenDropdown={setOpenDropdown}
       icon={FileText}
       active={selectedFiles.length > 0 || selectedSheets.length > 0}
-      minWidthClass="min-w-[240px]"
+      minWidthClass="min-w-[240px] max-sm:min-w-0"
       panelClassName="w-[640px] max-w-[92vw]"
     >
       <div className="flex h-[420px] divide-x divide-slate-100">

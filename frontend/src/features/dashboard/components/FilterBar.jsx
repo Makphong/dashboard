@@ -82,7 +82,7 @@ export function FilterBar({
   return (
     <header className="scroll-clarity-layer shrink-0 bg-white/95 border-b border-[#d7e8f6] px-4 md:px-8 py-3 z-[80]">
       <div className="max-w-[1600px] mx-auto flex items-center gap-2 md:gap-3">
-        <div className="flex-1 flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex-1 flex items-center gap-2 md:gap-3 max-sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
             onClick={onMenuClick}
             className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-[#3860be] transition-colors shrink-0"
@@ -124,14 +124,15 @@ export function FilterBar({
           />
         </div>
 
-        <div className="shrink-0 flex items-center gap-4 pl-4 border-l border-[#d7e8f6]">
+        <div className="shrink-0 flex items-center gap-4 pl-4 border-l border-[#d7e8f6] max-sm:gap-2 max-sm:pl-0 max-sm:border-l-0">
           <button
             onClick={() => refreshAll({ refreshSnapshot: true })}
             disabled={loading || syncing}
-            className="h-10 px-4 rounded-xl border border-[#bfe8f8] bg-white text-sm font-semibold text-[#3860be] hover:bg-[#e8f7fd] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-ktb"
+            aria-label={loading || syncing ? 'Refreshing data' : 'Refresh data'}
+            className="h-9 w-9 justify-center rounded-full border-0 bg-transparent text-[#3860be] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center shadow-none max-sm:mx-0 md:h-10 md:w-auto md:px-4 md:rounded-xl md:border md:border-[#bfe8f8] md:bg-white md:text-sm md:font-semibold md:hover:bg-[#e8f7fd] md:gap-2 md:shadow-ktb"
           >
             <RefreshCw className={`w-4 h-4 ${(loading || syncing) ? 'animate-spin' : ''}`} />
-            {loading || syncing ? 'Refreshing...' : 'Refresh Data'}
+            <span className="hidden md:inline">{loading || syncing ? 'Refreshing...' : 'Refresh Data'}</span>
           </button>
         </div>
       </div>
