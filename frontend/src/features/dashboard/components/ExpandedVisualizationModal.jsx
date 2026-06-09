@@ -363,12 +363,12 @@ const TimelineDetailView = React.memo(({ segments, timelineSettings }) => {
   return (
     <div className="space-y-6">
       <section>
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 grid-cols-2 max-sm:gap-2 sm:grid-cols-3 md:grid-cols-5">
           {summaryCards.map((card) => (
-            <div key={card.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">{card.label}</div>
-              <div className={`mt-2 text-3xl font-extrabold leading-none ${card.accentClass}`}>{card.count}</div>
-              <div className="mt-2 text-xs font-medium text-slate-500">bars</div>
+            <div key={card.key} className="rounded-2xl border border-slate-200 bg-white p-4 max-sm:p-3 shadow-sm">
+              <div className="text-[11px] max-sm:text-[9px] max-sm:tracking-wider font-bold uppercase tracking-[0.18em] text-slate-500 truncate">{card.label}</div>
+              <div className={`mt-2 max-sm:mt-1.5 text-3xl max-sm:text-2xl font-extrabold leading-none ${card.accentClass}`}>{card.count}</div>
+              <div className="mt-2 max-sm:mt-1 text-xs max-sm:text-[10px] font-medium text-slate-500">bars</div>
             </div>
           ))}
         </div>
@@ -1139,12 +1139,12 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
         className="bg-white w-full max-w-[95vw] h-[92vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden viz-panel-enter"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 md:px-10 border-b flex justify-between items-center bg-slate-50/50">
-          <div>
-            <h2 className="text-2xl font-extrabold text-[#17335f]">{modalTitle}</h2>
-            <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">{modalSubtitle}</p>
+        <div className="p-6 md:px-10 border-b flex justify-between items-center max-sm:items-start bg-slate-50/50">
+          <div className="max-sm:pr-2">
+            <h2 className="text-2xl max-sm:text-lg max-sm:leading-tight font-extrabold text-[#17335f]">{modalTitle}</h2>
+            <p className="text-sm max-sm:text-[9px] max-sm:tracking-normal max-sm:leading-tight max-sm:mt-0.5 text-slate-500 font-bold uppercase tracking-wider">{modalSubtitle}</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all hover:rotate-90 duration-300"><X className="w-8 h-8" /></button>
+          <button onClick={onClose} className="p-3 max-sm:p-2 max-sm:-mr-2 max-sm:-mt-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all hover:rotate-90 duration-300 shrink-0"><X className="w-8 h-8 max-sm:w-6 max-sm:h-6" /></button>
         </div>
         <div className="flex-1 overflow-auto p-6 md:p-10 no-scrollbar">
           <Suspense fallback={<ExpandedChartFallback />}>
