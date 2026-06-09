@@ -212,32 +212,31 @@ export const DashboardView = React.memo(({
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6">
-      <div className="flex justify-between items-end mb-6">
+    <div className="max-w-[1600px] 2xl:max-w-[1760px] mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-[#17335f]">Dashboard Overview</h1>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#17335f]">Dashboard Overview</h1>
           <p className="text-slate-500 mt-1">Comprehensive performance metrics and timeline analysis.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
+      <div className="grid grid-cols-5 gap-2 sm:gap-3 lg:gap-6 2xl:gap-8 mb-10">
         {kpiData.map((kpi, idx) => (
           <div 
             key={kpi.id} 
-            className={`relative min-w-0 bg-white p-5 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}
+            className={`relative min-w-0 bg-white p-2 sm:p-4 rounded-2xl border border-[#d7e8f6] shadow-ktb animate-stagger-${Math.min(idx + 1, 5)}`}
           >
-            <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center mb-4 relative z-10`}>
+            <div className={`hidden sm:flex w-10 h-10 rounded-xl ${kpi.bg} items-center justify-center mb-4 relative z-10`}>
               <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
             </div>
-            <div className="truncate text-slate-500 text-sm font-semibold mb-1 relative z-10">{kpi.label}</div>
-            <div className="min-w-0 whitespace-nowrap text-[1.7rem] leading-none lg:text-[2rem] font-extrabold text-[#17335f] relative z-10">{kpi.value}</div>
-            <div className="relative z-10 min-w-0">
+            <div className="truncate text-[0.56rem] leading-tight sm:text-sm font-semibold mb-0.5 sm:mb-1 text-slate-500 relative z-10">{kpi.label}</div>
+            <div className="min-w-0 whitespace-nowrap text-[0.72rem] leading-none sm:text-[1.4rem] lg:text-[2rem] 2xl:text-[2.1rem] font-extrabold text-[#17335f] relative z-10">{kpi.value}</div>
+            <div className="hidden sm:block relative z-10 min-w-0">
               <KpiSubtext text={kpi.subtext} />
             </div>
           </div>
         ))}
       </div>
-
 
       <div className={`bg-white p-6 rounded-2xl border border-[#d7e8f6] shadow-ktb relative group animate-stagger-2 ${showTimelineFilterMenu ? 'z-[120]' : 'z-10'}`}>
         <div className="absolute right-4 top-4 z-30 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
