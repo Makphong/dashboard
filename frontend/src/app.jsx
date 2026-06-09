@@ -3,11 +3,17 @@ import { useAppController } from './hooks/useAppController.js';
 import { useDashboardData } from './hooks/useDashboardData.js';
 import { DashboardLayout } from './features/dashboard/DashboardLayout.jsx';
 
-const DashboardView = lazy(() => import('./features/dashboard/DashboardView.jsx').then((module) => ({ default: module.DashboardView })));
-const DataManagementView = lazy(() => import('./features/data-management/DataManagementView.jsx').then((module) => ({ default: module.DataManagementView })));
-const SystemPerformanceView = lazy(() => import('./features/dashboard/views/SystemPerformanceView.jsx').then((module) => ({ default: module.SystemPerformanceView })));
-const ExpandedVisualizationModal = lazy(() => import('./features/dashboard/components/ExpandedVisualizationModal.jsx').then((module) => ({ default: module.ExpandedVisualizationModal })));
-const SegmentDetailPopup = lazy(() => import('./features/dashboard/components/SegmentDetailPopup.jsx').then((module) => ({ default: module.SegmentDetailPopup })));
+const dashboardViewPromise = import('./features/dashboard/DashboardView.jsx').then((module) => ({ default: module.DashboardView }));
+const dataManagementViewPromise = import('./features/data-management/DataManagementView.jsx').then((module) => ({ default: module.DataManagementView }));
+const systemPerformanceViewPromise = import('./features/dashboard/views/SystemPerformanceView.jsx').then((module) => ({ default: module.SystemPerformanceView }));
+const expandedVisualizationModalPromise = import('./features/dashboard/components/ExpandedVisualizationModal.jsx').then((module) => ({ default: module.ExpandedVisualizationModal }));
+const segmentDetailPopupPromise = import('./features/dashboard/components/SegmentDetailPopup.jsx').then((module) => ({ default: module.SegmentDetailPopup }));
+
+const DashboardView = lazy(() => dashboardViewPromise);
+const DataManagementView = lazy(() => dataManagementViewPromise);
+const SystemPerformanceView = lazy(() => systemPerformanceViewPromise);
+const ExpandedVisualizationModal = lazy(() => expandedVisualizationModalPromise);
+const SegmentDetailPopup = lazy(() => segmentDetailPopupPromise);
 
 function PanelLoader() {
   return (

@@ -7,10 +7,15 @@ import { formatDuration, toDisplayDate, toGanttSegmentTypeLabel, toTimelineLane 
 import { mapSegmentsToRows } from '../../timeline/timelineUtils.js';
 import { toSegmentGroup } from '../utils/segmentData.js';
 
-const GanttTimelineChart = lazy(() => import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
-const DonutWorkloadChart = lazy(() => import('../../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
-const UserContributionStackChart = lazy(() => import('../../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
-const ProcessTimeBreakdownChart = lazy(() => import('../../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart })));
+const ganttTimelineChartPromise = import('../../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart }));
+const donutWorkloadChartPromise = import('../../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart }));
+const userContributionStackChartPromise = import('../../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart }));
+const processTimeBreakdownChartPromise = import('../../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart }));
+
+const GanttTimelineChart = lazy(() => ganttTimelineChartPromise);
+const DonutWorkloadChart = lazy(() => donutWorkloadChartPromise);
+const UserContributionStackChart = lazy(() => userContributionStackChartPromise);
+const ProcessTimeBreakdownChart = lazy(() => processTimeBreakdownChartPromise);
 
 function ExpandedChartFallback() {
   return <div className="min-h-[420px] w-full rounded-[2rem] bg-slate-100 animate-pulse" />;

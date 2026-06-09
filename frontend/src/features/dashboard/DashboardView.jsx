@@ -15,10 +15,15 @@ function buildChartAnimationKey(rows, fields) {
   }).join('|');
 }
 
-const DonutWorkloadChart = lazy(() => import('../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart })));
-const UserContributionStackChart = lazy(() => import('../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart })));
-const GanttTimelineChart = lazy(() => import('../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart })));
-const ProcessTimeBreakdownChart = lazy(() => import('../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart })));
+const donutWorkloadChartPromise = import('../charts/DonutWorkloadChart.jsx').then((module) => ({ default: module.DonutWorkloadChart }));
+const userContributionStackChartPromise = import('../charts/UserContributionStackChart.jsx').then((module) => ({ default: module.UserContributionStackChart }));
+const ganttTimelineChartPromise = import('../timeline/GanttTimelineChart.jsx').then((module) => ({ default: module.GanttTimelineChart }));
+const processTimeBreakdownChartPromise = import('../charts/ProcessTimeBreakdownChart.jsx').then((module) => ({ default: module.ProcessTimeBreakdownChart }));
+
+const DonutWorkloadChart = lazy(() => donutWorkloadChartPromise);
+const UserContributionStackChart = lazy(() => userContributionStackChartPromise);
+const GanttTimelineChart = lazy(() => ganttTimelineChartPromise);
+const ProcessTimeBreakdownChart = lazy(() => processTimeBreakdownChartPromise);
 
 function ChartPanelFallback({ height = 'min-h-[320px]' }) {
   return <div className={`w-full rounded-2xl bg-slate-100 animate-pulse ${height}`} />;
