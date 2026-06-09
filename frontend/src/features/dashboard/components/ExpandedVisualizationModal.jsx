@@ -1101,12 +1101,12 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   }, [ganttVisibleSegments, chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    return buildAverageTransitionTimeData(ganttVisibleSegments, {
+    return buildAverageTransitionTimeData(chartBaseSegments || ganttVisibleSegments, {
       afterProcessing: 'After Processing',
       afterReprocessing: 'After Reprocessing',
       betweenReviewEdit: 'Between Review And Edit',
     });
-  }, [ganttVisibleSegments]);
+  }, [ganttVisibleSegments, chartBaseSegments]);
 
   const donutAnimationKey = React.useMemo(
     () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),

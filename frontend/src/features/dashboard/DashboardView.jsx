@@ -138,12 +138,12 @@ export const DashboardView = React.memo(({
   }, [chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
-    return buildAverageTransitionTimeData(ganttVisibleSegments, {
+    return buildAverageTransitionTimeData(chartBaseSegments, {
       afterProcessing: 'First Spread',
       afterReprocessing: 'Second Spread',
       betweenReviewEdit: 'Review & Edit',
     });
-  }, [ganttVisibleSegments]);
+  }, [chartBaseSegments]);
 
   const donutAnimationKey = React.useMemo(
     () => buildChartAnimationKey(workloadVisibleRows, ['totalSeconds', 'share']),
