@@ -50,16 +50,16 @@ function getStackKeys(data) {
   }));
 }
 
-function DurationBarLabel({ x, y, width, height, value, index, chartData }) {
+function DurationBarLabel({ x, y, width, height, value, index, chartData, isMobile }) {
   const row = chartData[index] || {};
   if (!value) return null;
   return (
     <text
-      x={x + width + 10}
+      x={x + width + (isMobile ? 5 : 10)}
       y={y + height / 2 + 5}
       textAnchor="start"
       fill={row.color || '#475569'}
-      className="text-[12px] font-bold"
+      className={`${isMobile ? 'text-[10px]' : 'text-[12px]'} font-bold`}
     >
       {formatDuration(value)}
     </text>
@@ -67,6 +67,14 @@ function DurationBarLabel({ x, y, width, height, value, index, chartData }) {
 }
 
 export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
+  const [isMobile, setIsMobile] = React.useState(typeof window !== 'undefined' && window.innerWidth < 640);
+  
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const rows = Array.isArray(data) ? data : [];
   const hasStackShape = rows.some((row) => STACK_KEYS.some(({ key }) => Number(row[key]) > 0));
   const chartData = React.useMemo(() => normalizeChartData(data), [data]);
@@ -78,7 +86,7 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
         <BarChart 
           data={chartData} 
           layout="vertical"
-          margin={{ top: 20, right: 80, left: 10, bottom: 20 }}
+          margin={isMobile ? { top: 20, right: 35, left: -20, bottom: 20 } : { top: 20, right: 80, left: 10, bottom: 20 }}
         >
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
           <XAxis 
@@ -92,8 +100,8 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
             dataKey="name" 
             type="category"
             interval={0} 
-            width={130}
-            tick={{ fontSize: 12, fontWeight: 600, fill: '#1e293b' }}
+            width={isMobile ? 85 : 130}
+            tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 600, fill: '#1e293b' }}
             axisLine={{ stroke: '#e2e8f0' }}
             tickLine={false}
           />
@@ -109,7 +117,7 @@ export const ProcessTimeBreakdownChart = ({ data, showLabels = true }) => {
             ))
           ) : (
             <Bar dataKey="seconds" name="Duration" radius={[0, 6, 6, 0]} barSize={32}>
-              {showLabels && <LabelList content={(props) => <DurationBarLabel {...props} chartData={chartData} />} />}
+              {showLabels && <LabelList content={(props) => <DurationBarLabel {...props} chartData={chartData} isMobile={isMobile} />} />}
               {chartData.map((entry) => (
                 <Cell key={entry.id} fill={entry.color} />
               ))}
