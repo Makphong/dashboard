@@ -48,7 +48,7 @@ export function buildKpiData(kpis) {
     },
     {
       id: 2,
-      label: 'Contributing Users',
+      label: 'Users',
       value: String(kpis.contributingUsers || 0),
       subtext: '',
       icon: Users,
