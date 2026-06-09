@@ -174,10 +174,12 @@ export function buildGanttPositionedBars(config) {
       const minWidth = segment.segmentType === 'USER_UPLOADING' ? 14 : 8;
       const width = Math.max(minWidth, x2 - x1);
 
-      if (!singleLane && x < lastRight + 1.5) x = lastRight + 1.5;
+      if (x < lastRight + 1.5) {
+        x = lastRight + 1.5;
+      }
 
       positioned.push({ s: segment, x, w: width });
-      if (!singleLane) lastRight = x + width;
+      lastRight = x + width;
     });
     result[lane] = positioned;
   });
