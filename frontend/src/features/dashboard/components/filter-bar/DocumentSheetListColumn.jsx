@@ -26,12 +26,12 @@ export function DocumentSheetListColumn({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1 no-scrollbar">
         {!activeDocumentEntry ? (
-          <div className="h-full flex flex-col items-center justify-center p-6 text-center opacity-40">
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center opacity-40 fade-slide-down">
             <Database className="w-8 h-8 text-slate-300 mb-2" />
             <div className="text-xs font-medium text-slate-400">Select a file to see sheets</div>
           </div>
         ) : filteredSheetsForActiveFile.length === 0 ? (
-          <div className="p-4 text-xs text-slate-400 text-center">No sheets found</div>
+          <div className="p-4 text-xs text-slate-400 text-center fade-slide-down">No sheets found</div>
         ) : (
           filteredSheetsForActiveFile.map((sheet) => {
             const isChecked = selectedSheetSet.has(sheet.key);
@@ -41,7 +41,7 @@ export function DocumentSheetListColumn({
             return (
               <div
                 key={sheet.name}
-                className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all"
+                className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all duration-200 fade-slide-down"
               >
                 <input
                   type="checkbox"

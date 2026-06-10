@@ -10,7 +10,7 @@ import {
 import { DocumentFileListColumn } from './DocumentFileListColumn.jsx';
 import { DocumentSheetListColumn } from './DocumentSheetListColumn.jsx';
 
-export function DocumentFilterPopover({
+export const DocumentFilterPopover = React.memo(({
   openDropdown,
   setOpenDropdown,
   documentTree,
@@ -30,7 +30,7 @@ export function DocumentFilterPopover({
   onTogglePinnedFile,
   onTogglePinnedSheet,
   onClearSelection,
-}) {
+}) => {
   const filteredDocumentTree = useMemo(
     () => getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles }),
     [documentTree, documentFileSearch, pinnedFiles],
@@ -99,4 +99,4 @@ export function DocumentFilterPopover({
       </div>
     </FilterPopover>
   );
-}
+});

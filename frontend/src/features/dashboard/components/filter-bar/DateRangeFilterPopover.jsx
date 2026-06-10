@@ -12,7 +12,7 @@ const DATE_PRESET_LABELS = {
   '90d': 'Last 90 Days',
 };
 
-export function DateRangeFilterPopover({
+export const DateRangeFilterPopover = React.memo(({
   openDropdown,
   setOpenDropdown,
   datePreset,
@@ -21,7 +21,7 @@ export function DateRangeFilterPopover({
   setDateStart,
   dateEnd,
   setDateEnd,
-}) {
+}) => {
   return (
     <FilterPopover
       id="date-range"
@@ -39,21 +39,21 @@ export function DateRangeFilterPopover({
             <button
               key={preset}
               onClick={() => setDatePreset(preset)}
-              className={`h-9 rounded-lg text-sm font-semibold transition-colors ${datePreset === preset ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
+              className={`h-9 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95 ${datePreset === preset ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
             >
               {DATE_PRESET_LABELS[preset]}
             </button>
           ))}
           <button
             onClick={() => setDatePreset('custom')}
-            className={`h-9 rounded-lg text-sm font-semibold transition-colors col-span-2 ${datePreset === 'custom' ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
+            className={`h-9 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95 col-span-2 ${datePreset === 'custom' ? 'bg-[#00a4e4] text-white shadow-sm' : 'bg-[#f6fbff] text-slate-600 hover:bg-[#e8f7fd]'}`}
           >
             Custom Range
           </button>
         </div>
 
         {datePreset === 'custom' && (
-          <div className="space-y-3 pt-3 border-t border-slate-100 animate-in slide-in-from-top-2 duration-200">
+          <div className="space-y-3 pt-3 border-t border-slate-100 fade-slide-down">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
@@ -79,4 +79,4 @@ export function DateRangeFilterPopover({
       </div>
     </FilterPopover>
   );
-}
+});
