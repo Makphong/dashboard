@@ -83,6 +83,7 @@ export const GanttBarsSvg = ({
   onPickSegment,
   onShowTooltip,
   onHideTooltip,
+  supportsHover,
 }) => (
   <svg width={timelineSvgWidth} height={bodyChartHeight} className="block bg-white/50">
     {visibleTicks.map((tick) => (
@@ -109,9 +110,9 @@ export const GanttBarsSvg = ({
               <g
                 key={`${s.id}-${barIdx}`}
                 onClick={() => onPickSegment(s)}
-                onMouseEnter={(event) => onShowTooltip(event, s, lane, color)}
-                onMouseMove={(event) => onShowTooltip(event, s, lane, color)}
-                onMouseLeave={onHideTooltip}
+                onPointerEnter={(event) => onShowTooltip(event, s, lane, color)}
+                onPointerMove={(event) => onShowTooltip(event, s, lane, color)}
+                onPointerLeave={onHideTooltip}
                 style={{ cursor: 'pointer' }}
               >
                 <rect x={x} y={y + 4} width={w} height={rowHeight - 8} rx="6" fill={color} opacity="0.9" />

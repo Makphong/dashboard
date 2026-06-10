@@ -1040,6 +1040,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
     workloadVisibleRows,
     contributionRows,
     mergeReviewAndEdit,
+    setSelectedGanttSegment,
     timelineSettings,
   } = data;
 
@@ -1151,6 +1152,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
             {visualizationId === 'gantt' && (
               <GanttTimelineChart
                 segments={ganttVisibleSegments}
+                onSelectSegment={setSelectedGanttSegment}
                 expanded
                 singleLane={timelineSettings?.singleLane}
                 showSystemLane={timelineSettings?.showSystemLane}

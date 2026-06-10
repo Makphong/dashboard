@@ -185,6 +185,7 @@ function App() {
               workloadVisibleRows: controller.workloadVisibleRows,
               contributionRows: dashboard.contributionRows,
               mergeReviewAndEdit: controller.mergeReviewAndEdit,
+              setSelectedGanttSegment: controller.setSelectedGanttSegment,
               timelineSettings: {
                 singleLane: controller.ganttSingleLaneMode,
                 showSystemLane: controller.showSystemLane,

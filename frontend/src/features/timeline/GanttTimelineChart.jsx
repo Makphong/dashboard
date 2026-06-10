@@ -59,6 +59,12 @@ export const GanttTimelineChart = ({
   const [zoomScale, setZoomScale] = useState(1);
   const [scrollState, setScrollState] = useState({ left: 0, top: 0, viewW: 1000, viewH: 600 });
 
+  // Detect if device generally supports hover (for baseline capability)
+  const supportsHover = useMemo(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(hover: hover)').matches;
+  }, []);
+
   const mapped = useMemo(() => mapSegmentsToRows(segments, singleLane), [segments, singleLane]);
 
   useEffect(() => {
@@ -351,10 +357,18 @@ export const GanttTimelineChart = ({
   }, [zoomScale, getX]);
 
   const pickSegment = (segment) => {
+    setHoveredSegment(null);
     if (typeof onSelectSegment === 'function') onSelectSegment(segment);
   };
 
   const showTooltip = (event, segment, lane, color) => {
+    // Explicitly block tooltip for touch interactions (finger taps)
+    // Pointer Events API: pointerType can be 'mouse', 'pen', or 'touch'
+    if (event.pointerType === 'touch') {
+      setHoveredSegment(null);
+      return;
+    }
+    
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -459,6 +473,7 @@ export const GanttTimelineChart = ({
                 onPickSegment={pickSegment}
                 onShowTooltip={showTooltip}
                 onHideTooltip={() => setHoveredSegment(null)}
+                supportsHover={supportsHover}
               />
             </div>
           </div>
