@@ -49,8 +49,9 @@ export const FilterPopover = ({
         const maxHeight = Math.max(120, window.innerHeight - top - viewportPadding);
         setPanelStyle({
           top,
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: `${viewportPadding}px`,
+          right: `${viewportPadding}px`,
+          width: 'auto',
           maxHeight,
         });
         return;
