@@ -19,7 +19,8 @@ import {
   toCompleteMarkerType,
   spreadMarkerPositions,
   buildAsteriskPoints,
-  toDisplayDate
+  toDisplayDate,
+  mergeAdjacentIdleSegments
 } from '../../lib/utils.js';
 
 function applySecondSpreadHandoffTiming(rows) {
@@ -115,10 +116,12 @@ export const mapSegmentsToRows = (segments, singleLane) => {
 
   applySecondSpreadHandoffTiming(parsedRows);
 
-  if (reopenMarkers.length === 0 || parsedRows.length === 0) return parsedRows;
+  const mergedRows = mergeAdjacentIdleSegments(parsedRows);
+
+  if (reopenMarkers.length === 0 || mergedRows.length === 0) return mergedRows;
 
   const userBarsByContext = new Map();
-  parsedRows.forEach((row) => {
+  mergedRows.forEach((row) => {
     if (!String(row.segmentType || '').startsWith('USER_')) return;
     if (!userBarsByContext.has(row.contextKey)) userBarsByContext.set(row.contextKey, []);
     userBarsByContext.get(row.contextKey).push(row);
@@ -138,7 +141,7 @@ export const mapSegmentsToRows = (segments, singleLane) => {
     });
   });
 
-  return parsedRows;
+  return mergedRows;
 };
 
 /**

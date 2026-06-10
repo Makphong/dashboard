@@ -119,6 +119,66 @@ export function mergeContinuousReprocessingSegments(sortedSegments) {
   return merged.sort((a, b) => a.startTs - b.startTs);
 }
 
+export function mergeAdjacentIdleSegments(rows) {
+  if (!Array.isArray(rows) || rows.length <= 1) return rows;
+
+  const rowsByContext = new Map();
+  rows.forEach((row) => {
+    if (!rowsByContext.has(row.contextKey)) rowsByContext.set(row.contextKey, []);
+    rowsByContext.get(row.contextKey).push(row);
+  });
+
+  const allMerged = [];
+
+  rowsByContext.forEach((contextRows) => {
+    contextRows.sort((a, b) => a.startTs - b.startTs);
+
+    const merged = [];
+    contextRows.forEach((row) => {
+      if (merged.length === 0) {
+        merged.push({ ...row });
+        return;
+      }
+
+      const prev = merged[merged.length - 1];
+      const canMerge = prev.lane === 'Idle'
+        && row.lane === 'Idle'
+        && row.startTs <= prev.endTs + 1000;
+
+      if (canMerge) {
+        const getPriority = (type) => {
+          if (type === 'IDLE_WAITING_FOR_REREVIEW') return 100;
+          if (type === 'IDLE_WAITING_FOR_REVIEW') return 90;
+          if (type === 'IDLE_AFTER_SYSTEM_REPROCESS') return 80;
+          if (type === 'POST_COMPLETED_ELAPSED') return 10;
+          return 0;
+        };
+
+        if (getPriority(row.segmentType) > getPriority(prev.segmentType)) {
+          prev.segmentType = row.segmentType;
+          prev.drillGroup = row.drillGroup;
+        }
+
+        prev.endTs = Math.max(prev.endTs, row.endTs);
+        if (row.endTs >= prev.endTs) prev.end = row.end;
+        prev.durationSeconds = Math.max(0, Math.round((prev.endTs - prev.startTs) / 1000));
+
+        if (Array.isArray(row.reopenMarkerList)) {
+          prev.reopenMarkerList = [
+            ...(prev.reopenMarkerList || []),
+            ...row.reopenMarkerList
+          ];
+        }
+      } else {
+        merged.push({ ...row });
+      }
+    });
+    allMerged.push(...merged);
+  });
+
+  return allMerged;
+}
+
 export function toDrillGroup(segmentType) {
   const type = String(segmentType || '');
   if (type === 'USER_UPLOADING') return 'Uploading';
