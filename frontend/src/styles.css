@@ -38,7 +38,6 @@ body {
   background:
     linear-gradient(180deg, rgba(0, 164, 228, 0.045) 0%, rgba(255, 255, 255, 0) 220px),
     #fbfdff;
-  overscroll-behavior-y: none;
 }
 
 .bg-blue-600 { background-color: var(--ktb-sky) !important; }
@@ -240,7 +239,7 @@ svg tspan.font-black {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto;
   transform: translateZ(0);
   backface-visibility: hidden;
 }

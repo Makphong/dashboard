@@ -64,6 +64,18 @@ function App() {
   const dashboard = useDashboardData();
   const controller = useAppController(dashboard);
 
+  // Prevent background scrolling when a modal is open
+  React.useEffect(() => {
+    const shell = document.querySelector('.app-scroll-shell');
+    if (!shell) return;
+    
+    if (controller.selectedGanttSegment || controller.expandedVisualizationId) {
+      shell.style.overflow = 'hidden';
+    } else {
+      shell.style.overflow = 'auto';
+    }
+  }, [controller.selectedGanttSegment, controller.expandedVisualizationId]);
+
   const resolvedSelectedGanttSegment = useMemo(() => {
     const selected = controller.selectedGanttSegment;
     if (!selected) return null;

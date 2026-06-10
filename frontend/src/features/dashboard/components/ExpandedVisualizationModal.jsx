@@ -1150,19 +1150,21 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   );
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 md:p-8 viz-overlay-enter" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-0 sm:p-4 md:p-8 viz-overlay-enter" onClick={onClose}>
       <div 
-        className="bg-white w-full max-w-[95vw] h-[92vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden viz-panel-enter"
+        className="bg-white w-full h-full sm:max-w-[95vw] sm:h-[92vh] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden viz-panel-enter"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 md:px-10 border-b flex justify-between items-center max-sm:items-start bg-slate-50/50">
-          <div className="max-sm:pr-2">
-            <h2 className="text-2xl max-sm:text-lg max-sm:leading-tight font-extrabold text-[#17335f]">{modalTitle}</h2>
-            <p className="text-sm max-sm:text-[9px] max-sm:tracking-normal max-sm:leading-tight max-sm:mt-0.5 text-slate-500 font-bold uppercase tracking-wider">{modalSubtitle}</p>
+        <div className="p-4 sm:p-6 md:px-10 border-b flex justify-between items-center bg-slate-50/50 shrink-0">
+          <div className="min-w-0 pr-4">
+            <h2 className="text-lg sm:text-2xl font-extrabold text-[#17335f] truncate">{modalTitle}</h2>
+            <p className="text-[9px] sm:text-sm text-slate-500 font-bold uppercase tracking-wider truncate">{modalSubtitle}</p>
           </div>
-          <button onClick={onClose} className="p-3 max-sm:p-2 max-sm:-mr-2 max-sm:-mt-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-2xl transition-all hover:rotate-90 duration-300 shrink-0"><X className="w-8 h-8 max-sm:w-6 max-sm:h-6" /></button>
+          <button onClick={onClose} className="p-2 sm:p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-xl sm:rounded-2xl transition-all hover:rotate-90 duration-300 shrink-0">
+            <X className="w-6 h-6 sm:w-8 sm:h-8" />
+          </button>
         </div>
-        <div className="flex-1 overflow-auto p-6 md:p-10 no-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 no-scrollbar">
           <Suspense fallback={<ExpandedChartFallback />}>
             {visualizationId === 'gantt' && (
               <GanttTimelineChart

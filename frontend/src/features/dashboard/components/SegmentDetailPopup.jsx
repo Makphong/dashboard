@@ -20,7 +20,7 @@ export function SegmentDetailPopup({ segment, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[150] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 confirm-overlay-enter" onClick={onClose}>
-      <div className="bg-white w-full max-w-xl rounded-[24px] md:rounded-[32px] shadow-2xl overflow-hidden confirm-panel-enter" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-[24px] md:rounded-[32px] shadow-2xl confirm-panel-enter" onClick={e => e.stopPropagation()}>
         <div className="p-5 md:p-8">
           {/* Header */}
           <div className="flex justify-between items-start mb-6 md:mb-8">
