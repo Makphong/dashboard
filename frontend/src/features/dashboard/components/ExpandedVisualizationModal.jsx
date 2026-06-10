@@ -364,8 +364,11 @@ const TimelineDetailView = React.memo(({ segments, timelineSettings }) => {
     <div className="space-y-6">
       <section>
         <div className="grid gap-3 grid-cols-2 max-sm:gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {summaryCards.map((card) => (
-            <div key={card.key} className="rounded-2xl border border-slate-200 bg-white p-4 max-sm:p-3 shadow-sm">
+          {summaryCards.map((card, idx) => (
+            <div 
+              key={card.key} 
+              className={`rounded-2xl border border-slate-200 bg-white p-4 max-sm:p-3 shadow-sm animate-stagger-${Math.min(8, idx + 1)}`}
+            >
               <div className="text-[11px] max-sm:text-[9px] max-sm:tracking-wider font-bold uppercase tracking-[0.18em] text-slate-500 truncate">{card.label}</div>
               <div className={`mt-2 max-sm:mt-1.5 text-3xl max-sm:text-2xl font-extrabold leading-none ${card.accentClass}`}>{card.count}</div>
               <div className="mt-2 max-sm:mt-1 text-xs max-sm:text-[10px] font-medium text-slate-500">bars</div>
@@ -374,7 +377,7 @@ const TimelineDetailView = React.memo(({ segments, timelineSettings }) => {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[1.5rem] bg-white">
+      <section className="overflow-hidden rounded-[1.5rem] bg-white fade-slide-down" style={{ animationDelay: '300ms' }}>
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Source detail</div>
           <div className="text-xl font-bold text-[#17335f]">Bars in the current timeline</div>
@@ -476,7 +479,10 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
   return (
     <div className="space-y-6">
       {userGroups.map((group, userIndex) => (
-        <section key={group.user} className="overflow-hidden rounded-[1.5rem] bg-white">
+        <section 
+          key={group.user} 
+          className={`overflow-hidden rounded-[1.5rem] bg-white animate-stagger-${Math.min(8, userIndex + 1)}`}
+        >
           <button
             type="button"
             onClick={() => toggleUser(group.user)}
@@ -601,7 +607,10 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
         const reviewActivities = row.activities.filter((activity) => activity.type === 'Review');
 
         return (
-          <section key={row.user} className="overflow-hidden rounded-[1.5rem] bg-white">
+          <section 
+            key={row.user} 
+            className={`overflow-hidden rounded-[1.5rem] bg-white animate-stagger-${Math.min(8, index + 1)}`}
+          >
             <button
               type="button"
               onClick={() => setOpenUser((current) => (current === row.user ? '' : row.user))}
@@ -778,7 +787,10 @@ const TimeBreakdownDetailView = React.memo(({
       {groups.map((group, index) => {
         const isOpen = openGroup === group.key;
         return (
-          <section key={group.key} className="overflow-hidden rounded-[1.5rem] bg-white">
+          <section 
+            key={group.key} 
+            className={`overflow-hidden rounded-[1.5rem] bg-white animate-stagger-${Math.min(8, index + 1)}`}
+          >
             <button
               type="button"
               onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
@@ -919,7 +931,10 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
       {groups.map((group, index) => {
         const isOpen = openGroup === group.key;
         return (
-          <section key={group.key} className="overflow-hidden rounded-[1.5rem] bg-white">
+          <section 
+            key={group.key} 
+            className={`overflow-hidden rounded-[1.5rem] bg-white animate-stagger-${Math.min(8, index + 1)}`}
+          >
             <button
               type="button"
               onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
