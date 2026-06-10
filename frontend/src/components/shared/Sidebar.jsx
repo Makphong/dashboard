@@ -31,7 +31,7 @@ const SidebarContent = ({
     className={
       mobile
         ? `fixed inset-y-0 left-0 z-10 flex w-64 flex-col border-r border-[#d7e8f6] bg-white shadow-2xl will-change-transform transform-gpu ${mobileStateClass || ''}`
-        : `hidden lg:flex scroll-clarity-layer flex-col border-r border-[#d7e8f6] bg-white transition-[transform,width] duration-300 ease-out lg:static ${
+        : `hidden lg:flex scroll-clarity-layer flex-col border-r border-[#d7e8f6] bg-white transition-[transform,width] duration-300 ease-out lg:relative lg:z-[150] ${
             isCollapsed ? 'lg:w-20' : 'lg:w-64'
           }`
     }
