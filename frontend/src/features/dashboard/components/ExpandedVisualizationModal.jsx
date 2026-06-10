@@ -480,26 +480,26 @@ const UserShareDetailView = React.memo(({ segments, workloadVisibleRows }) => {
           <button
             type="button"
             onClick={() => toggleUser(group.user)}
-            className="flex w-full flex-col gap-3 px-5 py-4 text-left md:flex-row md:items-center md:justify-between"
+            className="flex w-full items-center justify-between gap-2 px-3 py-3 text-left sm:gap-3 sm:px-5 sm:py-4"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f4f9fd] text-[#3860be]">
-                <User className="h-5 w-5" />
+            <div className="flex items-center gap-2 min-w-0 sm:gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f4f9fd] text-[#3860be] sm:h-11 sm:w-11">
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">User {userIndex + 1}</div>
-                <div className="truncate text-xl font-bold text-[#17335f]">{group.user}</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:text-xs">User {userIndex + 1}</div>
+                <div className="truncate text-lg font-bold text-[#17335f] sm:text-xl">{group.user}</div>
               </div>
             </div>
-            <div className="flex items-center gap-3 self-start md:self-auto">
-              <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
-                <Clock className="h-4 w-4 text-[#00a4e4]" />
+            <div className="flex items-center gap-2 shrink-0 sm:gap-3">
+              <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+                <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Total Time</div>
-                  <div className="text-base font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Total Time</div>
+                  <div className="text-sm font-bold text-[#17335f] sm:text-base">{formatDuration(group.totalSeconds)}</div>
                 </div>
               </div>
-              <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${openUser === group.user ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform sm:h-5 sm:w-5 ${openUser === group.user ? 'rotate-180' : ''}`} />
             </div>
           </button>
 
@@ -605,27 +605,27 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
             <button
               type="button"
               onClick={() => setOpenUser((current) => (current === row.user ? '' : row.user))}
-              className="flex w-full flex-col gap-3 border-b border-slate-200 px-5 py-4 text-left md:flex-row md:items-center md:justify-between"
+              className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 text-left sm:gap-3 sm:px-5 sm:py-4"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#f4f9fd] text-[#3860be]">
-                  <User className="h-5 w-5" />
+              <div className="flex items-center gap-2 min-w-0 sm:gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f4f9fd] text-[#3860be] sm:h-11 sm:w-11">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">User {index + 1}</div>
-                  <div className="truncate text-xl font-bold text-[#17335f]">{row.user}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:text-xs">User {index + 1}</div>
+                  <div className="truncate text-lg font-bold text-[#17335f] sm:text-xl">{row.user}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-start md:self-auto">
-                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
-                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+              <div className="flex items-center gap-2 shrink-0 sm:gap-3">
+                <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+                  <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Total Time</div>
-                    <div className="text-base font-bold text-[#17335f]">{formatDuration(row.totalSeconds)}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Total Time</div>
+                    <div className="text-sm font-bold text-[#17335f]">{formatDuration(row.totalSeconds)}</div>
                   </div>
                 </div>
-                <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform sm:h-5 sm:w-5 ${isOpen ? 'rotate-180' : ''}`} />
               </div>
             </button>
 
@@ -782,27 +782,27 @@ const TimeBreakdownDetailView = React.memo(({
             <button
               type="button"
               onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
-              className="flex w-full flex-col gap-3 border-b border-slate-200 px-5 py-4 text-left md:flex-row md:items-center md:justify-between"
+              className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 text-left sm:gap-3 sm:px-5 sm:py-4"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${group.colorClass}`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${group.dotClass}`} />
+              <div className="flex items-center gap-2 min-w-0 sm:gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl sm:h-11 sm:w-11 ${group.colorClass}`}>
+                  <span className={`h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5 ${group.dotClass}`} />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Group {index + 1}</div>
-                  <div className="truncate text-xl font-bold text-[#17335f]">{group.label}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:text-xs">Group {index + 1}</div>
+                  <div className="truncate text-lg font-bold text-[#17335f] sm:text-xl">{group.label}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-start md:self-auto">
-                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
-                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+              <div className="flex items-center gap-2 shrink-0 sm:gap-3">
+                <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+                  <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Total Time</div>
-                    <div className="text-base font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Total Time</div>
+                    <div className="text-sm font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
                   </div>
                 </div>
-                <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform sm:h-5 sm:w-5 ${isOpen ? 'rotate-180' : ''}`} />
               </div>
             </button>
 
@@ -923,34 +923,34 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
             <button
               type="button"
               onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
-              className="flex w-full flex-col gap-3 border-b border-slate-200 px-5 py-4 text-left md:flex-row md:items-center md:justify-between"
+              className="flex w-full flex-col gap-3 border-b border-slate-200 px-3 py-3 text-left sm:px-5 sm:py-4 md:flex-row md:items-center md:justify-between"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${group.colorClass}`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${group.dotClass}`} />
+              <div className="flex items-center gap-2 min-w-0 sm:gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl sm:h-11 sm:w-11 ${group.colorClass}`}>
+                  <span className={`h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5 ${group.dotClass}`} />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Group {index + 1}</div>
-                  <div className="truncate text-xl font-bold text-[#17335f]">{group.label}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 sm:text-xs">Group {index + 1}</div>
+                  <div className="truncate text-lg font-bold text-[#17335f] sm:text-xl">{group.label}</div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 self-start md:self-auto">
-                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
-                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+              <div className="flex flex-wrap items-center gap-2 self-start md:self-auto md:flex-nowrap sm:gap-3">
+                <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+                  <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Average</div>
-                    <div className="text-base font-bold text-[#17335f]">{formatDuration(group.averageSeconds)}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Average</div>
+                    <div className="text-sm font-bold text-[#17335f] sm:text-base">{formatDuration(group.averageSeconds)}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-2xl bg-[#f8fbfe] px-4 py-2">
-                  <Clock className="h-4 w-4 text-[#00a4e4]" />
+                <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+                  <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Total Time</div>
-                    <div className="text-base font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Total Time</div>
+                    <div className="text-sm font-bold text-[#17335f]">{formatDuration(group.totalSeconds)}</div>
                   </div>
                 </div>
-                <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform sm:h-5 sm:w-5 ${isOpen ? 'rotate-180' : ''}`} />
               </div>
             </button>
 
