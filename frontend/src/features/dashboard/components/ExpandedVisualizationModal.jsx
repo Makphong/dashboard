@@ -923,7 +923,7 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
             <button
               type="button"
               onClick={() => setOpenGroup((current) => (current === group.key ? '' : group.key))}
-              className="flex w-full flex-col gap-3 border-b border-slate-200 px-3 py-3 text-left sm:px-5 sm:py-4 md:flex-row md:items-center md:justify-between"
+              className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 text-left sm:gap-3 sm:px-5 sm:py-4"
             >
               <div className="flex items-center gap-2 min-w-0 sm:gap-3">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl sm:h-11 sm:w-11 ${group.colorClass}`}>
@@ -935,8 +935,8 @@ const TransitionBreakdownDetailView = React.memo(({ segments }) => {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 self-start md:self-auto md:flex-nowrap sm:gap-3">
-                <div className="flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
+              <div className="flex items-center gap-1.5 shrink-0 sm:gap-3">
+                <div className="hidden min-[440px]:flex items-center gap-1.5 rounded-2xl bg-[#f8fbfe] px-2.5 py-1.5 sm:gap-2 sm:px-4 sm:py-2">
                   <Clock className="h-3.5 w-3.5 text-[#00a4e4] sm:h-4 sm:w-4" />
                   <div>
                     <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400 sm:text-[11px]">Average</div>
