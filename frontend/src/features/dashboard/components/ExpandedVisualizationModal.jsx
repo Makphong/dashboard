@@ -64,6 +64,7 @@ function isTimelineDurationSegment(segment) {
 }
 
 function toTimelineDetailCountKey(segmentType) {
+  if (segmentType === 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS') return 'Idle';
   const drillGroup = toDrillGroup(segmentType);
   if (drillGroup === 'Uploading') return 'Uploading';
   if (drillGroup === 'Processing') return 'Processing';
@@ -148,11 +149,13 @@ function buildTimelineDetailData(segments, timelineSettings) {
     EditMeta: 0,
     Idle: 0,
   };
+  rawBars.forEach((bar) => {
+    if (bar.countKey) summaryCounts[bar.countKey] += 1;
+  });
+
   const sourceMap = new Map();
 
   bars.forEach((bar) => {
-    if (bar.countKey) summaryCounts[bar.countKey] += 1;
-
     const sourceKey = bar.activity;
     if (!sourceMap.has(sourceKey)) {
       sourceMap.set(sourceKey, {
