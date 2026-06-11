@@ -133,7 +133,7 @@ class Sheet8PatternSegmentationTest(unittest.TestCase):
 
 
 class Sheet19PatternSegmentationTest(unittest.TestCase):
-    def test_placeholder_pending_exit_keeps_boundary_when_following_round_has_mixed_actors(self) -> None:
+    def test_missing_status_round_splits_into_edit_idle_edit_segments(self) -> None:
         events = [
             _event(
                 49,
@@ -249,14 +249,98 @@ class Sheet19PatternSegmentationTest(unittest.TestCase):
             "USER_EDITING_CORRECTION",
             "User9",
             "2026-04-24T04:35:07.999999",
-            "2026-04-24T05:04:18.000001",
+            "2026-04-24T04:35:28",
         ))
         self.assertEqual(user_segments[2], (
+            "USER_EDITING_CORRECTION",
+            "cognize user",
+            "2026-04-24T05:04:18",
+            "2026-04-24T05:22:05",
+        ))
+        self.assertEqual(user_segments[3], (
             "USER_COMPLETION_APPROVAL",
             "cognize user",
             "2026-04-24T05:22:05",
             "2026-04-24T05:26:29",
         ))
+
+        idle_segments = [
+            (segment["segmentType"], segment["start"], segment["end"])
+            for segment in segments
+            if segment["segmentType"].startswith("IDLE_")
+        ]
+        self.assertIn(
+            (
+                "IDLE_WAITING_FOR_REREVIEW",
+                "2026-04-24T04:35:28",
+                "2026-04-24T05:04:18",
+            ),
+            idle_segments,
+        )
+        self.assertNotIn(
+            (
+                "IDLE_WAITING_FOR_REREVIEW",
+                "2026-04-24T05:04:18.000001",
+                "2026-04-24T05:22:05",
+            ),
+            idle_segments,
+        )
+
+    def test_explicit_in_review_interval_with_large_gap_is_not_split(self) -> None:
+        events = [
+            _event(
+                4,
+                dt.datetime(2026, 1, 1, 10, 0, 0),
+                "User4",
+                "User",
+                change_type="Spread Status",
+                from_status="Pending Re-Review by Moodys",
+                to_status="In Review by Moodys",
+            ),
+            _event(
+                3,
+                dt.datetime(2026, 1, 1, 10, 2, 0),
+                "User4",
+                "User",
+                change_type="Account Value",
+                from_value="1",
+                to_value="2",
+            ),
+            _event(
+                2,
+                dt.datetime(2026, 1, 1, 10, 30, 0),
+                "User4",
+                "User",
+                change_type="Account Value",
+                from_value="2",
+                to_value="3",
+            ),
+            _event(
+                1,
+                dt.datetime(2026, 1, 1, 10, 35, 0),
+                "User4",
+                "User",
+                change_type="Spread Status",
+                from_status="In Review by Moodys",
+                to_status="Pending Re-Review by Moodys",
+            ),
+        ]
+
+        segments = build_segments_for_document(events)
+        user_segments = [
+            (segment["segmentType"], segment["userName"], segment["start"], segment["end"])
+            for segment in segments
+            if segment["segmentType"].startswith("USER_")
+        ]
+
+        self.assertEqual(user_segments, [
+            (
+                "USER_EDITING_CORRECTION",
+                "User4",
+                "2026-01-01T10:00:00",
+                "2026-01-01T10:35:00",
+            )
+        ])
 
 
 class Sheet20PatternSegmentationTest(unittest.TestCase):
