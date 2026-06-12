@@ -1,5 +1,10 @@
 import { toDrillGroup } from '../../../lib/segmentUtils.js';
 
+function isTransitionIdleSegment(segmentType) {
+  const type = String(segmentType || '');
+  return toDrillGroup(type) === 'Idle' || type === 'IDLE_WAITING_FOR_SCHEDULED_REPROCESS';
+}
+
 function shouldExcludeTransitionActivity(activityLabel, documentLabel) {
   const haystack = `${String(activityLabel || '')} ${String(documentLabel || '')}`.toLowerCase();
   return haystack.includes('markup')
@@ -25,6 +30,11 @@ export function buildTransitionBreakdownGroups(segments, labels = {}) {
   segmentsBySheet.forEach((items) => {
     const sorted = [...items].sort((a, b) => a.startTs - b.startTs);
     let hasFutureReviewOrEdit = false;
+    const sheetTotals = new Map([
+      ['after-processing', 0],
+      ['after-reprocessing', 0],
+      ['between-review-edit', 0],
+    ]);
 
     for (let i = sorted.length - 1; i >= 0; i -= 1) {
       const curr = sorted[i];
@@ -34,7 +44,7 @@ export function buildTransitionBreakdownGroups(segments, labels = {}) {
         hasFutureReviewOrEdit = true;
       }
 
-      if (currDrill !== 'Idle') continue;
+      if (!isTransitionIdleSegment(curr.segmentType)) continue;
 
       const prev = i > 0 ? sorted[i - 1] : null;
       const prevDrill = prev ? toDrillGroup(prev.segmentType) : '';
@@ -59,8 +69,7 @@ export function buildTransitionBreakdownGroups(segments, labels = {}) {
       const group = groups.get(groupKey);
       const durationSeconds = Number(curr.durationSeconds) || 0;
       if (shouldExcludeTransitionActivity(curr.segmentType, curr.documentLabel)) continue;
-      group.totalSeconds += durationSeconds;
-      group.count += 1;
+      sheetTotals.set(groupKey, sheetTotals.get(groupKey) + durationSeconds);
       group.activities.push({
         id: curr.id || `${groupKey}-${curr.startTs || i}`,
         activity: curr.segmentType,
@@ -71,6 +80,11 @@ export function buildTransitionBreakdownGroups(segments, labels = {}) {
         documentLabel: curr.documentLabel,
       });
     }
+
+    groups.forEach((group, key) => {
+      group.totalSeconds += sheetTotals.get(key) || 0;
+      group.count += 1;
+    });
   });
 
   return Array.from(groups.values()).map((group) => ({
