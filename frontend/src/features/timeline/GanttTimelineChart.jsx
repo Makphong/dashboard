@@ -180,6 +180,12 @@ export const GanttTimelineChart = ({
     [lanes, visibleSegments]
   );
 
+  const stackOverlapsInSingleLane = useMemo(() => {
+    if (!singleLane || visibleSegments.length === 0) return false;
+    const contextKeys = new Set(visibleSegments.map((segment) => segment.contextKey).filter(Boolean));
+    return contextKeys.size === 1;
+  }, [singleLane, visibleSegments]);
+
   const timelinePadLeft = 14;
   const timelinePadRight = 18;
   const minTimelinePx = collapseGaps ? (singleLane ? 2 : 2) : 2;
@@ -194,17 +200,18 @@ export const GanttTimelineChart = ({
     return timelinePadLeft + (compactTs(normalizedTs) - baseCompactedTs) * pxPerMs;
   }, [compactTs, displayMinTs, baseCompactedTs, pxPerMs]);
 
-  const laneToPositionedBars = useMemo(() => buildGanttPositionedBars({
+  const { positionedByLane: laneToPositionedBars, laneStackDepths } = useMemo(() => buildGanttPositionedBars({
     lanes,
     laneToSegments,
     singleLane,
+    stackOverlapsInSingleLane,
     compactTs,
     displayMinTs,
     displayMaxTs,
     baseCompactedTs,
     pxPerMs,
     timelinePadLeft,
-  }), [lanes, laneToSegments, singleLane, compactTs, displayMinTs, displayMaxTs, baseCompactedTs, pxPerMs]);
+  }), [lanes, laneToSegments, singleLane, stackOverlapsInSingleLane, compactTs, displayMinTs, displayMaxTs, baseCompactedTs, pxPerMs]);
 
   const timelineSvgWidth = useMemo(() => {
     let maxRight = timelinePadLeft + timelineWidth + timelinePadRight;
@@ -236,10 +243,20 @@ export const GanttTimelineChart = ({
   }, [lanes]);
   const laneLabelWidth = isMobileViewport ? mobileLaneLabelWidth : (expanded ? 210 : 132);
   const headerHeight = 50;
-  const rowHeight = 34;
+  const laneBaseHeight = 34;
+  const barHeight = laneBaseHeight - 8;
+  const stackedBarGap = 4;
+  const stackStep = barHeight + stackedBarGap;
   const rowGap = 10;
-  const rowSlotHeight = rowHeight + rowGap;
   const rowTopPadding = 8;
+  const maxLaneStackDepth = useMemo(
+    () => lanes.reduce((maxDepth, lane) => Math.max(maxDepth, laneStackDepths[lane] || 1), 1),
+    [lanes, laneStackDepths]
+  );
+  const laneHeight = stackOverlapsInSingleLane
+    ? laneBaseHeight + Math.max(0, maxLaneStackDepth - 1) * stackStep
+    : laneBaseHeight;
+  const rowSlotHeight = laneHeight + rowGap;
   const bodyChartHeight = rowTopPadding + lanes.length * rowSlotHeight + 10;
   const timelineViewportHeight = expanded
     ? Math.max(rowSlotHeight + 12, lanes.length * rowSlotHeight + 12)
@@ -405,10 +422,11 @@ export const GanttTimelineChart = ({
     const y = event.clientY - rect.top;
     const resolvedStartTs = getLabelTs(segment.startTs);
     const resolvedEndTs = getLabelTs(segment.endTs);
+    const displayLane = segment.origLane || lane;
     const nextHoveredSegment = {
       x: Math.max(8, Math.min(x + 12, rect.width - 318)),
       y: Math.max(8, Math.min(y + 12, rect.height - 132)),
-      lane,
+      lane: displayLane,
       color,
       groupLabel: GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup,
       segmentType: segment.segmentType,
@@ -473,7 +491,7 @@ export const GanttTimelineChart = ({
               laneLabelWidth={laneLabelWidth}
               rowTopPadding={rowTopPadding}
               rowSlotHeight={rowSlotHeight}
-              rowHeight={rowHeight}
+              laneHeight={laneHeight}
             />
 
             <div
@@ -499,7 +517,8 @@ export const GanttTimelineChart = ({
                 laneToPositionedBars={laneToPositionedBars}
                 rowTopPadding={rowTopPadding}
                 rowSlotHeight={rowSlotHeight}
-                rowHeight={rowHeight}
+                barHeight={barHeight}
+                stackStep={stackStep}
                 scrollState={scrollState}
                 showStarMarkers={showStarMarkers}
                 getX={getX}

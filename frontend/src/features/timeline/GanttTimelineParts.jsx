@@ -55,13 +55,13 @@ export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth,
   </div>
 );
 
-export const GanttLaneLabels = ({ visibleLanes, lanes, laneLabelWidth, rowTopPadding, rowSlotHeight, rowHeight }) => (
+export const GanttLaneLabels = ({ visibleLanes, lanes, laneLabelWidth, rowTopPadding, rowSlotHeight, laneHeight }) => (
   <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 bg-white relative">
     {visibleLanes.map((lane) => {
       const idx = lanes.indexOf(lane);
       const y = rowTopPadding + idx * rowSlotHeight;
       return (
-        <div key={lane} style={{ position: 'absolute', top: y, width: '100%', height: rowHeight }} className="px-3 max-sm:px-2 flex items-center border-b border-slate-50">
+        <div key={lane} style={{ position: 'absolute', top: y, width: '100%', height: laneHeight }} className="px-3 max-sm:px-2 flex items-center border-b border-slate-50">
           <span className="text-[11px] max-sm:text-[10px] font-semibold text-slate-700 truncate">{lane}</span>
         </div>
       );
@@ -78,7 +78,8 @@ export const GanttBarsSvg = ({
   laneToPositionedBars,
   rowTopPadding,
   rowSlotHeight,
-  rowHeight,
+  barHeight,
+  stackStep,
   scrollState,
   showStarMarkers,
   getX,
@@ -102,7 +103,7 @@ export const GanttBarsSvg = ({
       return (
         <g key={`bars-${lane}`}>
           {positionedBars.map((positioned, barIdx) => {
-            const { s, x, w } = positioned;
+            const { s, x, w, stackLevel = 0 } = positioned;
             if (x + w < leftBound || x > rightBound) return null;
 
             const color = lane === 'Idle'
@@ -117,7 +118,7 @@ export const GanttBarsSvg = ({
                 onPointerLeave={onHideTooltip}
                 style={{ cursor: 'pointer' }}
               >
-                <rect x={x} y={y + 4} width={w} height={rowHeight - 8} rx="6" fill={color} opacity="0.9" />
+                <rect x={x} y={y + 4 + stackLevel * stackStep} width={w} height={barHeight} rx="6" fill={color} opacity="0.9" />
               </g>
             );
           })}

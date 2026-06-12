@@ -152,6 +152,7 @@ export function buildGanttPositionedBars(config) {
     lanes,
     laneToSegments,
     singleLane,
+    stackOverlapsInSingleLane,
     compactTs,
     displayMinTs,
     displayMaxTs,
@@ -175,7 +176,9 @@ export function buildGanttPositionedBars(config) {
   let currentGlobalShift = 0; // Tracks staircase offset to keep stacked bars aligned and drift-free during zoom
   
   const positionedByLane = {};
+  const laneStackDepths = {};
   lanes.forEach((lane) => { positionedByLane[lane] = []; });
+  lanes.forEach((lane) => { laneStackDepths[lane] = 1; });
 
   allSegments.forEach(({ lane, segment }) => {
     const x1 = timelinePadLeft + (compactTs(Math.max(segment.startTs, displayMinTs)) - baseCompactedTs) * pxPerMs;
@@ -207,7 +210,22 @@ export function buildGanttPositionedBars(config) {
     globalLastEndTs = Math.max(globalLastEndTs, segment.endTs);
   });
 
-  return positionedByLane;
+  if (singleLane && stackOverlapsInSingleLane) {
+    lanes.forEach((lane) => {
+      const activeRightByLevel = [];
+      positionedByLane[lane] = (positionedByLane[lane] || []).map((positioned) => {
+        let stackLevel = 0;
+        while ((activeRightByLevel[stackLevel] ?? -Infinity) > positioned.x) {
+          stackLevel += 1;
+        }
+        activeRightByLevel[stackLevel] = positioned.x + positioned.w;
+        laneStackDepths[lane] = Math.max(laneStackDepths[lane], stackLevel + 1);
+        return { ...positioned, stackLevel };
+      });
+    });
+  }
+
+  return { positionedByLane, laneStackDepths };
 }
 
 export function buildGanttTicks(config) {
