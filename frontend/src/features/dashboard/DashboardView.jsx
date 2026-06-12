@@ -156,7 +156,7 @@ export const DashboardView = React.memo(({
   );
 
   const contributionAnimationKey = React.useMemo(
-    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editSeconds', 'totalSeconds', 'reworkRate']),
+    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editDataSeconds', 'editMetaSeconds', 'totalSeconds', 'reworkRate']),
     [contributionRows]
   );
 

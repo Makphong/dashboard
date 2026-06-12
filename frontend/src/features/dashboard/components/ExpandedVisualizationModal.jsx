@@ -256,7 +256,7 @@ function buildUserBreakdownGroups(segments, contributionRows) {
     const drillGroup = toDrillGroup(segment.segmentType);
     const type = drillGroup === 'Review' || drillGroup === 'ReviewAutoClose'
       ? 'Review'
-      : (drillGroup === 'EditData' || drillGroup === 'EditMeta' ? 'Edit' : '');
+      : (drillGroup === 'EditData' ? 'EditData' : (drillGroup === 'EditMeta' ? 'EditMeta' : ''));
     if (!type) return;
 
     if (preferredUserSet.size > 0 && !preferredUserSet.has(lane)) return;
@@ -280,12 +280,14 @@ function buildUserBreakdownGroups(segments, contributionRows) {
   return orderedUsers.map((user) => {
     const activities = (grouped.get(user) || []).slice().sort((a, b) => a.startTs - b.startTs);
     const reviewSeconds = activities.reduce((sum, item) => sum + (item.type === 'Review' ? item.durationSeconds : 0), 0);
-    const editSeconds = activities.reduce((sum, item) => sum + (item.type === 'Edit' ? item.durationSeconds : 0), 0);
+    const editDataSeconds = activities.reduce((sum, item) => sum + (item.type === 'EditData' ? item.durationSeconds : 0), 0);
+    const editMetaSeconds = activities.reduce((sum, item) => sum + (item.type === 'EditMeta' ? item.durationSeconds : 0), 0);
     return {
       user,
       reviewSeconds,
-      editSeconds,
-      totalSeconds: reviewSeconds + editSeconds,
+      editDataSeconds,
+      editMetaSeconds,
+      totalSeconds: reviewSeconds + editDataSeconds + editMetaSeconds,
       activities,
     };
   }).filter((row) => row.totalSeconds > 0);
@@ -617,7 +619,8 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
     <div className="space-y-5">
       {preparedRows.map((row, index) => {
         const isOpen = openUser === row.user;
-        const editActivities = row.activities.filter((activity) => activity.type === 'Edit');
+        const editDataActivities = row.activities.filter((activity) => activity.type === 'EditData');
+        const editMetaActivities = row.activities.filter((activity) => activity.type === 'EditMeta');
         const reviewActivities = row.activities.filter((activity) => activity.type === 'Review');
 
         return (
@@ -660,11 +663,11 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
             >
               <div ref={isOpen ? contentRef : null} className="border-t border-slate-200" style={{ contain: 'layout paint' }}>
                 <div className="space-y-6 px-5 py-4">
-                  {editActivities.length > 0 ? (
+                  {editDataActivities.length > 0 ? (
                     <div className="overflow-hidden rounded-2xl border border-slate-200">
                       <div className="flex items-center gap-2 bg-[#fff7ed] px-4 py-3 text-[#c2410c]">
                         <span className="h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />
-                        <span className="text-sm font-bold uppercase tracking-[0.18em]">Edit</span>
+                        <span className="text-sm font-bold uppercase tracking-[0.18em]">Edit Data</span>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
@@ -678,7 +681,7 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {editActivities.map((activity, index) => (
+                            {editDataActivities.map((activity, index) => (
                               <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
                                 <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
                                 <td className="px-5 py-4">
@@ -697,7 +700,52 @@ const UserBreakdownDetailView = React.memo(({ rows, segments }) => {
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
                               <td className="px-5 py-4" />
-                              <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(row.editSeconds)}</td>
+                              <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(row.editDataSeconds)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {editMetaActivities.length > 0 ? (
+                    <div className="overflow-hidden rounded-2xl border border-slate-200">
+                      <div className="flex items-center gap-2 bg-[#fef2f2] px-4 py-3 text-[#9a3412]">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#C2410C]" />
+                        <span className="text-sm font-bold uppercase tracking-[0.18em]">Edit Meta</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-white">
+                            <tr className="border-b border-slate-100 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              <th className="px-5 py-3">No.</th>
+                              <th className="px-5 py-3">Activity</th>
+                              <th className="px-5 py-3">Start</th>
+                              <th className="px-5 py-3">End</th>
+                              <th className="px-5 py-3">Duration</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {editMetaActivities.map((activity, index) => (
+                              <tr key={activity.id} className="border-b border-slate-100 last:border-b-0">
+                                <td className="px-5 py-4 font-medium text-slate-500">{index + 1}</td>
+                                <td className="px-5 py-4">
+                                  <div className="font-semibold text-[#17335f]">{activity.activity}</div>
+                                  {activity.documentLabel ? <div className="mt-1 text-xs text-slate-400">{activity.documentLabel}</div> : null}
+                                </td>
+                                <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(activity.start)}</td>
+                                <td className="px-5 py-4 font-medium text-slate-600">{toDisplayDate(activity.end)}</td>
+                                <td className="px-5 py-4 font-bold text-[#17335f]">{formatDuration(activity.durationSeconds)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-slate-200 bg-slate-50/70">
+                              <td className="px-5 py-4 text-sm font-bold text-[#17335f]">Total</td>
+                              <td className="px-5 py-4" />
+                              <td className="px-5 py-4" />
+                              <td className="px-5 py-4" />
+                              <td className="px-5 py-4 text-sm font-bold text-[#17335f]">{formatDuration(row.editMetaSeconds)}</td>
                             </tr>
                           </tfoot>
                         </table>
@@ -1285,7 +1333,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
   );
 
   const contributionAnimationKey = React.useMemo(
-    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editSeconds', 'totalSeconds', 'reworkRate']),
+    () => buildChartAnimationKey(contributionRows, ['reviewSeconds', 'editDataSeconds', 'editMetaSeconds', 'totalSeconds', 'reworkRate']),
     [contributionRows]
   );
 

@@ -7,7 +7,7 @@ import { safeNumber, clampPercent, formatDuration, formatPercent } from '../../l
 export const UserContributionStackChart = React.memo(({ rows = [], expanded = false }) => {
   const [tooltip, setTooltip] = useState({ show: false, x: 0, y: 0, user: '', type: '', duration: '', percent: '', color: '' });
   const [hoveredUser, setHoveredUser] = useState(null);
-  const [hoveredType, setHoveredType] = useState(null); // 'review' | 'edit' | null
+  const [hoveredType, setHoveredType] = useState(null);
   const containerRef = React.useRef(null);
   const tooltipFrameRef = React.useRef(null);
 
@@ -16,12 +16,14 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
     return rows
       .map((row) => {
         const review = safeNumber(row.reviewSeconds);
-        const edit = safeNumber(row.editSeconds);
-        const total = review + edit;
+        const editData = safeNumber(row.editDataSeconds);
+        const editMeta = safeNumber(row.editMetaSeconds);
+        const total = review + editData + editMeta;
         return {
           user: row.user || 'Unknown User',
           review,
-          edit,
+          editData,
+          editMeta,
           total,
           reworkRate: safeNumber(row.reworkRate),
         };
@@ -89,7 +91,11 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
         </div>
         <div className="inline-flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]"></span>
-          Edit
+          Edit Data
+        </div>
+        <div className="inline-flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#C2410C]"></span>
+          Edit Meta
         </div>
       </div>
 
@@ -101,7 +107,8 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
           const currentMax = maxTotal || 1;
           const totalWidth = clampPercent(Math.max((row.total / currentMax) * 100, 12));
           const reviewWidth = row.total > 0 ? clampPercent((row.review / row.total) * 100) : 0;
-          const editWidth = row.total > 0 ? clampPercent((row.edit / row.total) * 100) : 0;
+          const editDataWidth = row.total > 0 ? clampPercent((row.editData / row.total) * 100) : 0;
+          const editMetaWidth = row.total > 0 ? clampPercent((row.editMeta / row.total) * 100) : 0;
           const isUserDimmed = hoveredUser && hoveredUser !== row.user;
 
           return (
@@ -127,23 +134,38 @@ export const UserContributionStackChart = React.memo(({ rows = [], expanded = fa
                       setHoveredUser(null);
                       setHoveredType(null);
                     }}
-                    className={`h-full bg-[#06B6D4] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'edit' ? 'opacity-20' : 'opacity-100'}`} 
+                    className={`h-full bg-[#06B6D4] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType !== null && hoveredType !== 'review' ? 'opacity-20' : 'opacity-100'}`}
                     style={{ width: `${reviewWidth}%` }}
                   />
                   <div 
                     onMouseEnter={(e) => {
-                      handleMouseMove(e, row.user, 'Edit', formatDuration(row.edit), formatPercent(row.edit / (row.total || 1)), '#F59E0B');
+                      handleMouseMove(e, row.user, 'Edit Data', formatDuration(row.editData), formatPercent(row.editData / (row.total || 1)), '#F59E0B');
                       setHoveredUser(row.user);
-                      setHoveredType('edit');
+                      setHoveredType('editData');
                     }}
-                    onMouseMove={(e) => handleMouseMove(e, row.user, 'Edit', formatDuration(row.edit), formatPercent(row.edit / (row.total || 1)), '#F59E0B')}
+                    onMouseMove={(e) => handleMouseMove(e, row.user, 'Edit Data', formatDuration(row.editData), formatPercent(row.editData / (row.total || 1)), '#F59E0B')}
                     onMouseLeave={() => {
                       setTooltip(prev => ({ ...prev, show: false }));
                       setHoveredUser(null);
                       setHoveredType(null);
                     }}
-                    className={`h-full bg-[#F59E0B] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType === 'review' ? 'opacity-20' : 'opacity-100'}`} 
-                    style={{ width: `${editWidth}%` }}
+                    className={`h-full bg-[#F59E0B] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType !== null && hoveredType !== 'editData' ? 'opacity-20' : 'opacity-100'}`}
+                    style={{ width: `${editDataWidth}%` }}
+                  />
+                  <div
+                    onMouseEnter={(e) => {
+                      handleMouseMove(e, row.user, 'Edit Meta', formatDuration(row.editMeta), formatPercent(row.editMeta / (row.total || 1)), '#C2410C');
+                      setHoveredUser(row.user);
+                      setHoveredType('editMeta');
+                    }}
+                    onMouseMove={(e) => handleMouseMove(e, row.user, 'Edit Meta', formatDuration(row.editMeta), formatPercent(row.editMeta / (row.total || 1)), '#C2410C')}
+                    onMouseLeave={() => {
+                      setTooltip(prev => ({ ...prev, show: false }));
+                      setHoveredUser(null);
+                      setHoveredType(null);
+                    }}
+                    className={`h-full bg-[#C2410C] cursor-pointer transition-[width,opacity,filter] duration-500 ease-out hover:brightness-110 ${hoveredUser === row.user && hoveredType !== null && hoveredType !== 'editMeta' ? 'opacity-20' : 'opacity-100'}`}
+                    style={{ width: `${editMetaWidth}%` }}
                   />
                 </div>
               </div>
