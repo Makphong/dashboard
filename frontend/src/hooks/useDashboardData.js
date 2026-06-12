@@ -63,6 +63,8 @@ export function useDashboardData() {
   const [pinnedFiles, setPinnedFiles] = usePersistentState('filter_pinnedFiles', []);
   const [pinnedSheets, setPinnedSheets] = usePersistentState('filter_pinnedSheets', []);
   const [activeDocumentFile, setActiveDocumentFile] = usePersistentState('filter_activeDocumentFile', '');
+  const [fileDisplayNames, setFileDisplayNames] = usePersistentState('filter_fileDisplayNames', {});
+  const [pageDisplayNames, setPageDisplayNames] = usePersistentState('filter_pageDisplayNames', {});
 
   const {
     invalidSheetCounts,
@@ -235,6 +237,10 @@ export function useDashboardData() {
     setPinnedSheets,
     activeDocumentFile,
     setActiveDocumentFile,
+    fileDisplayNames,
+    setFileDisplayNames,
+    pageDisplayNames,
+    setPageDisplayNames,
     documentTree,
     userOptions,
     weekendExcludedCount,

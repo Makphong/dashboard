@@ -48,12 +48,16 @@ export function updateSelectionForSheet({
   return { nextFiles, nextSheets };
 }
 
-export function getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles }) {
+export function getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles, fileDisplayNames = {} }) {
   const pinnedFileSet = new Set(pinnedFiles);
   const searchText = documentFileSearch.trim().toLowerCase();
 
   return documentTree
-    .filter((item) => item.fileName.toLowerCase().includes(searchText))
+    .filter((item) => {
+      const displayName = String(fileDisplayNames[item.fileName] || item.fileName).toLowerCase();
+      const fileName = String(item.fileName || '').toLowerCase();
+      return displayName.includes(searchText) || fileName.includes(searchText);
+    })
     .sort((a, b) => {
       const aPinned = pinnedFileSet.has(a.fileName);
       const bPinned = pinnedFileSet.has(b.fileName);
@@ -68,6 +72,7 @@ export function getFilteredSheetsForActiveFile({
   activeDocumentFile,
   documentSheetSearch,
   pinnedSheets,
+  pageDisplayNames = {},
 }) {
   const pinnedSheetSet = new Set(pinnedSheets);
   const searchText = documentSheetSearch.trim().toLowerCase();
@@ -75,7 +80,12 @@ export function getFilteredSheetsForActiveFile({
 
   const filteredSheetsForActiveFile = activeDocumentEntry
     ? activeDocumentEntry.sheets
-      .filter((sheet) => sheet.toLowerCase().includes(searchText))
+      .filter((sheet) => {
+        const sheetKey = buildSheetKey(activeDocumentFile, sheet);
+        const displayName = String(pageDisplayNames[sheetKey] || sheet).toLowerCase();
+        const sheetName = String(sheet || '').toLowerCase();
+        return displayName.includes(searchText) || sheetName.includes(searchText);
+      })
       .sort((a, b) => {
         const aKey = buildSheetKey(activeDocumentFile, a);
         const bKey = buildSheetKey(activeDocumentFile, b);

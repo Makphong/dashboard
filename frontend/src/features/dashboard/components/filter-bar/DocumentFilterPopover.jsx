@@ -20,6 +20,8 @@ export const DocumentFilterPopover = React.memo(({
   pinnedSheets,
   activeDocumentFile,
   setActiveDocumentFile,
+  fileDisplayNames,
+  pageDisplayNames,
   documentFileSearch,
   setDocumentFileSearch,
   documentSheetSearch,
@@ -29,11 +31,13 @@ export const DocumentFilterPopover = React.memo(({
   onToggleSheetSelection,
   onTogglePinnedFile,
   onTogglePinnedSheet,
+  onRenameFile,
+  onRenamePage,
   onClearSelection,
 }) => {
   const filteredDocumentTree = useMemo(
-    () => getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles }),
-    [documentTree, documentFileSearch, pinnedFiles],
+    () => getFilteredDocumentTree({ documentTree, documentFileSearch, pinnedFiles, fileDisplayNames }),
+    [documentTree, documentFileSearch, pinnedFiles, fileDisplayNames],
   );
 
   const { activeDocumentEntry, filteredSheetsForActiveFile } = useMemo(
@@ -42,8 +46,9 @@ export const DocumentFilterPopover = React.memo(({
       activeDocumentFile,
       documentSheetSearch,
       pinnedSheets,
+      pageDisplayNames,
     }),
-    [documentTree, activeDocumentFile, documentSheetSearch, pinnedSheets],
+    [documentTree, activeDocumentFile, documentSheetSearch, pinnedSheets, pageDisplayNames],
   );
 
   const selectedFileSet = useMemo(() => new Set(selectedFiles), [selectedFiles]);
@@ -79,9 +84,11 @@ export const DocumentFilterPopover = React.memo(({
           selectedFileSet={selectedFileSet}
           activeDocumentFile={activeDocumentFile}
           setActiveDocumentFile={setActiveDocumentFile}
+          fileDisplayNames={fileDisplayNames}
           pinnedFileSet={pinnedFileSet}
           onToggleFileSelection={onToggleFileSelection}
           onTogglePin={onTogglePinnedFile}
+          onRenameFile={onRenameFile}
           onClearSelection={onClearSelection}
         />
 
@@ -92,9 +99,11 @@ export const DocumentFilterPopover = React.memo(({
           setDocumentSheetSearch={setDocumentSheetSearch}
           selectedSheetSet={selectedSheetSet}
           pinnedSheetSet={pinnedSheetSet}
+          pageDisplayNames={pageDisplayNames}
           invalidSheetCounts={invalidSheetCounts}
           onToggleSheetSelection={onToggleSheetSelection}
           onTogglePin={onTogglePinnedSheet}
+          onRenamePage={onRenamePage}
         />
       </div>
     </FilterPopover>
