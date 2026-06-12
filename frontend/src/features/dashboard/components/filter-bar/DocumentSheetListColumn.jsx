@@ -36,7 +36,7 @@ export function DocumentSheetListColumn({
   return (
     <div className="w-1/2 flex flex-col bg-slate-50/30">
       <div className="p-3 border-b border-slate-50 space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sheets for selected file</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">Selected sheet</div>
         <DropdownSearch
           value={documentSheetSearch}
           onChange={setDocumentSheetSearch}
