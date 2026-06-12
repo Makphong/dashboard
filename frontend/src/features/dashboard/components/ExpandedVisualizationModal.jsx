@@ -293,7 +293,7 @@ function buildUserBreakdownGroups(segments, contributionRows) {
   }).filter((row) => row.totalSeconds > 0);
 }
 
-function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit) {
+function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit, mergeSpread) {
   const safeSegments = Array.isArray(segments) ? segments : [];
   const safeSelected = Array.isArray(selectedSegmentTypes) ? selectedSegmentTypes : [];
 
@@ -304,6 +304,12 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
     if (safeSelected.length > 0 && !safeSelected.includes(segmentGroup)) return null;
     if (!showProcessBreakdownIdle && drillGroup === 'Idle') return null;
 
+    if (
+      mergeSpread
+      && (drillGroup === 'Processing' || drillGroup === 'Reprocessing')
+    ) {
+      return { key: 'spread', label: 'Spread', colorClass: 'bg-[#dbeafe] text-[#1d4ed8]', dotClass: 'bg-[#3b82f6]' };
+    }
     if (
       mergeReviewAndEdit
       && (
@@ -347,8 +353,12 @@ function buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBre
   });
 
   const order = mergeReviewAndEdit
-    ? ['uploading', 'processing', 'reprocess', 'review-edit', 'idle']
-    : ['uploading', 'processing', 'reprocess', 'review', 'edit-data', 'edit-meta', 'idle'];
+    ? (mergeSpread
+      ? ['uploading', 'spread', 'review-edit', 'idle']
+      : ['uploading', 'processing', 'reprocess', 'review-edit', 'idle'])
+    : (mergeSpread
+      ? ['uploading', 'spread', 'review', 'edit-data', 'edit-meta', 'idle']
+      : ['uploading', 'processing', 'reprocess', 'review', 'edit-data', 'edit-meta', 'idle']);
 
   return order
     .filter((key) => grouped.has(key))
@@ -812,14 +822,15 @@ const TimeBreakdownDetailView = React.memo(({
   selectedSegmentTypes,
   showProcessBreakdownIdle,
   mergeReviewAndEdit,
+  mergeSpread,
 }) => {
   const [openGroup, setOpenGroup] = React.useState('');
   const [contentHeight, setContentHeight] = React.useState(0);
   const contentRef = React.useRef(null);
 
   const groups = React.useMemo(
-    () => buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit),
-    [segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit]
+    () => buildTimeBreakdownGroups(segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit, mergeSpread),
+    [segments, selectedSegmentTypes, showProcessBreakdownIdle, mergeReviewAndEdit, mergeSpread]
   );
 
   React.useLayoutEffect(() => {
@@ -1253,6 +1264,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
     workloadVisibleRows,
     contributionRows,
     mergeReviewAndEdit,
+    mergeSpread,
     setSelectedGanttSegment,
     timelineSettings,
   } = data;
@@ -1287,8 +1299,12 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       const mergedReviewEdit = totals.Review + totals.EditData + totals.EditMeta;
       items = [
         { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
-        { label: 'Processing', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
-        { label: 'Reprocess', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+        ...(mergeSpread
+          ? [{ label: 'Spread', seconds: totals.Processing + totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Processing }]
+          : [
+            { label: 'Processing', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
+            { label: 'Reprocess', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+          ]),
         { label: 'Review And Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
       ];
     } else {
@@ -1299,6 +1315,25 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
           seconds,
           color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
         }));
+      if (mergeSpread) {
+        const mergedItems = [];
+        let spreadInserted = false;
+        items.forEach((item) => {
+          if (item.label === 'Processing' || item.label === 'Reprocess') {
+            if (!spreadInserted) {
+              mergedItems.push({
+                label: 'Spread',
+                seconds: totals.Processing + totals.Reprocess,
+                color: GANTT_DRILL_GROUP_COLORS.Processing,
+              });
+              spreadInserted = true;
+            }
+            return;
+          }
+          mergedItems.push(item);
+        });
+        items = mergedItems;
+      }
     }
 
     const completeSeconds = (
@@ -1317,7 +1352,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
       });
     }
     return items;
-  }, [ganttVisibleSegments, chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
+  }, [ganttVisibleSegments, chartBaseSegments, mergeReviewAndEdit, mergeSpread, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
     return buildAverageTransitionTimeData(chartBaseSegments || ganttVisibleSegments, {
@@ -1395,6 +1430,7 @@ export const ExpandedVisualizationModal = React.memo(({ visualizationId, onClose
               selectedSegmentTypes={selectedSegmentTypes}
               showProcessBreakdownIdle={showProcessBreakdownIdle}
               mergeReviewAndEdit={mergeReviewAndEdit}
+              mergeSpread={mergeSpread}
             />
           )}
           {visualizationId === 'matrix-detail' && (

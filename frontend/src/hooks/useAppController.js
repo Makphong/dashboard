@@ -24,6 +24,7 @@ export function useAppController(dashboard) {
   const [showProcessBreakdownIdle, setShowProcessBreakdownIdle] = usePersistentState('filter_showProcessBreakdownIdle', true);
   const [showProcessBreakdownLabels, setShowProcessBreakdownLabels] = usePersistentState('filter_showProcessBreakdownLabels', true);
   const [mergeReviewAndEdit, setMergeReviewAndEdit] = usePersistentState('chart_mergeReviewAndEdit', true);
+  const [mergeSpread, setMergeSpread] = usePersistentState('chart_mergeSpread', false);
   const [ganttSingleLaneMode, setGanttSingleLaneMode] = usePersistentState('filter_ganttSingleLaneMode', false);
   const [showSystemLane, setShowSystemLane] = usePersistentState('filter_showSystemLane', true);
   const [showStarMarkers, setShowStarMarkers] = usePersistentState('filter_showStarMarkers', true);
@@ -121,6 +122,8 @@ export function useAppController(dashboard) {
     setShowProcessBreakdownLabels,
     mergeReviewAndEdit,
     setMergeReviewAndEdit,
+    mergeSpread,
+    setMergeSpread,
     ganttSingleLaneMode,
     setGanttSingleLaneMode,
     showSystemLane,

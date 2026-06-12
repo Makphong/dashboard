@@ -55,6 +55,8 @@ export const DashboardView = React.memo(({
   setShowProcessBreakdownLabels,
   mergeReviewAndEdit,
   setMergeReviewAndEdit,
+  mergeSpread,
+  setMergeSpread,
   ganttSingleLaneMode,
   setGanttSingleLaneMode,
   showSystemLane,
@@ -109,8 +111,12 @@ export const DashboardView = React.memo(({
       const mergedReviewEdit = totals.Review + totals.EditData + totals.EditMeta;
       items = [
         { label: 'Uploading', seconds: totals.Uploading, color: GANTT_DRILL_GROUP_COLORS.Uploading },
-        { label: 'First Spread', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
-        { label: 'Second Spread', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+        ...(mergeSpread
+          ? [{ label: 'Spread', seconds: totals.Processing + totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Processing }]
+          : [
+            { label: 'First Spread', seconds: totals.Processing, color: GANTT_DRILL_GROUP_COLORS.Processing },
+            { label: 'Second Spread', seconds: totals.Reprocess, color: GANTT_DRILL_GROUP_COLORS.Reprocessing },
+          ]),
         { label: 'Review & Edit', seconds: mergedReviewEdit, color: '#F59E0B' },
       ];
     } else {
@@ -122,6 +128,25 @@ export const DashboardView = React.memo(({
           seconds,
           color: GANTT_DRILL_GROUP_COLORS[label === 'Reprocess' ? 'Reprocessing' : label] || '#94A3B8'
         }));
+      if (mergeSpread) {
+        const mergedItems = [];
+        let spreadInserted = false;
+        items.forEach((item) => {
+          if (item.label === 'First Spread' || item.label === 'Second Spread') {
+            if (!spreadInserted) {
+              mergedItems.push({
+                label: 'Spread',
+                seconds: totals.Processing + totals.Reprocess,
+                color: GANTT_DRILL_GROUP_COLORS.Processing,
+              });
+              spreadInserted = true;
+            }
+            return;
+          }
+          mergedItems.push(item);
+        });
+        items = mergedItems;
+      }
     }
 
     const completeSeconds = (
@@ -140,7 +165,7 @@ export const DashboardView = React.memo(({
       });
     }
     return items;
-  }, [chartBaseSegments, mergeReviewAndEdit, showProcessBreakdownIdle]);
+  }, [chartBaseSegments, mergeReviewAndEdit, mergeSpread, showProcessBreakdownIdle]);
 
   const transitionTimeData = React.useMemo(() => {
     return buildAverageTransitionTimeData(chartBaseSegments, {
@@ -359,6 +384,7 @@ export const DashboardView = React.memo(({
                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Process Settings</div>
                     <div className="space-y-3">
                       <ToggleSetting checked={mergeReviewAndEdit} onChange={() => setMergeReviewAndEdit(!mergeReviewAndEdit)}>Merge Review & Edit</ToggleSetting>
+                      <ToggleSetting checked={mergeSpread} onChange={() => setMergeSpread(!mergeSpread)}>Merge Spread</ToggleSetting>
                       <ToggleSetting checked={showProcessBreakdownLabels} onChange={() => setShowProcessBreakdownLabels(!showProcessBreakdownLabels)}>Show Bar Labels</ToggleSetting>
                     </div>
                   </div>

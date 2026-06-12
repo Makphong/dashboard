@@ -160,6 +160,8 @@ function App() {
                 setShowProcessBreakdownLabels={controller.setShowProcessBreakdownLabels}
                 mergeReviewAndEdit={controller.mergeReviewAndEdit}
                 setMergeReviewAndEdit={controller.setMergeReviewAndEdit}
+                mergeSpread={controller.mergeSpread}
+                setMergeSpread={controller.setMergeSpread}
                 ganttSingleLaneMode={controller.ganttSingleLaneMode}
                 setGanttSingleLaneMode={controller.setGanttSingleLaneMode}
                 showSystemLane={controller.showSystemLane}
@@ -197,6 +199,7 @@ function App() {
               workloadVisibleRows: controller.workloadVisibleRows,
               contributionRows: dashboard.contributionRows,
               mergeReviewAndEdit: controller.mergeReviewAndEdit,
+              mergeSpread: controller.mergeSpread,
               setSelectedGanttSegment: controller.setSelectedGanttSegment,
               timelineSettings: {
                 singleLane: controller.ganttSingleLaneMode,
