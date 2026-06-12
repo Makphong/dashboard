@@ -21,6 +21,8 @@ export const DateRangeFilterPopover = React.memo(({
   setDateStart,
   dateEnd,
   setDateEnd,
+  excludeWeekends,
+  setExcludeWeekends,
 }) => {
   return (
     <FilterPopover
@@ -30,7 +32,7 @@ export const DateRangeFilterPopover = React.memo(({
       openDropdown={openDropdown}
       setOpenDropdown={setOpenDropdown}
       icon={Calendar}
-      active={datePreset !== 'all'}
+      active={datePreset !== 'all' || excludeWeekends}
       minWidthClass="min-w-[190px] max-sm:min-w-0"
     >
       <div className="p-4 space-y-4">
@@ -76,6 +78,23 @@ export const DateRangeFilterPopover = React.memo(({
             </div>
           </div>
         )}
+
+        <div className="pt-3 border-t border-slate-100 space-y-2">
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <div className="text-sm font-semibold text-slate-700">Exclude Weekends</div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={excludeWeekends}
+              onClick={() => setExcludeWeekends((prev) => !prev)}
+              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${excludeWeekends ? 'bg-[#00a4e4]' : 'bg-slate-300'}`}
+            >
+              <span
+                className={`inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white shadow-sm transition-transform ${excludeWeekends ? 'translate-x-5' : 'translate-x-0.5'}`}
+              />
+            </button>
+          </label>
+        </div>
       </div>
     </FilterPopover>
   );

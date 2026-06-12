@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  applyWeekendExclusionToSegments,
   buildDocumentTree,
   buildUserOptions,
   getDateRangeBounds,
@@ -18,6 +19,7 @@ export function useDashboardDerivedData(params) {
     selectedFiles,
     selectedSheets,
     selectedSegmentTypes,
+    excludeWeekends,
   } = params;
 
   const segments = performance?.segments || [];
@@ -28,7 +30,14 @@ export function useDashboardDerivedData(params) {
     [selectedSegmentTypes]
   );
 
-  const parsedSegments = useMemo(() => parseSegments(segments), [segments]);
+  const rawParsedSegments = useMemo(() => parseSegments(segments), [segments]);
+
+  const weekendAdjusted = useMemo(
+    () => (excludeWeekends ? applyWeekendExclusionToSegments(rawParsedSegments) : { segments: rawParsedSegments, affectedCount: 0 }),
+    [excludeWeekends, rawParsedSegments]
+  );
+
+  const parsedSegments = weekendAdjusted.segments;
 
   const documentTree = useMemo(
     () => buildDocumentTree(sources, parsedSegments),
@@ -43,14 +52,17 @@ export function useDashboardDerivedData(params) {
       datePreset,
       dateStart,
       dateEnd,
+      excludeWeekends,
     }),
-    [parsedSegments, selectedSheets, selectedFiles, datePreset, dateStart, dateEnd]
+    [parsedSegments, selectedSheets, selectedFiles, datePreset, dateStart, dateEnd, excludeWeekends]
   );
 
   const dateRangeBounds = useMemo(
-    () => getDateRangeBounds(parsedSegments, datePreset, dateStart, dateEnd),
-    [parsedSegments, datePreset, dateStart, dateEnd]
+    () => getDateRangeBounds(rawParsedSegments, datePreset, dateStart, dateEnd),
+    [rawParsedSegments, datePreset, dateStart, dateEnd]
   );
+
+  const weekendExcludedCount = excludeWeekends ? weekendAdjusted.affectedCount : 0;
 
   const segmentTypeOptions = useMemo(() => SEGMENT_GROUP_OPTIONS, []);
 
@@ -60,6 +72,7 @@ export function useDashboardDerivedData(params) {
     documentTree,
     userOptions,
     dateRangeBounds,
+    weekendExcludedCount,
     segmentTypeOptions,
     normalizedSelectedSegmentTypes,
   };

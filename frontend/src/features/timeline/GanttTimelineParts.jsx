@@ -27,7 +27,7 @@ export const GanttLegend = ({ items }) => (
   </div>
 );
 
-export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth, headerHeight, visibleTicks, getX }) => (
+export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth, headerHeight, visibleTicks, getX, getLabelTs }) => (
   <div className="scroll-clarity-layer flex border-b border-slate-200 bg-slate-50/95 sticky top-0 z-20">
     <div style={{ width: laneLabelWidth }} className="shrink-0 border-r border-slate-200 p-3 max-sm:px-2 flex items-center">
       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-sm:text-[9px]">Lane</span>
@@ -36,8 +36,10 @@ export const GanttHeader = ({ laneLabelWidth, headerScrollRef, timelineSvgWidth,
       <svg width={timelineSvgWidth} height={headerHeight}>
         {visibleTicks.map((tick, idx) => {
           const x = getX(tick);
-          const header = formatTickHeader(tick);
-          const showDate = idx === 0 || !isSameCalendarDay(visibleTicks[idx - 1], tick);
+          const labelTs = getLabelTs ? getLabelTs(tick) : tick;
+          const previousLabelTs = idx > 0 ? (getLabelTs ? getLabelTs(visibleTicks[idx - 1]) : visibleTicks[idx - 1]) : null;
+          const header = formatTickHeader(labelTs);
+          const showDate = idx === 0 || !isSameCalendarDay(previousLabelTs, labelTs);
           return (
             <g key={tick}>
               <line x1={x} x2={x} y1={headerHeight - 15} y2={headerHeight} stroke="#CBD5E1" />

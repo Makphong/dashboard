@@ -92,14 +92,14 @@ export function SegmentDetailPopup({ segment, onClose }) {
               <div className="grid grid-cols-2 gap-4 md:gap-8 pt-4 md:pt-5 border-t border-[#eef8fd]">
                 <div>
                   <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-1.5">Execution Start</div>
-                  <div className="text-[11px] md:text-[13px] font-bold text-slate-700">
-                    {toDisplayDate(segment.start)}
+                <div className="text-[11px] md:text-[13px] font-bold text-slate-700">
+                    {toDisplayDate(segment.displayStart || segment.start)}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 md:mb-1.5">Execution End</div>
                   <div className="text-[11px] md:text-[13px] font-bold text-slate-700">
-                    {toDisplayDate(segment.end)}
+                    {toDisplayDate(segment.displayEnd || segment.end)}
                   </div>
                 </div>
               </div>

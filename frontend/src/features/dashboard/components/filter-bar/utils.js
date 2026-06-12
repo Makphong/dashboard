@@ -91,11 +91,13 @@ export function getFilteredSheetsForActiveFile({
 }
 
 export function getDateRangeSummary(datePreset, dateStart, dateEnd) {
-  if (datePreset === 'all') return 'All Time';
-  if (datePreset === 'custom') return `${dateStart} - ${dateEnd}`;
-  if (datePreset === '7d') return 'Last 7 Days';
-  if (datePreset === '30d') return 'Last 30 Days';
-  return 'Last 90 Days';
+  let summary = 'Last 90 Days';
+  if (datePreset === 'all') summary = 'All Time';
+  else if (datePreset === 'custom') summary = `${dateStart} - ${dateEnd}`;
+  else if (datePreset === '7d') summary = 'Last 7 Days';
+  else if (datePreset === '30d') summary = 'Last 30 Days';
+
+  return summary;
 }
 
 export function getDocumentSummary(selectedFiles, selectedSheets) {

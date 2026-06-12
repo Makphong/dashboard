@@ -52,6 +52,7 @@ export function useDashboardData() {
   const [datePreset, setDatePreset] = usePersistentState('filter_datePreset', 'all');
   const [dateStart, setDateStart] = usePersistentState('filter_dateStart', '');
   const [dateEnd, setDateEnd] = usePersistentState('filter_dateEnd', '');
+  const [excludeWeekends, setExcludeWeekends] = usePersistentState('filter_excludeWeekends', false);
   const [selectedFiles, setSelectedFiles] = usePersistentState('filter_selectedFiles', []);
   const [selectedSheets, setSelectedSheets] = usePersistentState('filter_selectedSheets', []);
   const [selectedUsers, setSelectedUsers] = usePersistentState('filter_selectedUsers', []);
@@ -69,6 +70,7 @@ export function useDashboardData() {
     documentTree,
     userOptions,
     dateRangeBounds,
+    weekendExcludedCount,
     segmentTypeOptions,
     normalizedSelectedSegmentTypes,
   } = useDashboardDerivedData({
@@ -77,6 +79,7 @@ export function useDashboardData() {
     datePreset,
     dateStart,
     dateEnd,
+    excludeWeekends,
     selectedFiles,
     selectedSheets,
     selectedSegmentTypes,
@@ -89,6 +92,7 @@ export function useDashboardData() {
     selectedSegmentTypes: normalizedSelectedSegmentTypes,
     showIdle,
     dateRangeBounds,
+    excludeWeekends,
   });
 
   const {
@@ -209,6 +213,8 @@ export function useDashboardData() {
     setDateStart,
     dateEnd,
     setDateEnd,
+    excludeWeekends,
+    setExcludeWeekends,
     selectedFiles,
     setSelectedFiles,
     selectedSheets,
@@ -231,6 +237,7 @@ export function useDashboardData() {
     setActiveDocumentFile,
     documentTree,
     userOptions,
+    weekendExcludedCount,
     segmentTypeOptions,
     invalidSheetCounts,
     ganttVisibleSegments,

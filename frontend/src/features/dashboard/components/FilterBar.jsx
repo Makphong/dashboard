@@ -28,6 +28,9 @@ export const FilterBar = React.memo(({
     setDateStart,
     dateEnd,
     setDateEnd,
+    excludeWeekends,
+    setExcludeWeekends,
+    weekendExcludedCount,
     selectedFiles,
     setSelectedFiles,
     selectedSheets,
@@ -99,6 +102,9 @@ export const FilterBar = React.memo(({
             setDateStart={setDateStart}
             dateEnd={dateEnd}
             setDateEnd={setDateEnd}
+            excludeWeekends={excludeWeekends}
+            setExcludeWeekends={setExcludeWeekends}
+            weekendExcludedCount={weekendExcludedCount}
           />
 
           <DocumentFilterPopover

@@ -10,6 +10,7 @@ export function useDashboardFilters(parsedSegments, filters) {
     selectedSegmentTypes,
     showIdle,
     dateRangeBounds,
+    excludeWeekends,
   } = filters;
 
   const filteredBaseSegments = useMemo(() => {
@@ -27,7 +28,10 @@ export function useDashboardFilters(parsedSegments, filters) {
     }
 
     return parsedSegments.filter((segment) => {
-      if (segment.endTs < dateRangeBounds.minTs || segment.startTs > dateRangeBounds.maxTs) return false;
+      const rangeStartTs = segment.rawStartTs ?? segment.startTs;
+      const rangeEndTs = segment.rawEndTs ?? segment.endTs;
+      if (rangeEndTs < dateRangeBounds.minTs || rangeStartTs > dateRangeBounds.maxTs) return false;
+      if (excludeWeekends && (Number(segment.durationSeconds) || 0) <= 0) return false;
 
       const fileSelected = fileSet.has(segment.fileName);
       const sheetSelected = sheetSet.has(segment.sheetKey);
@@ -46,7 +50,7 @@ export function useDashboardFilters(parsedSegments, filters) {
 
       return true;
     });
-  }, [parsedSegments, dateRangeBounds, selectedFiles, selectedSheets, selectedUsers]);
+  }, [parsedSegments, dateRangeBounds, selectedFiles, selectedSheets, selectedUsers, excludeWeekends]);
 
   const ganttVisibleSegments = useMemo(() => {
     return filteredBaseSegments.filter((segment) => {

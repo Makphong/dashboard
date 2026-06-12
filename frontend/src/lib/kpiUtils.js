@@ -68,7 +68,7 @@ export function buildKpisFromSegments(segments) {
 
   const effectiveDuration = (segment) => safeNumber(segment?.durationSeconds);
 
-  const activeUserTimeSeconds = userSegments.reduce((sum, segment) => sum + effectiveDuration(segment), 0);
+  const activeUserTimeSeconds = coreUserSegments.reduce((sum, segment) => sum + effectiveDuration(segment), 0);
   const coreActiveUserTimeSeconds = coreUserSegments.reduce((sum, segment) => sum + effectiveDuration(segment), 0);
   const contributingUsers = new Set(
     userSegments

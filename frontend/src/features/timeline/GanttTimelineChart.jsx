@@ -6,6 +6,7 @@ import {
   GANTT_DRILL_GROUP_LABELS
 } from '../../lib/constants.js';
 import { mapSegmentsToRows } from './timelineUtils.js';
+import { resolveBusinessAxisTimestamp } from '../dashboard/utils/segmentData.js';
 import {
   buildGanttDisplayBounds,
   buildGanttGapInfo,
@@ -66,6 +67,29 @@ export const GanttTimelineChart = ({
   }, []);
 
   const mapped = useMemo(() => mapSegmentsToRows(segments, singleLane), [segments, singleLane]);
+
+  const axisBaseRawTs = useMemo(() => {
+    if (mapped.length === 0) return null;
+    const rawStarts = mapped
+      .map((segment) => Number(segment.rawStartTs))
+      .filter((value) => Number.isFinite(value));
+    if (rawStarts.length === 0) return null;
+    return Math.min(...rawStarts);
+  }, [mapped]);
+
+  const useBusinessAxisLabels = useMemo(
+    () => mapped.some((segment) => (
+      Number.isFinite(segment.rawStartTs)
+      && Number.isFinite(segment.rawEndTs)
+      && (segment.rawStartTs !== segment.startTs || segment.rawEndTs !== segment.endTs)
+    )),
+    [mapped]
+  );
+
+  const getLabelTs = useCallback((projectedTs) => {
+    if (!useBusinessAxisLabels || !Number.isFinite(axisBaseRawTs)) return projectedTs;
+    return resolveBusinessAxisTimestamp(axisBaseRawTs, projectedTs);
+  }, [useBusinessAxisLabels, axisBaseRawTs]);
 
   useEffect(() => {
     const updateSize = () => {
@@ -358,7 +382,13 @@ export const GanttTimelineChart = ({
 
   const pickSegment = (segment) => {
     setHoveredSegment(null);
-    if (typeof onSelectSegment === 'function') onSelectSegment(segment);
+    if (typeof onSelectSegment === 'function') {
+      onSelectSegment({
+        ...segment,
+        displayStart: new Date(getLabelTs(segment.startTs)).toISOString(),
+        displayEnd: new Date(getLabelTs(segment.endTs)).toISOString(),
+      });
+    }
   };
 
   const showTooltip = (event, segment, lane, color) => {
@@ -373,6 +403,8 @@ export const GanttTimelineChart = ({
     const rect = containerRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    const resolvedStartTs = getLabelTs(segment.startTs);
+    const resolvedEndTs = getLabelTs(segment.endTs);
     const nextHoveredSegment = {
       x: Math.max(8, Math.min(x + 12, rect.width - 318)),
       y: Math.max(8, Math.min(y + 12, rect.height - 132)),
@@ -380,8 +412,8 @@ export const GanttTimelineChart = ({
       color,
       groupLabel: GANTT_DRILL_GROUP_LABELS[segment.drillGroup] || segment.drillGroup,
       segmentType: segment.segmentType,
-      start: segment.start,
-      end: segment.end,
+      start: new Date(resolvedStartTs).toISOString(),
+      end: new Date(resolvedEndTs).toISOString(),
       durationSeconds: segment.durationSeconds,
     };
 
@@ -425,6 +457,7 @@ export const GanttTimelineChart = ({
           headerHeight={headerHeight}
           visibleTicks={visibleTicks}
           getX={getX}
+          getLabelTs={getLabelTs}
         />
 
         <div
