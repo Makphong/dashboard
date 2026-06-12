@@ -182,7 +182,7 @@ export const GanttTimelineChart = ({
 
   const timelinePadLeft = 14;
   const timelinePadRight = 18;
-  const minTimelinePx = collapseGaps ? (singleLane ? 1950 : 1600) : 2200;
+  const minTimelinePx = collapseGaps ? (singleLane ? 2 : 2) : 2;
   const baseTimelineWidth = Math.min(120000, Math.max(minTimelinePx, Math.round(displaySpanHours * pxPerHour)));
   const timelineWidth = Math.min(GANTT_MAX_TIMELINE_WIDTH_PX, Math.max(minTimelinePx, Math.round(baseTimelineWidth * zoomScale)));
   const baseCompactedTs = useMemo(() => compactTs(displayMinTs), [compactTs, displayMinTs]);
